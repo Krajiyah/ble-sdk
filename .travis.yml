@@ -4,9 +4,12 @@ go:
   - 1.10.x
 
 env:
-  - GO111MODULE=on
-  - secure: "TODO add shared (encrypted) secret for secure ble connections"
+  global:
+    - GO111MODULE=on
+    - secure: "TODO add shared (encrypted) secret for secure ble connections"
 
 install: true
 
-script: make build && make test
+scripts: 
+  - make build
+  - make test
