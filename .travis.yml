@@ -4,12 +4,13 @@ go:
   - 1.10.x
 
 env:
+  - GO111MODULE=on
   - secure: "TODO add shared (encrypted) secret for secure ble connections"
+
+install: true
 
 jobs:
   include:
-    - stage: Pull Dependencies
-      script: make install
     - stage: Build
       script: make build
     - stage: Test
