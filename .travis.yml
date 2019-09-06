@@ -9,9 +9,4 @@ env:
 
 install: true
 
-jobs:
-  include:
-    - stage: Build
-      script: make build
-    - stage: Test
-      script: make test
+script: make build && make test

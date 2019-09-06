@@ -19,5 +19,5 @@ build:
 	go build -o $(BINARY_CLIENT_DST) examples/client/main.go
 	go build -o $(BINARY_SERVER_DST) examples/server/main.go
 
-testt:
+test:
 	go test -v test/*_test.go
