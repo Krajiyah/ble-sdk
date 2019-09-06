@@ -4,9 +4,7 @@ go:
   - 1.10.x
 
 env:
-  global:
-    - GO111MODULE=on
-    - secure: "TODO add shared (encrypted) secret for secure ble connections"
+  - GO111MODULE=on BLESECRET=ci-secret
 
 install: true
 
