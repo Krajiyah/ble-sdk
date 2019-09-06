@@ -8,6 +8,4 @@ env:
 
 install: true
 
-scripts: 
-  - make build
-  - make test
+script: make build && make test
