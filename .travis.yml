@@ -1,0 +1,16 @@
+language: go
+
+go:
+  - 1.10.x
+
+env:
+  - secure: "TODO add shared (encrypted) secret for secure ble connections"
+
+jobs:
+  include:
+    - stage: Pull Dependencies
+      script: make install
+    - stage: Build
+      script: make build
+    - stage: Test
+      script: make test
