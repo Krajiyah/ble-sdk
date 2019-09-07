@@ -30,41 +30,24 @@ func getSamplePacket() BLEPacket {
 	return packet
 }
 
-func TestGetPacketsFromData(t *testing.T) {
-	data := getRandBytes(t)
-	packets := GetPacketsFromData(data)
-	assert.Equal(t, len(packets), numPackets)
-	for index, packet := range packets {
-		assert.Assert(t, len(packet.Guid) > 0)
-		assert.Equal(t, packet.Index, index)
-		assert.Equal(t, packet.Total, numPackets)
-		assert.Assert(t, len(packet.Checksum) > 0)
-	}
-}
-
 func TestAddPacketAndGetPacketStreams(t *testing.T) {
 	packet := getSamplePacket()
 	packetData, err := packet.Data()
 	assert.NilError(t, err)
 	pa := NewPacketAggregator()
-	err = pa.AddPacketFromPacketBytes(packetData)
+	g, err := pa.AddPacketFromPacketBytes(packetData)
 	assert.NilError(t, err)
-	actual := pa.GetPacketStreams()
-	assert.DeepEqual(t, actual, []string{dummyGuid})
+	assert.Equal(t, packet.Guid, g)
+	ok := pa.HasDataFromPacketStream(g)
+	assert.Assert(t, ok)
 }
 
 func TestGetDataFromPackets(t *testing.T) {
 	expected := getRandBytes(t)
-	packets := GetPacketsFromData(expected)
 	pa := NewPacketAggregator()
-	guid := packets[0].Guid
-	for _, packet := range packets {
-		packetData, err := packet.Data()
-		assert.NilError(t, err)
-		err = pa.AddPacketFromPacketBytes(packetData)
-		assert.NilError(t, err)
-	}
-	actual, err := pa.GetDataFromPackets(guid)
+	guid, err := pa.AddData(expected)
+	assert.NilError(t, err)
+	actual, err := pa.PopAllDataFromPackets(guid)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, actual, expected)
 }

@@ -13,11 +13,12 @@ import (
 )
 
 const (
-	errCheckSumMismatch = "Packet data is corrupted! Reason: checksum mismatch"
-	errTotalMismatch    = "Packet data is corrupted! Reason: packet total mismatch"
-	errIndexOutOfBounds = "Packet data is corrupted! Reason: packet index out of bounds"
-	errMixedPackets     = "Packet data is corrupted! Reason: packets are from mixed packet streams"
-	errNotEnoughPackets = "Packet data is corrupted! Reason: not enough packets were received"
+	errCheckSumMismatch     = "Packet data is corrupted! Reason: checksum mismatch"
+	errTotalMismatch        = "Packet data is corrupted! Reason: packet total mismatch"
+	errIndexOutOfBounds     = "Packet data is corrupted! Reason: packet index out of bounds"
+	errMixedPackets         = "Packet data is corrupted! Reason: packets are from mixed packet streams"
+	errNotEnoughPackets     = "Packet data is corrupted! Reason: not enough packets were received"
+	errNoPacketDataInStream = "Can't pop packet data since no packets in stream from input guid"
 )
 
 // BLEPacket is a struct used for packaging data within MTU chunks
@@ -50,8 +51,7 @@ func NewPacketAggregator() PacketAggregator {
 	return PacketAggregator{map[string][]BLEPacket{}}
 }
 
-// GetPacketsFromData chunks data into MTU sizes
-func GetPacketsFromData(data []byte) []BLEPacket {
+func getPacketsFromData(data []byte) []BLEPacket {
 	l := []BLEPacket{}
 	guid := getUUID()
 	checksum := GetChecksum(data)
@@ -69,8 +69,81 @@ func GetPacketsFromData(data []byte) []BLEPacket {
 	return l
 }
 
-// GetDataFromPackets aggregates all the packets and confirms if data accurate
-func (pa *PacketAggregator) GetDataFromPackets(guid string) ([]byte, error) {
+// PopAllDataFromPackets aggregates all the packets and confirms if data accurate
+func (pa *PacketAggregator) PopAllDataFromPackets(guid string) ([]byte, error) {
+	ret, err := pa.getAllDataFromPackets(guid)
+	if err != nil {
+		return nil, err
+	}
+	pa.store[guid] = []BLEPacket{}
+	return ret, nil
+}
+
+// AddPacketFromPacketBytes will take the input bytes, parse to packet struct, and add to store (returns guid)
+func (pa *PacketAggregator) AddPacketFromPacketBytes(packetBytes []byte) (string, error) {
+	buf := bytes.NewBuffer(packetBytes)
+	dec := gob.NewDecoder(buf)
+	var packet BLEPacket
+	err := dec.Decode(&packet)
+	if err != nil {
+		return "", err
+	}
+	pa.initStore(packet.Guid)
+	tmp := pa.store[packet.Guid]
+	tmp = append(tmp, packet)
+	pa.store[packet.Guid] = tmp
+	return packet.Guid, nil
+}
+
+// AddData will take input bytes, get packets from bytes, and call AddPacketFromPacketBytes black box
+func (pa *PacketAggregator) AddData(data []byte) (string, error) {
+	packets := getPacketsFromData(data)
+	var guid string
+	for _, packet := range packets {
+		data, err := packet.Data()
+		if err != nil {
+			return "", err
+		}
+		guid, err = pa.AddPacketFromPacketBytes(data)
+		if err != nil {
+			return "", err
+		}
+	}
+	return guid, nil
+}
+
+// HasDataFromPacketStream returns true if all packet data is in correctly for a given guid stream
+func (pa *PacketAggregator) HasDataFromPacketStream(guid string) bool {
+	_, err := pa.getAllDataFromPackets(guid)
+	return err == nil
+}
+
+// PopPacketDataFromStream returns next packet in (index) order in the given guid stream
+func (pa *PacketAggregator) PopPacketDataFromStream(guid string) ([]byte, bool, error) {
+	pa.initStore(guid)
+	if len(pa.store[guid]) == 0 {
+		return nil, false, errors.New(errNoPacketDataInStream)
+	}
+	packet := pa.store[guid][0]
+	data, err := packet.Data()
+	if err != nil {
+		return nil, false, err
+	}
+	tmp := pa.store[guid]
+	tmp = tmp[1:]
+	pa.store[guid] = tmp
+	isLastPacket := packet.Index+1 == packet.Total
+	return data, isLastPacket, nil
+}
+
+func (pa *PacketAggregator) initStore(guid string) {
+	if _, ok := pa.store[guid]; !ok {
+		pa.store[guid] = []BLEPacket{}
+	}
+}
+
+func (pa *PacketAggregator) getAllDataFromPackets(guid string) ([]byte, error) {
+	pa.initStore(guid)
 	packets := pa.store[guid]
 	slice.Sort(packets, func(i, j int) bool {
 		return packets[i].Index < packets[j].Index
@@ -103,33 +176,6 @@ func (pa *PacketAggregator) GetDataFromPackets(guid string) ([]byte, error) {
 		return nil, errors.New(errNotEnoughPackets)
 	}
 	return ret, nil
-}
-
-// AddPacketFromPacketBytes will take the input bytes, parse to packet struct, and add to store
-func (pa *PacketAggregator) AddPacketFromPacketBytes(packetBytes []byte) error {
-	buf := bytes.NewBuffer(packetBytes)
-	dec := gob.NewDecoder(buf)
-	var packet BLEPacket
-	err := dec.Decode(&packet)
-	if err != nil {
-		return err
-	}
-	tmp := pa.store[packet.Guid]
-	tmp = append(tmp, packet)
-	pa.store[packet.Guid] = tmp
-	return nil
-}
-
-// GetPacketStreams will yield list of guids which have all the packets it needs
-func (pa *PacketAggregator) GetPacketStreams() []string {
-	ret := []string{}
-	for guid := range pa.store {
-		_, err := pa.GetDataFromPackets(guid)
-		if err == nil {
-			ret = append(ret, guid)
-		}
-	}
-	return ret
 }
 
 func getUUID() string {

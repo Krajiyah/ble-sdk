@@ -16,8 +16,11 @@ install:
 	go mod vendor
 
 build:
-	go build -o $(BINARY_CLIENT_DST) examples/client/main.go
-	go build -o $(BINARY_SERVER_DST) examples/server/main.go
+ifndef BLESECRET
+	$(error BLESECRET must be set)
+endif
+	go build -ldflags "-X main.BLESecret=$(BLESECRET)" -o $(BINARY_CLIENT_DST) examples/client/main.go
+	go build -ldflags "-X main.BLESecret=$(BLESECRET)" -o $(BINARY_SERVER_DST) examples/server/main.go
 
 test:
 	go test -v test/**/*_test.go
