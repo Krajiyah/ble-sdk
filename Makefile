@@ -20,4 +20,4 @@ build:
 	go build -o $(BINARY_SERVER_DST) examples/server/main.go
 
 test:
-	go test -v test/*_test.go
+	go test -v test/**/*_test.go
