@@ -28,10 +28,12 @@ func (l *emptyListener) onServerStatusChanged(s BLEServerStatus, err error)     
 func (l *emptyListener) onClientStateMapChanged(m map[string]client.BLEClientState) {}
 func (l *emptyListener) onClientLog(r *models.ClientLogRequest)                     {}
 
-type mockConn struct{}
+type mockConn struct {
+	ctx context.Context
+}
 
-func (c *mockConn) Context() context.Context          { return context.Background() }
-func (c *mockConn) SetContext(ctx context.Context)    {}
+func (c *mockConn) Context() context.Context          { return c.ctx }
+func (c *mockConn) SetContext(ctx context.Context)    { c.ctx = ctx }
 func (c *mockConn) LocalAddr() ble.Addr               { return ble.NewAddr(dummyAddr) }
 func (c *mockConn) RemoteAddr() ble.Addr              { return ble.NewAddr(dummyAddr) }
 func (c *mockConn) RxMTU() int                        { return util.MTU }
@@ -66,7 +68,7 @@ func getDummyServer() *BLEServer {
 }
 
 func getMockReq(data []byte) ble.Request {
-	return ble.NewRequest(&mockConn{}, data, 0)
+	return ble.NewRequest(&mockConn{context.Background()}, data, 0)
 }
 
 func getMockRsp(data []byte) ble.ResponseWriter {
@@ -115,16 +117,15 @@ func TestReadHandler(t *testing.T) {
 	})
 	guid := ""
 
+	req := getMockReq([]byte{})
+	rsp := getMockRsp([]byte{})
 	for !pa.HasDataFromPacketStream(guid) {
 		// test read handler behavior
-		req := getMockReq([]byte{})
-		rsp := getMockRsp([]byte{})
 		handler(req, rsp)
 
 		// mock client read
 		var err error
 		guid, err = pa.AddPacketFromPacketBytes(testReadHandlerPacketBuffer.Bytes())
-		// TODO: fix bug guid changes every new packet comes in
 		assert.NilError(t, err)
 	}
 
