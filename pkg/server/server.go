@@ -10,7 +10,7 @@ import (
 	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/examples/lib/dev"
+	"github.com/currantlabs/ble/linux"
 )
 
 const (
@@ -47,7 +47,7 @@ type BLEServerStatusListener interface {
 // NewBLEServer creates a new BLEService
 func NewBLEServer(name string, secret string, listener BLEServerStatusListener) (*BLEServer, error) {
 	server := &BLEServer{name, secret, Running, map[string]BLEClientState{}, util.NewPacketAggregator(), listener}
-	d, err := dev.NewDevice("default")
+	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,6 @@ func (server *BLEServer) setClientState(addr string, state BLEClientState) {
 
 func newClientStatusChar(server *BLEServer) *ble.Characteristic {
 	lastHeard := map[string]int64{}
-
 	c := newWriteChar(server, ClientStateUUID, func(addr string, data []byte, err error) {
 		if err != nil {
 			// TODO: how to handle error?

@@ -26,6 +26,26 @@ type ClientLogRequest struct {
 	Message string
 }
 
+func encode(x interface{}) ([]byte, error) {
+	buf := bytes.NewBuffer([]byte{})
+	enc := gob.NewEncoder(buf)
+	err := enc.Encode(x)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Data will return serialized form of struct as bytes
+func (c *ClientStateRequest) Data() ([]byte, error) {
+	return encode(c)
+}
+
+// Data will return serialized form of struct as bytes
+func (c *ClientLogRequest) Data() ([]byte, error) {
+	return encode(c)
+}
+
 // GetClientStateRequestFromBytes constructs client state request from characteristic write payload
 func GetClientStateRequestFromBytes(data []byte) (*ClientStateRequest, error) {
 	buf := bytes.NewBuffer(data)

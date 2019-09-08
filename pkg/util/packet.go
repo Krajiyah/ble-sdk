@@ -54,7 +54,7 @@ func NewPacketAggregator() PacketAggregator {
 func getPacketsFromData(data []byte) []BLEPacket {
 	l := []BLEPacket{}
 	guid := getUUID()
-	checksum := GetChecksum(data)
+	checksum := getChecksum(data)
 	chunks := splitBytes(data, MTU)
 	total := len(chunks)
 	for i := 0; i < total; i++ {
@@ -153,7 +153,7 @@ func (pa *PacketAggregator) getAllDataFromPackets(guid string) ([]byte, error) {
 		ret = append(ret, packet.RawData...)
 	}
 	total := len(packets)
-	checksum := GetChecksum(ret)
+	checksum := getChecksum(ret)
 	guids := mapset.NewSet()
 	indexes := mapset.NewSet()
 	for _, packet := range packets {
@@ -184,8 +184,8 @@ func getUUID() string {
 	return v[0:8]
 }
 
-// GetChecksum is utility which allows you to easily get checksum string for given byte array
-func GetChecksum(data []byte) string {
+// getChecksum is utility which allows you to easily get checksum string for given byte array
+func getChecksum(data []byte) string {
 	h := sha256.New()
 	h.Write(data)
 	hash := base64.StdEncoding.EncodeToString(h.Sum(nil))

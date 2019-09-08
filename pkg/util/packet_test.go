@@ -1,10 +1,9 @@
-package test
+package util
 
 import (
 	"math/rand"
 	"testing"
 
-	. "github.com/Krajiyah/ble-sdk/pkg/util"
 	"gotest.tools/assert"
 )
 
@@ -26,7 +25,7 @@ func getSamplePacket() BLEPacket {
 	packet.Guid = dummyGuid
 	packet.Index = 0
 	packet.Total = 1
-	packet.Checksum = GetChecksum(packet.RawData)
+	packet.Checksum = getChecksum(packet.RawData)
 	return packet
 }
 

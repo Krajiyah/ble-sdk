@@ -23,4 +23,7 @@ endif
 	go build -ldflags "-X main.BLESecret=$(BLESECRET)" -o $(BINARY_SERVER_DST) examples/server/main.go
 
 test:
-	go test -v test/**/*_test.go
+	go test -v -cover -coverprofile coverage.out ./pkg/util ./pkg/server ./pkg/models ./pkg/client
+coverage:
+	go tool cover -func=coverage.out
+	go tool cover -html=coverage.out

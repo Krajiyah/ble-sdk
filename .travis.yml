@@ -4,10 +4,9 @@ go:
   - 1.12.x
   - 1.13.x
 env:
-  - GO111MODULE=on BLESECRET=ci-secret
+  - GO111MODULE=on BLESECRET=ci-secret 
 os:
   - linux
-  - osx
 dist: trusty
 sudo: false
 install: true
