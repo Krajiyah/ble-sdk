@@ -27,6 +27,7 @@ type emptyListener struct{}
 func (l *emptyListener) onServerStatusChanged(s BLEServerStatus, err error)         {}
 func (l *emptyListener) onClientStateMapChanged(m map[string]client.BLEClientState) {}
 func (l *emptyListener) onClientLog(r *models.ClientLogRequest)                     {}
+func (l *emptyListener) onReadOrWriteError(error)                                   {}
 
 type mockConn struct {
 	ctx context.Context

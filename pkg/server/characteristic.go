@@ -62,17 +62,17 @@ func generateReadHandler(server *BLEServer, uuid string, load func(context.Conte
 		} else {
 			data, err := load(ctx)
 			if err != nil {
-				// TODO: how to handle error?
+				server.listener.onReadOrWriteError(err)
 				return
 			}
 			encryptedData, err := util.Encrypt(data, server.secret)
 			if err != nil {
-				// TODO: how to handle error?
+				server.listener.onReadOrWriteError(err)
 				return
 			}
 			guid, err = server.packetAggregator.AddData(encryptedData)
 			if err != nil {
-				// TODO: how to handle error?
+				server.listener.onReadOrWriteError(err)
 				return
 			}
 			ctx = context.WithValue(ctx, sessionKey, guid)

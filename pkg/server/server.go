@@ -42,6 +42,7 @@ type BLEServerStatusListener interface {
 	onServerStatusChanged(BLEServerStatus, error)
 	onClientStateMapChanged(map[string]BLEClientState)
 	onClientLog(*models.ClientLogRequest)
+	onReadOrWriteError(error)
 }
 
 // NewBLEServer creates a new BLEService
@@ -87,13 +88,13 @@ func newClientStatusChar(server *BLEServer) *ble.Characteristic {
 	lastHeard := map[string]int64{}
 	c := newWriteChar(server, ClientStateUUID, func(addr string, data []byte, err error) {
 		if err != nil {
-			// TODO: how to handle error?
+			server.listener.onReadOrWriteError(err)
 			return
 		}
 		lastHeard[addr] = internal.UnixTS()
 		r, err := models.GetClientStateRequestFromBytes(data)
 		if err != nil {
-			// TODO: how to handle error?
+			server.listener.onReadOrWriteError(err)
 			return
 		}
 		state := BLEClientState{Status: Connected, RssiMap: r.RssiMap}
@@ -123,12 +124,12 @@ func newTimeSyncChar(server *BLEServer) *ble.Characteristic {
 func newClientLogChar(server *BLEServer) *ble.Characteristic {
 	return newWriteChar(server, ClientLogUUID, func(addr string, data []byte, err error) {
 		if err != nil {
-			// TODO: how to handle error?
+			server.listener.onReadOrWriteError(err)
 			return
 		}
 		r, err := models.GetClientLogRequestFromBytes(data)
 		if err != nil {
-			// TODO: how to handle error?
+			server.listener.onReadOrWriteError(err)
 			return
 		}
 		server.listener.onClientLog(r)
