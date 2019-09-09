@@ -9,6 +9,20 @@ import (
 	"github.com/currantlabs/ble"
 )
 
+// BLEReadCharacteristic is a struct representation of characteristic that can handle read operations from clients
+type BLEReadCharacteristic struct {
+	Uuid           string
+	HandleRead     func(context.Context) ([]byte, error)
+	DoInBackground func()
+}
+
+// BLEWriteCharacteristic is a struct representation of characteristic that can handle write  operations from clients
+type BLEWriteCharacteristic struct {
+	Uuid           string
+	HandleWrite    func(addr string, data []byte, err error)
+	DoInBackground func()
+}
+
 func getAddrFromReq(req ble.Request) string {
 	return strings.ToUpper(req.Conn().RemoteAddr().String())
 }
@@ -62,17 +76,17 @@ func generateReadHandler(server *BLEServer, uuid string, load func(context.Conte
 		} else {
 			data, err := load(ctx)
 			if err != nil {
-				server.listener.onReadOrWriteError(err)
+				server.listener.OnReadOrWriteError(err)
 				return
 			}
 			encryptedData, err := util.Encrypt(data, server.secret)
 			if err != nil {
-				server.listener.onReadOrWriteError(err)
+				server.listener.OnReadOrWriteError(err)
 				return
 			}
 			guid, err = server.packetAggregator.AddData(encryptedData)
 			if err != nil {
-				server.listener.onReadOrWriteError(err)
+				server.listener.OnReadOrWriteError(err)
 				return
 			}
 			ctx = context.WithValue(ctx, sessionKey, guid)
@@ -87,4 +101,16 @@ func generateReadHandler(server *BLEServer, uuid string, load func(context.Conte
 			rsp.Write(packetData)
 		}
 	}
+}
+
+func constructReadChar(server *BLEServer, char *BLEReadCharacteristic) *ble.Characteristic {
+	c := newReadChar(server, char.Uuid, char.HandleRead)
+	go char.DoInBackground()
+	return c
+}
+
+func constructWriteChar(server *BLEServer, char *BLEWriteCharacteristic) *ble.Characteristic {
+	c := newWriteChar(server, char.Uuid, char.HandleWrite)
+	go char.DoInBackground()
+	return c
 }

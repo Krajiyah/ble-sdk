@@ -10,6 +10,10 @@ const (
 	Disconnected
 )
 
+func (s BLEClientStatus) String() string {
+	return []string{"Connected", "Disconnected"}[s]
+}
+
 // BLEClientState is representation of ble client's state
 type BLEClientState struct {
 	Status  BLEClientStatus

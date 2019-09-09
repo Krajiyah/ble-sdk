@@ -22,13 +22,6 @@ var (
 	testReadHandlerPacketBuffer *bytes.Buffer
 )
 
-type emptyListener struct{}
-
-func (l *emptyListener) onServerStatusChanged(s BLEServerStatus, err error)         {}
-func (l *emptyListener) onClientStateMapChanged(m map[string]client.BLEClientState) {}
-func (l *emptyListener) onClientLog(r *models.ClientLogRequest)                     {}
-func (l *emptyListener) onReadOrWriteError(error)                                   {}
-
 type mockConn struct {
 	ctx context.Context
 }
@@ -65,7 +58,13 @@ func getRandBytes(t *testing.T) []byte {
 }
 
 func getDummyServer() *BLEServer {
-	return &BLEServer{"SomeName", "passwd123", Running, map[string]client.BLEClientState{}, util.NewPacketAggregator(), &emptyListener{}}
+	l := BLEServerStatusListener{
+		func(s BLEServerStatus, err error) {},
+		func(m map[string]client.BLEClientState) {},
+		func(r models.ClientLogRequest) {},
+		func(err error) {},
+	}
+	return &BLEServer{"SomeName", "passwd123", Running, map[string]client.BLEClientState{}, util.NewPacketAggregator(), l}
 }
 
 func getMockReq(data []byte) ble.Request {

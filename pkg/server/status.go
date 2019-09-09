@@ -9,3 +9,7 @@ const (
 	// Crashed indicates ble server is not running and has returned error in execution
 	Crashed
 )
+
+func (s BLEServerStatus) String() string {
+	return []string{"Running", "Crashed"}[s]
+}
