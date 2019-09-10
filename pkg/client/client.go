@@ -102,7 +102,11 @@ func (client *BLEClient) WriteValue(uuid string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	guid, err := client.packetAggregator.AddData(data)
+	encData, err := util.Encrypt(data, client.secret)
+	if err != nil {
+		return err
+	}
+	guid, err := client.packetAggregator.AddData(encData)
 	if err != nil {
 		return err
 	}
