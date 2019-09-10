@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/Krajiyah/ble-sdk/internal"
-	. "github.com/Krajiyah/ble-sdk/pkg/client"
-	"github.com/Krajiyah/ble-sdk/pkg/models"
+	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux"
@@ -41,7 +40,7 @@ type BLEServer struct {
 type BLEServerStatusListener struct {
 	OnServerStatusChanged   func(BLEServerStatus, error)
 	OnClientStateMapChanged func(map[string]BLEClientState)
-	OnClientLog             func(models.ClientLogRequest)
+	OnClientLog             func(ClientLogRequest)
 	OnReadOrWriteError      func(error)
 }
 
@@ -109,7 +108,7 @@ func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 			return
 		}
 		lastHeard[addr] = internal.UnixTS()
-		r, err := models.GetClientStateRequestFromBytes(data)
+		r, err := GetClientStateRequestFromBytes(data)
 		if err != nil {
 			server.listener.OnReadOrWriteError(err)
 			return
@@ -142,7 +141,7 @@ func newClientLogChar(server *BLEServer) *BLEWriteCharacteristic {
 			server.listener.OnReadOrWriteError(err)
 			return
 		}
-		r, err := models.GetClientLogRequestFromBytes(data)
+		r, err := GetClientLogRequestFromBytes(data)
 		if err != nil {
 			server.listener.OnReadOrWriteError(err)
 			return

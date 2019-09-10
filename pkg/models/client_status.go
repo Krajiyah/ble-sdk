@@ -1,4 +1,4 @@
-package client
+package models
 
 // BLEClientStatus is an enum for all possible status conditions for ble client
 type BLEClientStatus int

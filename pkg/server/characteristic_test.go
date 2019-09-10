@@ -6,8 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/Krajiyah/ble-sdk/pkg/client"
-	"github.com/Krajiyah/ble-sdk/pkg/models"
+	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
 	"gotest.tools/assert"
@@ -60,11 +59,11 @@ func getRandBytes(t *testing.T) []byte {
 func getDummyServer() *BLEServer {
 	l := BLEServerStatusListener{
 		func(s BLEServerStatus, err error) {},
-		func(m map[string]client.BLEClientState) {},
-		func(r models.ClientLogRequest) {},
+		func(m map[string]BLEClientState) {},
+		func(r ClientLogRequest) {},
 		func(err error) {},
 	}
-	return &BLEServer{"SomeName", "passwd123", Running, map[string]client.BLEClientState{}, util.NewPacketAggregator(), l}
+	return &BLEServer{"SomeName", "passwd123", Running, map[string]BLEClientState{}, util.NewPacketAggregator(), l}
 }
 
 func getMockReq(data []byte) ble.Request {

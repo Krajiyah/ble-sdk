@@ -16,6 +16,6 @@ require (
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/stretchr/testify v1.4.0 // indirect
 	go4.org v0.0.0-20190313082347-94abd6928b1d // indirect
-	golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297 // indirect
+	golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297
 	gotest.tools v2.2.0+incompatible
 )

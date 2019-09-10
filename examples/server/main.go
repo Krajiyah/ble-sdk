@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Krajiyah/ble-sdk/pkg/client"
 	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 )
@@ -49,10 +48,10 @@ func main() {
 		}},
 	}
 	l := server.BLEServerStatusListener{
-		func(s server.BLEServerStatus, err error) {
+		func(s models.BLEServerStatus, err error) {
 			fmt.Println(fmt.Sprintf("Server status changed: %s, Error: %s", s, err))
 		},
-		func(m map[string]client.BLEClientState) {
+		func(m map[string]models.BLEClientState) {
 			fmt.Println(fmt.Sprintf("Client status changed: %+v", m))
 		},
 		func(r models.ClientLogRequest) {

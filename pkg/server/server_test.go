@@ -8,24 +8,23 @@ import (
 	"time"
 
 	"github.com/Krajiyah/ble-sdk/internal"
-	"github.com/Krajiyah/ble-sdk/pkg/client"
-	"github.com/Krajiyah/ble-sdk/pkg/models"
+	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"gotest.tools/assert"
 )
 
 var errs []error
-var state map[string]client.BLEClientState
-var logs []models.ClientLogRequest
+var state map[string]BLEClientState
+var logs []ClientLogRequest
 
 func getTestServer() *BLEServer {
 	l := BLEServerStatusListener{
 		func(s BLEServerStatus, err error) { errs = append(errs, err) },
-		func(m map[string]client.BLEClientState) { state = m },
-		func(r models.ClientLogRequest) { logs = append(logs, r) },
+		func(m map[string]BLEClientState) { state = m },
+		func(r ClientLogRequest) { logs = append(logs, r) },
 		func(err error) { errs = append(errs, err) },
 	}
-	return &BLEServer{"SomeName", "passwd123", Running, map[string]client.BLEClientState{}, util.NewPacketAggregator(), l}
+	return &BLEServer{"SomeName", "passwd123", Running, map[string]BLEClientState{}, util.NewPacketAggregator(), l}
 }
 
 func dummyReadChar() *BLEReadCharacteristic {
@@ -38,8 +37,8 @@ func dummyWriteChar() *BLEWriteCharacteristic {
 
 func beforeEach() {
 	errs = []error{}
-	state = map[string]client.BLEClientState{}
-	logs = []models.ClientLogRequest{}
+	state = map[string]BLEClientState{}
+	logs = []ClientLogRequest{}
 }
 
 func TestStatusSetters(t *testing.T) {
@@ -51,9 +50,9 @@ func TestStatusSetters(t *testing.T) {
 	assert.Equal(t, len(errs), 1)
 	assert.DeepEqual(t, errs[0].Error(), expected.Error())
 	addr := "someaddr"
-	s := client.BLEClientState{client.Disconnected, map[string]int{}}
+	s := BLEClientState{Disconnected, map[string]int{}}
 	server.setClientState(addr, s)
-	expectedState := map[string]client.BLEClientState{}
+	expectedState := map[string]BLEClientState{}
 	expectedState[addr] = s
 	assert.DeepEqual(t, server.clientStateMap, expectedState)
 	assert.DeepEqual(t, server.clientStateMap, state)
@@ -80,11 +79,11 @@ func TestClientLogChar(t *testing.T) {
 	beforeEach()
 	server := getTestServer()
 	char := newClientLogChar(server)
-	req := models.ClientLogRequest{models.Info, "some message"}
+	req := ClientLogRequest{Info, "some message"}
 	b, err := req.Data()
 	assert.NilError(t, err)
 	char.HandleWrite("some addr", b, nil)
-	assert.DeepEqual(t, logs, []models.ClientLogRequest{req})
+	assert.DeepEqual(t, logs, []ClientLogRequest{req})
 }
 
 func TestClientStatusChar(t *testing.T) {
@@ -93,12 +92,12 @@ func TestClientStatusChar(t *testing.T) {
 	char := newClientStatusChar(server)
 	addr := "some addr"
 	m := map[string]int{"some other addr": -80}
-	req := models.ClientStateRequest{m}
+	req := ClientStateRequest{m}
 	b, err := req.Data()
 	assert.NilError(t, err)
 	go char.DoInBackground()
 	char.HandleWrite(addr, b, nil)
-	assert.DeepEqual(t, server.clientStateMap, map[string]client.BLEClientState{addr: client.BLEClientState{client.Connected, m}})
-	time.Sleep(PollingInterval * 2)
-	assert.DeepEqual(t, server.clientStateMap, map[string]client.BLEClientState{addr: client.BLEClientState{client.Disconnected, map[string]int{}}})
+	assert.DeepEqual(t, server.clientStateMap, map[string]BLEClientState{addr: BLEClientState{Connected, m}})
+	time.Sleep(PollingInterval * 3)
+	assert.DeepEqual(t, server.clientStateMap, map[string]BLEClientState{addr: BLEClientState{Disconnected, map[string]int{}}})
 }

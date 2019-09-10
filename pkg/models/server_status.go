@@ -1,4 +1,4 @@
-package server
+package models
 
 // BLEServerStatus is an enum for all possible status conditions for ble server
 type BLEServerStatus int
