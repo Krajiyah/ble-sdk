@@ -29,7 +29,7 @@ type BLEClient struct {
 	serverAddr         string
 	rssiMap            map[string]int
 	ctx                context.Context
-	cln                ble.Client
+	cln                *ble.Client
 	characteristics    map[string]*ble.Characteristic
 	packetAggregator   util.PacketAggregator
 	onConnected        func(int, int)
@@ -43,19 +43,10 @@ func NewBLEClient(addr string, secret string, serverAddr string, onConnected fun
 		return nil, err
 	}
 	ble.SetDefaultDevice(d)
-	client := BLEClient{}
-	client.secret = secret
-	client.packetAggregator = util.NewPacketAggregator()
-	client.addr = addr
-	client.status = Disconnected
-	client.connectionAttempts = 0
-	client.serverAddr = serverAddr
-	client.rssiMap = map[string]int{}
-	client.ctx = makeINFContext()
-	client.characteristics = map[string]*ble.Characteristic{}
-	client.onConnected = client.onConnected
-	client.onDisconnected = client.onDisconnected
-	return &client, nil
+	return &BLEClient{
+		addr, secret, Disconnected, 0, serverAddr, map[string]int{}, makeINFContext(), nil,
+		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
+	}, nil
 }
 
 // Run is a method that runs the connection from client to service (forever)
@@ -67,7 +58,7 @@ func (client *BLEClient) Run() {
 
 // UnixTS returns the current time synced timestamp from the ble service
 func (client *BLEClient) UnixTS() (int64, error) {
-	b, err := client.readValue(client.characteristics[server.TimeSyncUUID])
+	b, err := client.ReadValue(server.TimeSyncUUID)
 	if err != nil {
 		return 0, err
 	}
@@ -81,7 +72,53 @@ func (client *BLEClient) UnixTS() (int64, error) {
 // Log writes a log object to the ble server's log characteristic
 func (client *BLEClient) Log(log ClientLogRequest) error {
 	b, _ := log.Data()
-	return client.writeValue(client.characteristics[server.ClientLogUUID], b)
+	return client.WriteValue(server.ClientLogUUID, b)
+}
+
+// ReadValue will read packeted data from ble server from given uuid
+func (client *BLEClient) ReadValue(uuid string) ([]byte, error) {
+	c, err := client.getCharacteristic(uuid)
+	if err != nil {
+		return nil, err
+	}
+	guid := ""
+	for !client.packetAggregator.HasDataFromPacketStream(guid) {
+		packetData, err := (*client.cln).ReadCharacteristic(c)
+		if err != nil {
+			return nil, err
+		}
+		guid, err = client.packetAggregator.AddPacketFromPacketBytes(packetData)
+	}
+	encData, err := client.packetAggregator.PopAllDataFromPackets(guid)
+	if err != nil {
+		return nil, err
+	}
+	return util.Decrypt(encData, client.secret)
+}
+
+// WriteValue will write data (which is parsed to packets) to ble server to given uuid
+func (client *BLEClient) WriteValue(uuid string, data []byte) error {
+	c, err := client.getCharacteristic(uuid)
+	if err != nil {
+		return err
+	}
+	guid, err := client.packetAggregator.AddData(data)
+	if err != nil {
+		return err
+	}
+	isLastPacket := false
+	for !isLastPacket {
+		var packetData []byte
+		packetData, isLastPacket, err = client.packetAggregator.PopPacketDataFromStream(guid)
+		if err != nil {
+			return err
+		}
+		err = (*client.cln).WriteCharacteristic(c, packetData, true)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (client *BLEClient) filter(a ble.Advertisement) bool {
@@ -126,7 +163,7 @@ func (client *BLEClient) pingLoop() {
 		time.Sleep(PingInterval)
 		req := &ClientStateRequest{client.rssiMap}
 		b, _ := req.Data()
-		err := client.writeValue(client.characteristics[server.ClientStateUUID], b)
+		err := client.WriteValue(server.ClientStateUUID, b)
 		if err != nil {
 			client.connectLoop()
 		}
@@ -135,10 +172,10 @@ func (client *BLEClient) pingLoop() {
 
 func (client *BLEClient) connect() error {
 	if client.cln != nil {
-		client.cln.CancelConnection()
+		(*client.cln).CancelConnection()
 	}
 	cln, err := ble.Connect(client.ctx, client.filter)
-	client.cln = cln
+	client.cln = &cln
 	if err != nil {
 		return err
 	}
@@ -161,40 +198,11 @@ func (client *BLEClient) connect() error {
 	return nil
 }
 
-func (client *BLEClient) readValue(c *ble.Characteristic) ([]byte, error) {
-	guid := ""
-	for !client.packetAggregator.HasDataFromPacketStream(guid) {
-		packetData, err := client.cln.ReadCharacteristic(c)
-		if err != nil {
-			return nil, err
-		}
-		guid, err = client.packetAggregator.AddPacketFromPacketBytes(packetData)
+func (client *BLEClient) getCharacteristic(uuid string) (*ble.Characteristic, error) {
+	if c, ok := client.characteristics[uuid]; ok {
+		return c, nil
 	}
-	encData, err := client.packetAggregator.PopAllDataFromPackets(guid)
-	if err != nil {
-		return nil, err
-	}
-	return util.Decrypt(encData, client.secret)
-}
-
-func (client *BLEClient) writeValue(c *ble.Characteristic, data []byte) error {
-	guid, err := client.packetAggregator.AddData(data)
-	if err != nil {
-		return err
-	}
-	isLastPacket := false
-	for !isLastPacket {
-		var packetData []byte
-		packetData, isLastPacket, err = client.packetAggregator.PopPacketDataFromStream(guid)
-		if err != nil {
-			return err
-		}
-		err = client.cln.WriteCharacteristic(c, packetData, true)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return nil, errors.New("No such uuid in characteristics advertised from server")
 }
 
 func addrEqualAddr(a string, b string) bool {
