@@ -26,6 +26,7 @@ type BLEClient struct {
 	secret             string
 	status             BLEClientStatus
 	connectionAttempts int
+	timeSync           *util.TimeSync
 	serverAddr         string
 	rssiMap            map[string]int
 	ctx                context.Context
@@ -44,7 +45,7 @@ func NewBLEClient(addr string, secret string, serverAddr string, onConnected fun
 	}
 	ble.SetDefaultDevice(d)
 	return &BLEClient{
-		addr, secret, Disconnected, 0, serverAddr, map[string]int{}, makeINFContext(), nil,
+		addr, secret, Disconnected, 0, nil, serverAddr, map[string]int{}, makeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
 	}, nil
 }
@@ -57,7 +58,11 @@ func (client *BLEClient) Run() {
 }
 
 // UnixTS returns the current time synced timestamp from the ble service
-func (client *BLEClient) UnixTS() (int64, error) {
+func (client *BLEClient) UnixTS() int64 {
+	return client.timeSync.TS()
+}
+
+func (client *BLEClient) getUnixTS() (int64, error) {
 	b, err := client.ReadValue(server.TimeSyncUUID)
 	if err != nil {
 		return 0, err
@@ -170,7 +175,15 @@ func (client *BLEClient) pingLoop() {
 		err := client.WriteValue(server.ClientStateUUID, b)
 		if err != nil {
 			client.connectLoop()
+			continue
 		}
+		initTS, err := client.getUnixTS()
+		if err != nil {
+			client.connectLoop()
+			continue
+		}
+		timeSync := util.NewTimeSync(initTS)
+		client.timeSync = &timeSync
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Krajiyah/ble-sdk/internal"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"gotest.tools/assert"
@@ -72,7 +71,7 @@ func TestTimeSyncChar(t *testing.T) {
 	b, err := char.HandleRead(context.Background())
 	assert.NilError(t, err)
 	ts, err := strconv.Atoi(string(b))
-	assert.Equal(t, int64(ts), internal.UnixTS())
+	assert.Equal(t, int64(ts), util.UnixTS())
 }
 
 func TestClientLogChar(t *testing.T) {

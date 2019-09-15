@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/Krajiyah/ble-sdk/internal"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
@@ -93,7 +92,7 @@ func mockConnection(client *BLEClient) {
 
 func getDummyClient() *BLEClient {
 	return &BLEClient{
-		testAddr, testSecret, Disconnected, 0, testServerAddr, map[string]int{}, makeINFContext(), nil,
+		testAddr, testSecret, Disconnected, 0, nil, testServerAddr, map[string]int{}, makeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), dummyOnConnected, dummyOnDisconnected,
 	}
 }
@@ -103,7 +102,7 @@ func TestUnixTS(t *testing.T) {
 
 	// mock server read
 	pa := util.NewPacketAggregator()
-	expected := internal.UnixTS()
+	expected := util.UnixTS()
 	encData, err := util.Encrypt([]byte(strconv.Itoa(int(expected))), testSecret)
 	assert.NilError(t, err)
 	guid, err := pa.AddData(encData)
@@ -117,7 +116,7 @@ func TestUnixTS(t *testing.T) {
 	client := getDummyClient()
 	setCharacteristic(client, server.TimeSyncUUID)
 	mockConnection(client)
-	ts, err := client.UnixTS()
+	ts, err := client.getUnixTS()
 	assert.NilError(t, err)
 	assert.Equal(t, ts, expected)
 }

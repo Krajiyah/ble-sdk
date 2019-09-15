@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Krajiyah/ble-sdk/internal"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
@@ -107,7 +106,7 @@ func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 			server.listener.OnReadOrWriteError(err)
 			return
 		}
-		lastHeard[addr] = internal.UnixTS()
+		lastHeard[addr] = util.UnixTS()
 		r, err := GetClientStateRequestFromBytes(data)
 		if err != nil {
 			server.listener.OnReadOrWriteError(err)
@@ -118,7 +117,7 @@ func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 	}, func() {
 		for {
 			time.Sleep(PollingInterval)
-			diff := internal.UnixTS() - int64(PollingInterval.Seconds()*1000)
+			diff := util.UnixTS() - int64(PollingInterval.Seconds()*1000)
 			for addr := range lastHeard {
 				if diff > lastHeard[addr] {
 					state := BLEClientState{Status: Disconnected, RssiMap: map[string]int{}}
@@ -131,7 +130,7 @@ func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 
 func newTimeSyncChar(server *BLEServer) *BLEReadCharacteristic {
 	return &BLEReadCharacteristic{TimeSyncUUID, func(_ context.Context) ([]byte, error) {
-		return []byte(strconv.FormatInt(internal.UnixTS(), 10)), nil
+		return []byte(strconv.FormatInt(util.UnixTS(), 10)), nil
 	}, func() {}}
 }
 
