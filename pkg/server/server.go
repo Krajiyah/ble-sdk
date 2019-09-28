@@ -8,6 +8,7 @@ import (
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
+	"github.com/currantlabs/ble/linux"
 )
 
 const (
@@ -46,7 +47,7 @@ type BLEServerStatusListener struct {
 func NewBLEServer(name string, secret string, listener BLEServerStatusListener,
 	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, error) {
 	server := &BLEServer{name, secret, Running, map[string]BLEClientState{}, util.NewPacketAggregator(), listener}
-	d, err := util.NewDevice()
+	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
 	}

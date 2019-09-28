@@ -10,6 +10,7 @@ import (
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
+	"github.com/currantlabs/ble/linux"
 	"golang.org/x/net/context"
 )
 
@@ -40,7 +41,7 @@ type BLEClient struct {
 
 // NewBLEClient is a function that creates a new ble client
 func NewBLEClient(addr string, secret string, serverAddr string, onConnected func(int, int), onDisconnected func()) (*BLEClient, error) {
-	d, err := util.NewDevice()
+	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
 	}

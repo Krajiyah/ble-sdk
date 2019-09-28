@@ -7,7 +7,6 @@ env:
   - GO111MODULE=on BLESECRET=ci-secret BLE_CLIENT_ADDR=11:22:33:44:55:66 BLE_SERVER_ADDR=11:22:33:44:55:66
 os:
   - linux
-  - osx
 dist: trusty
 sudo: false
 install: true
