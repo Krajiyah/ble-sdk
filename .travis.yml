@@ -9,7 +9,14 @@ os:
   - linux
 dist: trusty
 sudo: false
-install: true
+install:
+  - go get -v github.com/client9/misspell/cmd/misspell
+  - go get -v github.com/fzipp/gocyclo
+  - go get -v github.com/golang/lint/golint
+  - go get -v github.com/gordonklaus/ineffassign
+  - go get -v github.com/h12w/gosweep
+  - go get -v github.com/mattn/goveralls
+  - go get -v -u golang.org/x/tools/cmd/goimports
 script:
   - make
-  - make -B test
+  - bash ${GOPATH}/src/github.com/h12w/gosweep/gosweep.sh
