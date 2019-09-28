@@ -1,30 +1,15 @@
 language: go
-cache:
-  directories:
-    - ${GOPATH}/src/github.com/${TRAVIS_REPO_SLUG}/vendor
-    - ${GOPATH}/src/github.com/fzipp
-    - ${GOPATH}/src/github.com/golang
-    - ${GOPATH}/src/github.com/gordonklaus
-    - ${GOPATH}/src/github.com/h12w
-    - ${GOPATH}/src/github.com/mattn
 go:
   - 1.11.x
   - 1.12.x
   - 1.13.x
 env:
-  - CI_SERVICE=travis-ci GO111MODULE=on BLESECRET=ci-secret BLE_CLIENT_ADDR=11:22:33:44:55:66 BLE_SERVER_ADDR=11:22:33:44:55:66
+  - GO111MODULE=on BLESECRET=ci-secret BLE_CLIENT_ADDR=11:22:33:44:55:66 BLE_SERVER_ADDR=11:22:33:44:55:66
 os:
   - linux
 dist: trusty
 sudo: false
-install:
-  - go get -v github.com/client9/misspell/cmd/misspell
-  - go get -v github.com/fzipp/gocyclo
-  # - go get -v github.com/golang/lint/golint
-  - go get -v github.com/gordonklaus/ineffassign
-  - go get -v github.com/h12w/gosweep
-  - go get -v github.com/mattn/goveralls
-  - go get -v -u golang.org/x/tools/cmd/goimports
+install: true
 script:
   - make
-  - bash ${GOPATH}/src/github.com/h12w/gosweep/gosweep.sh
+  - bash ci-test.sh
