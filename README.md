@@ -8,6 +8,22 @@
 
 Easy to use Go SDK for BLE service and client. Here is the link to [documentation](https://godoc.org/github.com/Krajiyah/ble-sdk)
 
+## Dependencies for Runtime Environment
+
+### Debian
+
+```bash
+sudo apt-get -y update
+sudo apt-get -y install bluez
+sudo apt-get -y install libglib2.0-dev
+sudo apt-get -y install libbluetooth-dev
+
+# May need to run these for client before run (on boot)
+sudo hciconfig hci0 up
+sudo hciconfig sspmode 1
+sudo hciconfig piscan
+```
+
 ## Examples
 
 - [Client](https://github.com/Krajiyah/ble-sdk/blob/master/examples/client/main.go)
