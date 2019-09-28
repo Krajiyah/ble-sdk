@@ -12,4 +12,4 @@ sudo: false
 install: true
 script:
   - make
-  - bash ci-test.sh
+  - make -B test
