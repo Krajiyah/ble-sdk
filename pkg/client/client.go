@@ -10,11 +10,12 @@ import (
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/linux"
 	"golang.org/x/net/context"
 )
 
 const (
+	// ScanInterval is the rate at which ble clients scan for ble server
+	ScanInterval = time.Millisecond * 500
 	// PingInterval is the rate at which ble clients will let ble server know of its state
 	PingInterval = time.Second * 1
 	inf          = 1000000
@@ -39,7 +40,7 @@ type BLEClient struct {
 
 // NewBLEClient is a function that creates a new ble client
 func NewBLEClient(addr string, secret string, serverAddr string, onConnected func(int, int), onDisconnected func()) (*BLEClient, error) {
-	d, err := linux.NewDevice()
+	d, err := util.NewDevice()
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +142,7 @@ func (client *BLEClient) filter(a ble.Advertisement) bool {
 func (client *BLEClient) scan() {
 	client.rssiMap = map[string]int{}
 	for {
+		time.Sleep(ScanInterval)
 		ble.Scan(client.ctx, true, func(a ble.Advertisement) {
 			rssi := a.RSSI()
 			addr := a.Address().String()

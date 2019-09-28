@@ -19,8 +19,14 @@ build:
 ifndef BLESECRET
 	$(error BLESECRET must be set)
 endif
-	go build -ldflags "-X main.BLESecret=$(BLESECRET)" -o $(BINARY_CLIENT_DST) examples/client/main.go
-	go build -ldflags "-X main.BLESecret=$(BLESECRET)" -o $(BINARY_SERVER_DST) examples/server/main.go
+ifndef BLE_CLIENT_ADDR
+	$(error BLE_CLIENT_ADDR must be set)
+endif
+ifndef BLE_SERVER_ADDR
+	$(error BLE_SERVER_ADDR must be set)
+endif
+	GOOS=linux GOARCH=arm GOARM=5 go build -ldflags "-X main.BLESecret=$(BLESECRET) -X main.BLEClientAddr=$(BLE_CLIENT_ADDR) -X main.BLEServerAddr=$(BLE_SERVER_ADDR)" -o $(BINARY_CLIENT_DST) examples/client/main.go
+	GOOS=linux GOARCH=arm GOARM=5 go build -ldflags "-X main.BLESecret=$(BLESECRET)" -o $(BINARY_SERVER_DST) examples/server/main.go
 
 test:
 	go test -v -cover -coverprofile coverage.out ./pkg/util ./pkg/server ./pkg/models ./pkg/client

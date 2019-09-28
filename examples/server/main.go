@@ -20,7 +20,7 @@ var BLESecret string
 
 func main() {
 	if BLESecret == "" {
-		fmt.Errorf("please compile this with BLESecret as ldflag")
+		fmt.Println("please compile this with BLESecret as ldflag")
 		return
 	}
 	moreReadChars := []*server.BLEReadCharacteristic{
@@ -61,6 +61,7 @@ func main() {
 			fmt.Println(fmt.Sprintf("There was an error in handling a read or write operations from a characteristic: %s", err))
 		},
 	}
+	fmt.Println("Starting BLE server...")
 	serv, err := server.NewBLEServer(serviceName, BLESecret, l, moreReadChars, moreWriteChars)
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble server: " + err.Error())

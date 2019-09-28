@@ -14,6 +14,7 @@ require (
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/mgutz/logxi v0.0.0-20161027140823-aebf8a7d67ab // indirect
 	github.com/pkg/errors v0.8.1 // indirect
+	github.com/raff/goble v0.0.0-20190909174656-72afc67d6a99 // indirect
 	github.com/stretchr/testify v1.4.0 // indirect
 	go4.org v0.0.0-20190313082347-94abd6928b1d // indirect
 	golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297
