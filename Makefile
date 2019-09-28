@@ -29,7 +29,7 @@ endif
 	 GOOS=linux GOARCH=arm GOARM=5 go build -ldflags "-X main.BLESecret=$(BLESECRET)" -o $(BINARY_SERVER_DST) examples/server/main.go
 
 test:
-	./test.sh
+	./scripts/test.sh
 
 coverage:
 	go tool cover -html=coverage.out
