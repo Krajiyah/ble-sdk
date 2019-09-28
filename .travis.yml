@@ -1,10 +1,18 @@
 language: go
+cache:
+  directories:
+    - ${GOPATH}/src/github.com/${TRAVIS_REPO_SLUG}/vendor
+    - ${GOPATH}/src/github.com/fzipp
+    - ${GOPATH}/src/github.com/golang
+    - ${GOPATH}/src/github.com/gordonklaus
+    - ${GOPATH}/src/github.com/h12w
+    - ${GOPATH}/src/github.com/mattn
 go:
   - 1.11.x
   - 1.12.x
   - 1.13.x
 env:
-  - GO111MODULE=on BLESECRET=ci-secret BLE_CLIENT_ADDR=11:22:33:44:55:66 BLE_SERVER_ADDR=11:22:33:44:55:66
+  - CI_SERVICE=travis-ci GO111MODULE=on BLESECRET=ci-secret BLE_CLIENT_ADDR=11:22:33:44:55:66 BLE_SERVER_ADDR=11:22:33:44:55:66
 os:
   - linux
 dist: trusty
