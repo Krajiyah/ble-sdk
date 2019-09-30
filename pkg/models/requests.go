@@ -22,6 +22,7 @@ type ClientStateRequest struct {
 
 // ClientLogRequest is the payload for the equivalent write characteristic
 type ClientLogRequest struct {
+	Addr    string
 	Level   LogLevel
 	Message string
 }

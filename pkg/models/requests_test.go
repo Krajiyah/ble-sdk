@@ -16,7 +16,7 @@ func TestClientStateRequest(t *testing.T) {
 }
 
 func TestClientLogRequest(t *testing.T) {
-	expected := ClientLogRequest{Info, "Some message"}
+	expected := ClientLogRequest{"someaddr", Info, "Some message"}
 	enc, err := expected.Data()
 	assert.NilError(t, err)
 	actual, err := GetClientLogRequestFromBytes(enc)

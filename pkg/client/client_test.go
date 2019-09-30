@@ -128,7 +128,7 @@ func TestLog(t *testing.T) {
 	client := getDummyClient()
 	setCharacteristic(client, server.ClientLogUUID)
 	mockConnection(client)
-	expected := ClientLogRequest{Info, "Some Message"}
+	expected := ClientLogRequest{"SomeAddress", Info, "Some Message"}
 	err := client.Log(expected)
 	assert.NilError(t, err)
 
@@ -142,7 +142,10 @@ func TestLog(t *testing.T) {
 	assert.NilError(t, err)
 	guid2, err := pa.AddPacketFromPacketBytes(writeCharData[1])
 	assert.NilError(t, err)
+	guid3, err := pa.AddPacketFromPacketBytes(writeCharData[2])
+	assert.NilError(t, err)
 	assert.Equal(t, guid1, guid2)
+	assert.Equal(t, guid1, guid3)
 	ok := pa.HasDataFromPacketStream(guid1)
 	assert.Assert(t, ok)
 	encData, err = pa.PopAllDataFromPackets(guid1)

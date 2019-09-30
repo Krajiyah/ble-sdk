@@ -78,7 +78,7 @@ func TestClientLogChar(t *testing.T) {
 	beforeEach()
 	server := getTestServer()
 	char := newClientLogChar(server)
-	req := ClientLogRequest{Info, "some message"}
+	req := ClientLogRequest{"some addr", Info, "some message"}
 	b, err := req.Data()
 	assert.NilError(t, err)
 	char.HandleWrite("some addr", b, nil)
