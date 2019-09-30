@@ -15,6 +15,10 @@ const (
 	Error
 )
 
+func (l LogLevel) String() string {
+	return []string{"Info", "Debug", "Warning", "Error"}[l]
+}
+
 // ClientStateRequest is the payload for the equivalent write characteristic
 type ClientStateRequest struct {
 	RssiMap map[string]int
