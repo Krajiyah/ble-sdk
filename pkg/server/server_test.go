@@ -27,7 +27,7 @@ func getTestServer() *BLEServer {
 }
 
 func dummyReadChar() *BLEReadCharacteristic {
-	return &BLEReadCharacteristic{"10010000-0001-1000-8000-00805F9B34FB", func(context.Context) ([]byte, error) { return nil, nil }, func() {}}
+	return &BLEReadCharacteristic{"10010000-0001-1000-8000-00805F9B34FB", func(string, context.Context) ([]byte, error) { return nil, nil }, func() {}}
 }
 
 func dummyWriteChar() *BLEWriteCharacteristic {
@@ -68,7 +68,7 @@ func TestTimeSyncChar(t *testing.T) {
 	beforeEach()
 	server := getTestServer()
 	char := newTimeSyncChar(server)
-	b, err := char.HandleRead(context.Background())
+	b, err := char.HandleRead("some addr", context.Background())
 	assert.NilError(t, err)
 	ts, err := strconv.Atoi(string(b))
 	assert.Equal(t, int64(ts), util.UnixTS())

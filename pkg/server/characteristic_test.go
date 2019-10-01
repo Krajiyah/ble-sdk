@@ -111,7 +111,7 @@ func TestReadHandler(t *testing.T) {
 	server := getDummyServer()
 	expected := getRandBytes(t)
 	pa := util.NewPacketAggregator()
-	handler := generateReadHandler(server, MainServiceUUID, func(c context.Context) ([]byte, error) {
+	handler := generateReadHandler(server, MainServiceUUID, func(addr string, c context.Context) ([]byte, error) {
 		return expected, nil
 	})
 	guid := ""

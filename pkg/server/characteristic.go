@@ -12,7 +12,7 @@ import (
 // BLEReadCharacteristic is a struct representation of characteristic that can handle read operations from clients
 type BLEReadCharacteristic struct {
 	Uuid           string
-	HandleRead     func(context.Context) ([]byte, error)
+	HandleRead     func(string, context.Context) ([]byte, error)
 	DoInBackground func()
 }
 
@@ -33,7 +33,7 @@ func newWriteChar(server *BLEServer, uuid string, onWrite func(addr string, data
 	return c
 }
 
-func newReadChar(server *BLEServer, uuid string, load func(context.Context) ([]byte, error)) *ble.Characteristic {
+func newReadChar(server *BLEServer, uuid string, load func(string, context.Context) ([]byte, error)) *ble.Characteristic {
 	c := ble.NewCharacteristic(ble.MustParse(uuid))
 	c.HandleRead(ble.ReadHandlerFunc(generateReadHandler(server, uuid, load)))
 	return c
@@ -65,7 +65,7 @@ func getSessionKey(uuid string, addr string) sessionKeyType {
 	return sessionKeyType(fmt.Sprintf("session || %s || %s", uuid, addr))
 }
 
-func generateReadHandler(server *BLEServer, uuid string, load func(context.Context) ([]byte, error)) func(req ble.Request, rsp ble.ResponseWriter) {
+func generateReadHandler(server *BLEServer, uuid string, load func(string, context.Context) ([]byte, error)) func(req ble.Request, rsp ble.ResponseWriter) {
 	return func(req ble.Request, rsp ble.ResponseWriter) {
 		addr := getAddrFromReq(req)
 		sessionKey := getSessionKey(uuid, addr)
@@ -74,7 +74,7 @@ func generateReadHandler(server *BLEServer, uuid string, load func(context.Conte
 		if ctx.Value(sessionKey) != nil {
 			guid = ctx.Value(sessionKey).(string)
 		} else {
-			data, err := load(ctx)
+			data, err := load(addr, ctx)
 			if err != nil {
 				server.listener.OnReadOrWriteError(err)
 				return

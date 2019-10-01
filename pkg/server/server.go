@@ -129,7 +129,7 @@ func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 }
 
 func newTimeSyncChar(server *BLEServer) *BLEReadCharacteristic {
-	return &BLEReadCharacteristic{TimeSyncUUID, func(_ context.Context) ([]byte, error) {
+	return &BLEReadCharacteristic{TimeSyncUUID, func(_ string, _ context.Context) ([]byte, error) {
 		return []byte(strconv.FormatInt(util.UnixTS(), 10)), nil
 	}, func() {}}
 }

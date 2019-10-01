@@ -24,7 +24,7 @@ func main() {
 		return
 	}
 	moreReadChars := []*server.BLEReadCharacteristic{
-		&server.BLEReadCharacteristic{exampleReadCharUUID, func(context.Context) ([]byte, error) {
+		&server.BLEReadCharacteristic{exampleReadCharUUID, func(addr string, ctx context.Context) ([]byte, error) {
 			return []byte("Hello World!"), nil
 		}, func() {
 			for {
