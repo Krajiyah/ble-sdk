@@ -29,6 +29,7 @@ type BLEForwarder struct {
 	addr                    string
 	secret                  string
 	serverAddr              string
+	connected               bool
 	isConnectedToServer     bool
 	rssiMap                 map[string]map[string]int
 	shortestPath            []string
@@ -47,7 +48,7 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string)
 	}
 	ble.SetDefaultDevice(d)
 	forwarder := &BLEForwarder{
-		name, addr, secret, serverAddr, false,
+		name, addr, secret, serverAddr, false, false,
 		map[string]map[string]int{}, []string{},
 		util.MakeINFContext(), nil, nil, nil, map[string]*ble.Characteristic{},
 	}
@@ -93,6 +94,8 @@ func (forwarder *BLEForwarder) shortestPathRefresh() {
 }
 
 func (forwarder *BLEForwarder) connect(hostAddr string) error {
+	forwarder.connected = false
+	forwarder.isConnectedToServer = false
 	if forwarder.cln != nil {
 		(*forwarder.cln).CancelConnection()
 	}
@@ -111,6 +114,7 @@ func (forwarder *BLEForwarder) connect(hostAddr string) error {
 	if err != nil {
 		return err
 	}
+	forwarder.connected = true
 	if hostAddr == forwarder.serverAddr {
 		forwarder.isConnectedToServer = true
 	}
@@ -140,6 +144,10 @@ func (forwarder *BLEForwarder) connect(hostAddr string) error {
 
 func newWriteForwardChar(forwarder *BLEForwarder) func(req ble.Request, rsp ble.ResponseWriter) {
 	return func(req ble.Request, rsp ble.ResponseWriter) {
+		if !forwarder.connected {
+			// TODO: handle error
+			return
+		}
 		if !forwarder.isConnectedToServer {
 			err := (*forwarder.cln).WriteCharacteristic(forwarder.nextHopWriteForwardChar, req.Data(), true)
 			if err != nil {
@@ -154,6 +162,10 @@ func newWriteForwardChar(forwarder *BLEForwarder) func(req ble.Request, rsp ble.
 
 func newReadForwardChar(forwarder *BLEForwarder) func(req ble.Request, rsp ble.ResponseWriter) {
 	return func(req ble.Request, rsp ble.ResponseWriter) {
+		if !forwarder.connected {
+			// TODO: handle error
+			return
+		}
 		if !forwarder.isConnectedToServer {
 			data, err := (*forwarder.cln).ReadCharacteristic(forwarder.nextHopReadForwardChar)
 			if err != nil {
