@@ -92,7 +92,7 @@ func mockConnection(client *BLEClient) {
 
 func getDummyClient() *BLEClient {
 	return &BLEClient{
-		testAddr, testSecret, Disconnected, 0, nil, testServerAddr, map[string]int{}, makeINFContext(), nil,
+		testAddr, testSecret, Disconnected, 0, nil, testServerAddr, map[string]int{}, util.MakeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), dummyOnConnected, dummyOnDisconnected,
 	}
 }

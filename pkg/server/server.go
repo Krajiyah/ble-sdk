@@ -22,7 +22,6 @@ const (
 	ClientLogUUID = "00010000-0006-1000-8000-00805F9B34FB"
 	// PollingInterval is the amount of time used for re-doing status update work
 	PollingInterval = time.Second * 2
-	inf             = time.Hour * 1000000
 )
 
 // BLEServer is the struct used for instantiating a ble server
@@ -60,7 +59,7 @@ func NewBLEServer(name string, secret string, listener BLEServerStatusListener,
 
 // Run is the method called by BLEService struct for when the service is ready to listen to ble clients
 func (server *BLEServer) Run() error {
-	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), inf))
+	ctx := util.MakeINFContext()
 	err := ble.AdvertiseNameAndServices(ctx, server.name, ble.MustParse(MainServiceUUID))
 	server.setStatus(Crashed, err)
 	for addr := range server.clientStateMap {

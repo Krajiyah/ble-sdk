@@ -3,7 +3,6 @@ package client
 import (
 	"errors"
 	"strconv"
-	"strings"
 	"time"
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
@@ -19,7 +18,6 @@ const (
 	ScanInterval = time.Millisecond * 500
 	// PingInterval is the rate at which ble clients will let ble server know of its state
 	PingInterval = time.Second * 1
-	inf          = 1000000
 )
 
 // BLEClient is a struct used to handle client connection to BLEServer
@@ -47,12 +45,12 @@ func NewBLEClient(addr string, secret string, serverAddr string, onConnected fun
 	}
 	ble.SetDefaultDevice(d)
 	return &BLEClient{
-		addr, secret, Disconnected, 0, nil, serverAddr, map[string]int{}, makeINFContext(), nil,
+		addr, secret, Disconnected, 0, nil, serverAddr, map[string]int{}, util.MakeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
 	}, nil
 }
 
-// Run is a method that runs the connection from client to service (forever)
+// Run is a method that runs the connection from client to service
 func (client *BLEClient) Run() {
 	client.connectLoop()
 	go client.scan()
@@ -133,7 +131,7 @@ func (client *BLEClient) WriteValue(uuid string, data []byte) error {
 }
 
 func (client *BLEClient) filter(a ble.Advertisement) bool {
-	b := addrEqualAddr(a.Address().String(), client.serverAddr)
+	b := util.AddrEqualAddr(a.Address().String(), client.serverAddr)
 	if b {
 		client.rssiMap[client.addr] = a.RSSI()
 	}
@@ -148,9 +146,6 @@ func (client *BLEClient) scan() {
 			rssi := a.RSSI()
 			addr := a.Address().String()
 			client.rssiMap[addr] = rssi
-			if addr == client.serverAddr {
-				client.rssiMap[client.addr] = a.RSSI()
-			}
 		}, nil)
 	}
 }
@@ -208,7 +203,7 @@ func (client *BLEClient) connect() error {
 		return err
 	}
 	for _, s := range p.Services {
-		if uuidEqualStr(s.UUID, server.MainServiceUUID) {
+		if util.UuidEqualStr(s.UUID, server.MainServiceUUID) {
 			for _, c := range s.Characteristics {
 				client.characteristics[c.UUID.String()] = c
 			}
@@ -223,17 +218,4 @@ func (client *BLEClient) getCharacteristic(uuid string) (*ble.Characteristic, er
 		return c, nil
 	}
 	return nil, errors.New("No such uuid in characteristics advertised from server")
-}
-
-func addrEqualAddr(a string, b string) bool {
-	return strings.ToUpper(a) == strings.ToUpper(b)
-}
-
-func uuidEqualStr(u ble.UUID, s string) bool {
-	compare := strings.Replace(s, "-", "", -1)
-	return addrEqualAddr(compare, u.String())
-}
-
-func makeINFContext() context.Context {
-	return ble.WithSigHandler(context.WithTimeout(context.Background(), inf*time.Hour))
 }
