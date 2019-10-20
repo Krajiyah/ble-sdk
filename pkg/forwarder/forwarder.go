@@ -29,8 +29,7 @@ type BLEForwarder struct {
 	addr                    string
 	secret                  string
 	serverAddr              string
-	connected               bool
-	isConnectedToServer     bool
+	connectedAddr           string
 	rssiMap                 map[string]map[string]int
 	shortestPath            []string
 	ctx                     context.Context
@@ -48,7 +47,7 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string)
 	}
 	ble.SetDefaultDevice(d)
 	forwarder := &BLEForwarder{
-		name, addr, secret, serverAddr, false, false,
+		name, addr, secret, serverAddr, "",
 		map[string]map[string]int{}, []string{},
 		util.MakeINFContext(), nil, nil, nil, map[string]*ble.Characteristic{},
 	}
@@ -94,8 +93,7 @@ func (forwarder *BLEForwarder) shortestPathRefresh() {
 }
 
 func (forwarder *BLEForwarder) connect(hostAddr string) error {
-	forwarder.connected = false
-	forwarder.isConnectedToServer = false
+	forwarder.connectedAddr = ""
 	if forwarder.cln != nil {
 		(*forwarder.cln).CancelConnection()
 	}
@@ -114,12 +112,9 @@ func (forwarder *BLEForwarder) connect(hostAddr string) error {
 	if err != nil {
 		return err
 	}
-	forwarder.connected = true
-	if hostAddr == forwarder.serverAddr {
-		forwarder.isConnectedToServer = true
-	}
+	forwarder.connectedAddr = hostAddr
 	for _, s := range p.Services {
-		if forwarder.isConnectedToServer {
+		if forwarder.connectedAddr == forwarder.serverAddr {
 			if util.UuidEqualStr(s.UUID, server.MainServiceUUID) {
 				for _, c := range s.Characteristics {
 					forwarder.serverCharacterstics[c.UUID.String()] = c
@@ -142,13 +137,21 @@ func (forwarder *BLEForwarder) connect(hostAddr string) error {
 	return nil
 }
 
-func newWriteForwardChar(forwarder *BLEForwarder) func(req ble.Request, rsp ble.ResponseWriter) {
+func (forwarder *BLEForwarder) isConnected() bool {
+	return forwarder.connectedAddr != ""
+}
+
+func (forwarder *BLEForwarder) isConnectedToServer() bool {
+	return forwarder.connectedAddr == forwarder.serverAddr
+}
+
+func newWriteForwardCharHandler(forwarder *BLEForwarder) func(req ble.Request, rsp ble.ResponseWriter) {
 	return func(req ble.Request, rsp ble.ResponseWriter) {
-		if !forwarder.connected {
+		if !forwarder.isConnected() {
 			// TODO: handle error
 			return
 		}
-		if !forwarder.isConnectedToServer {
+		if !forwarder.isConnectedToServer() {
 			err := (*forwarder.cln).WriteCharacteristic(forwarder.nextHopWriteForwardChar, req.Data(), true)
 			if err != nil {
 				// TODO: handle error
@@ -160,13 +163,13 @@ func newWriteForwardChar(forwarder *BLEForwarder) func(req ble.Request, rsp ble.
 	}
 }
 
-func newReadForwardChar(forwarder *BLEForwarder) func(req ble.Request, rsp ble.ResponseWriter) {
+func newReadForwardCharHandler(forwarder *BLEForwarder) func(req ble.Request, rsp ble.ResponseWriter) {
 	return func(req ble.Request, rsp ble.ResponseWriter) {
-		if !forwarder.connected {
+		if !forwarder.isConnected() {
 			// TODO: handle error
 			return
 		}
-		if !forwarder.isConnectedToServer {
+		if !forwarder.isConnectedToServer() {
 			data, err := (*forwarder.cln).ReadCharacteristic(forwarder.nextHopReadForwardChar)
 			if err != nil {
 				// TODO: handle error
@@ -182,10 +185,10 @@ func newReadForwardChar(forwarder *BLEForwarder) func(req ble.Request, rsp ble.R
 func getService(forwarder *BLEForwarder) *ble.Service {
 	service := ble.NewService(ble.MustParse(MainServiceUUID))
 	write := ble.NewCharacteristic(ble.MustParse(WriteForwardCharUUID))
-	write.HandleWrite(ble.WriteHandlerFunc(newWriteForwardChar(forwarder)))
+	write.HandleWrite(ble.WriteHandlerFunc(newWriteForwardCharHandler(forwarder)))
 	service.AddCharacteristic(write)
 	read := ble.NewCharacteristic(ble.MustParse(ReadForwardCharUUID))
-	read.HandleRead(ble.ReadHandlerFunc(newReadForwardChar(forwarder)))
+	read.HandleRead(ble.ReadHandlerFunc(newReadForwardCharHandler(forwarder)))
 	service.AddCharacteristic(read)
 	return service
 }
