@@ -16,6 +16,14 @@ var errs []error
 var state map[string]BLEClientState
 var logs []ClientLogRequest
 
+func assertSimilar(t *testing.T, x int64, y int64) {
+	diff := x - y
+	if diff < 0 {
+		diff *= -1
+	}
+	assert.Assert(t, diff < 50)
+}
+
 func getTestServer() *BLEServer {
 	l := BLEServerStatusListener{
 		func(s BLEServerStatus, err error) { errs = append(errs, err) },
@@ -71,7 +79,7 @@ func TestTimeSyncChar(t *testing.T) {
 	b, err := char.HandleRead("some addr", context.Background())
 	assert.NilError(t, err)
 	ts, err := strconv.Atoi(string(b))
-	assert.Equal(t, int64(ts), util.UnixTS())
+	assertSimilar(t, int64(ts), util.UnixTS())
 }
 
 func TestClientLogChar(t *testing.T) {
