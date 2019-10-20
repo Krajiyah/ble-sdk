@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
@@ -17,7 +18,9 @@ const (
 	// WriteForwardCharUUID represents UUID for ble characteristic which handles forwarding of writes
 	WriteForwardCharUUID = "00030000-0003-1000-8000-00805F9B34FB"
 	// ReadForwardCharUUID represents UUID for ble characteristic which handles forwarding of reads
-	ReadForwardCharUUID         = "00030000-0004-1000-8000-00805F9B34FB"
+	ReadForwardCharUUID = "00030000-0004-1000-8000-00805F9B34FB"
+	// ReadRssiMapCharUUID represents UUID for ble characteristic which handles forwarding of reads
+	ReadRssiMapCharUUID         = "00030000-0005-1000-8000-00805F9B34FB"
 	shortestPathRefreshInterval = time.Second * 5
 	scanInterval                = time.Second * 2
 	maxConnectAttempts          = 5
@@ -30,7 +33,7 @@ type BLEForwarder struct {
 	secret                  string
 	serverAddr              string
 	connectedAddr           string
-	rssiMap                 map[string]map[string]int
+	rssiMap                 models.RssiMap
 	shortestPath            []string
 	ctx                     context.Context
 	cln                     *ble.Client
@@ -72,6 +75,7 @@ func (forwarder *BLEForwarder) scanLoop() {
 			rssi := a.RSSI()
 			addr := a.Address().String()
 			forwarder.rssiMap[forwarder.addr][addr] = rssi
+			// TODO: determine if addr is forwarder and read rssi map char and write result to forwarder.rssiMap
 		}, nil)
 	}
 }
@@ -182,13 +186,29 @@ func newReadForwardCharHandler(forwarder *BLEForwarder) func(req ble.Request, rs
 	}
 }
 
+func newReadRssiMapCharHandler(forwarder *BLEForwarder) func(req ble.Request, rsp ble.ResponseWriter) {
+	pa := util.NewPacketAggregator()
+	return server.GenerateReadHandler(forwarder.secret, pa, ReadRssiMapCharUUID, func(addr string, ctx context.Context) ([]byte, error) {
+		return forwarder.rssiMap.Data()
+	}, func(err error) {
+		// TODO: handle announcement error
+	})
+}
+
 func getService(forwarder *BLEForwarder) *ble.Service {
 	service := ble.NewService(ble.MustParse(MainServiceUUID))
+
 	write := ble.NewCharacteristic(ble.MustParse(WriteForwardCharUUID))
 	write.HandleWrite(ble.WriteHandlerFunc(newWriteForwardCharHandler(forwarder)))
 	service.AddCharacteristic(write)
+
 	read := ble.NewCharacteristic(ble.MustParse(ReadForwardCharUUID))
 	read.HandleRead(ble.ReadHandlerFunc(newReadForwardCharHandler(forwarder)))
 	service.AddCharacteristic(read)
+
+	readRssiMap := ble.NewCharacteristic(ble.MustParse(ReadRssiMapCharUUID))
+	readRssiMap.HandleRead(ble.ReadHandlerFunc(newReadRssiMapCharHandler(forwarder)))
+	service.AddCharacteristic(readRssiMap)
+
 	return service
 }

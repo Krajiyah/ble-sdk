@@ -65,7 +65,7 @@ func getSessionKey(uuid string, addr string) sessionKeyType {
 	return sessionKeyType(fmt.Sprintf("session || %s || %s", uuid, addr))
 }
 
-func generateReadHandler(server *BLEServer, uuid string, load func(string, context.Context) ([]byte, error)) func(req ble.Request, rsp ble.ResponseWriter) {
+func GenerateReadHandler(secret string, packetAggregator util.PacketAggregator, uuid string, load func(string, context.Context) ([]byte, error), onError func(error)) func(req ble.Request, rsp ble.ResponseWriter) {
 	return func(req ble.Request, rsp ble.ResponseWriter) {
 		addr := getAddrFromReq(req)
 		sessionKey := getSessionKey(uuid, addr)
@@ -76,23 +76,23 @@ func generateReadHandler(server *BLEServer, uuid string, load func(string, conte
 		} else {
 			data, err := load(addr, ctx)
 			if err != nil {
-				server.listener.OnReadOrWriteError(err)
+				onError(err)
 				return
 			}
-			encryptedData, err := util.Encrypt(data, server.secret)
+			encryptedData, err := util.Encrypt(data, secret)
 			if err != nil {
-				server.listener.OnReadOrWriteError(err)
+				onError(err)
 				return
 			}
-			guid, err = server.packetAggregator.AddData(encryptedData)
+			guid, err = packetAggregator.AddData(encryptedData)
 			if err != nil {
-				server.listener.OnReadOrWriteError(err)
+				onError(err)
 				return
 			}
 			ctx = context.WithValue(ctx, sessionKey, guid)
 			req.Conn().SetContext(ctx)
 		}
-		packetData, isLastPacket, err := server.packetAggregator.PopPacketDataFromStream(guid)
+		packetData, isLastPacket, err := packetAggregator.PopPacketDataFromStream(guid)
 		if isLastPacket {
 			ctx = context.WithValue(ctx, sessionKey, nil)
 			req.Conn().SetContext(ctx)
@@ -101,6 +101,10 @@ func generateReadHandler(server *BLEServer, uuid string, load func(string, conte
 			rsp.Write(packetData)
 		}
 	}
+}
+
+func generateReadHandler(server *BLEServer, uuid string, load func(string, context.Context) ([]byte, error)) func(req ble.Request, rsp ble.ResponseWriter) {
+	return GenerateReadHandler(server.secret, server.packetAggregator, uuid, load, server.listener.OnReadOrWriteError)
 }
 
 func constructReadChar(server *BLEServer, char *BLEReadCharacteristic) *ble.Characteristic {
