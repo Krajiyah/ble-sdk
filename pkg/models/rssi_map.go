@@ -13,6 +13,17 @@ func (rm *RssiMap) Data() ([]byte, error) {
 	return encode(rm)
 }
 
+// Merge will write input rssiMap to this rssiMap
+func (rm *RssiMap) Merge(o *RssiMap) {
+	actualRM := *rm
+	actualO := *o
+	for addr := range actualO {
+		for nestedAddr := range actualO[addr] {
+			actualRM[addr][nestedAddr] = actualO[addr][nestedAddr]
+		}
+	}
+}
+
 // GetRssiMapFromBytes constructs client state request from characteristic write payload
 func GetRssiMapFromBytes(data []byte) (*RssiMap, error) {
 	buf := bytes.NewBuffer(data)

@@ -43,7 +43,12 @@ func NewBLEClient(addr string, secret string, serverAddr string, onConnected fun
 	if err != nil {
 		return nil, err
 	}
-	ble.SetDefaultDevice(d)
+	return NewBLEClientSharedDevice(d, addr, secret, serverAddr, onConnected, onDisconnected)
+}
+
+// NewBLEClientSharedDevice is a function that creates a new ble client
+func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, serverAddr string, onConnected func(int, int), onDisconnected func()) (*BLEClient, error) {
+	ble.SetDefaultDevice(device)
 	return &BLEClient{
 		addr, secret, Disconnected, 0, nil, serverAddr, map[string]int{}, util.MakeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
@@ -138,15 +143,20 @@ func (client *BLEClient) filter(a ble.Advertisement) bool {
 	return b
 }
 
+// RawScan exposes underlying BLE scanner
+func (client *BLEClient) RawScan(handle func(ble.Advertisement)) error {
+	return ble.Scan(client.ctx, true, handle, nil)
+}
+
 func (client *BLEClient) scan() {
 	client.rssiMap = map[string]int{}
 	for {
 		time.Sleep(ScanInterval)
-		ble.Scan(client.ctx, true, func(a ble.Advertisement) {
+		client.RawScan(func(a ble.Advertisement) {
 			rssi := a.RSSI()
 			addr := a.Address().String()
 			client.rssiMap[addr] = rssi
-		}, nil)
+		})
 	}
 }
 
@@ -185,20 +195,25 @@ func (client *BLEClient) pingLoop() {
 	}
 }
 
-func (client *BLEClient) connect() error {
+// RawConnect exposes underlying ble connection functionality
+func (client *BLEClient) RawConnect(filter ble.AdvFilter) (*ble.Profile, error) {
 	if client.cln != nil {
 		(*client.cln).CancelConnection()
 	}
-	cln, err := ble.Connect(client.ctx, client.filter)
+	cln, err := ble.Connect(client.ctx, filter)
 	client.cln = &cln
 	if err != nil {
-		return err
+		return nil, err
 	}
 	_, err = cln.ExchangeMTU(util.MTU)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	p, err := cln.DiscoverProfile(true)
+	return cln.DiscoverProfile(true)
+}
+
+func (client *BLEClient) connect() error {
+	p, err := client.RawConnect(client.filter)
 	if err != nil {
 		return err
 	}
