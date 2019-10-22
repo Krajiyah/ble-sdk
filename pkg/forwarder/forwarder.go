@@ -37,6 +37,7 @@ type BLEForwarder struct {
 	forwardingClient *client.BLEClient
 	serverAddr       string
 	connectedAddr    string
+	toConnectAddr    string
 	rssiMap          models.RssiMap
 	readCharUUIDChan chan string
 	listener         models.BLEForwarderListener
@@ -50,7 +51,7 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 	}
 	f := &BLEForwarder{
 		addr, nil, nil,
-		serverAddr, "", map[string]map[string]int{},
+		serverAddr, "", "", map[string]map[string]int{},
 		make(chan string),
 		listener,
 	}
@@ -115,20 +116,24 @@ func (forwarder *BLEForwarder) scanLoop() {
 				continue
 			}
 			forwarder.rssiMap.Merge(rssiMap)
+			if forwarder.toConnectAddr != "" {
+				err := forwarder.keepTryConnect(connectionMutex, forwarder.toConnectAddr)
+				if err != nil {
+					forwarder.listener.OnConnectionError(err)
+				}
+			}
 		}
 	}()
 	go func() {
-		nextHopAddrPrev := ""
 		for {
 			time.Sleep(shortestPathRefreshInterval)
 			path, err := util.ShortestPathToServer(forwarder.addr, forwarder.serverAddr, forwarder.rssiMap)
 			nextHopAddr := path[0]
-			if err == nil && nextHopAddrPrev != nextHopAddr {
-				nextHopAddrPrev = nextHopAddr
-				err := forwarder.keepTryConnect(connectionMutex, nextHopAddr)
+			if err == nil && forwarder.toConnectAddr != nextHopAddr {
+				forwarder.toConnectAddr = nextHopAddr
+				err := forwarder.keepTryConnect(connectionMutex, forwarder.toConnectAddr)
 				if err != nil {
 					forwarder.listener.OnConnectionError(err)
-					continue
 				}
 			}
 		}
