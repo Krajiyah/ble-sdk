@@ -31,6 +31,14 @@ type ClientLogRequest struct {
 	Message string
 }
 
+// ForwarderRequest is the wrapped payload for forwarding data
+type ForwarderRequest struct {
+	CharUUID string
+	Payload  []byte
+	IsRead   bool
+	IsWrite  bool
+}
+
 func encode(x interface{}) ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 	enc := gob.NewEncoder(buf)
@@ -51,26 +59,36 @@ func (c *ClientLogRequest) Data() ([]byte, error) {
 	return encode(c)
 }
 
+// Data will return serialized form of struct as bytes
+func (f *ForwarderRequest) Data() ([]byte, error) {
+	return encode(f)
+}
+
+func getDecoder(data []byte) *gob.Decoder {
+	buf := bytes.NewBuffer(data)
+	return gob.NewDecoder(buf)
+}
+
 // GetClientStateRequestFromBytes constructs client state request from characteristic write payload
 func GetClientStateRequestFromBytes(data []byte) (*ClientStateRequest, error) {
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
+	dec := getDecoder(data)
 	var ret ClientStateRequest
 	err := dec.Decode(&ret)
-	if err != nil {
-		return nil, err
-	}
-	return &ret, nil
+	return &ret, err
 }
 
 // GetClientLogRequestFromBytes constructs client log request from characteristic write payload
 func GetClientLogRequestFromBytes(data []byte) (*ClientLogRequest, error) {
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
+	dec := getDecoder(data)
 	var ret ClientLogRequest
 	err := dec.Decode(&ret)
-	if err != nil {
-		return nil, err
-	}
-	return &ret, nil
+	return &ret, err
+}
+
+// GetForwarderRequestFromBytes constructs forwarder request from characteristic write payload
+func GetForwarderRequestFromBytes(data []byte) (*ForwarderRequest, error) {
+	dec := getDecoder(data)
+	var ret ForwarderRequest
+	err := dec.Decode(&ret)
+	return &ret, err
 }

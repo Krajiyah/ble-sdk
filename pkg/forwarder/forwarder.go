@@ -17,8 +17,10 @@ import (
 const (
 	// WriteForwardCharUUID represents UUID for ble characteristic which handles forwarding of writes
 	WriteForwardCharUUID = "00030000-0003-1000-8000-00805F9B34FB"
-	// ReadForwardCharUUID represents UUID for ble characteristic which handles forwarding of reads
-	ReadForwardCharUUID = "00030000-0004-1000-8000-00805F9B34FB"
+	// StartReadForwardCharUUID represents UUID for ble characteristic which handles forwarding of reads
+	StartReadForwardCharUUID = "00030000-0004-1000-8000-00805F9B34FB"
+	// EndReadForwardCharUUID represents UUID for ble characteristic which handles forwarding of reads
+	EndReadForwardCharUUID = "00030000-0006-1000-8000-00805F9B34FB"
 	// ReadRssiMapCharUUID represents UUID for ble characteristic which handles forwarding of reads
 	ReadRssiMapCharUUID         = "00030000-0005-1000-8000-00805F9B34FB"
 	shortestPathRefreshInterval = time.Second * 5
@@ -34,6 +36,7 @@ type BLEForwarder struct {
 	serverAddr       string
 	connectedAddr    string
 	rssiMap          models.RssiMap
+	readCharUUIDChan chan string
 }
 
 // NewBLEForwarder is a function that creates a new ble forwarder
@@ -45,12 +48,14 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 	f := &BLEForwarder{
 		addr, nil, nil,
 		serverAddr, "", map[string]map[string]int{},
+		make(chan string),
 	}
 	serv, err := server.NewBLEServerSharedDevice(d, name, secret, listener, []*server.BLEReadCharacteristic{
-		newReadForwardCharHandler(f),
-		newReadRssiMapCharHandler(f),
+		newEndReadForwardChar(f),
+		newReadRssiMapChar(f),
 	}, []*server.BLEWriteCharacteristic{
-		newWriteForwardCharHandler(f),
+		newWriteForwardChar(f),
+		newStartReadForwardChar(f),
 	})
 	if err != nil {
 		return nil, err
@@ -97,7 +102,7 @@ func (forwarder *BLEForwarder) scanLoop() {
 			}
 			data, err := forwarder.forwardingClient.ReadValue(ReadRssiMapCharUUID)
 			if err != nil {
-				// TODO: handle error
+				// TODO: handle error (could be due to being a server)
 				continue
 			}
 			rssiMap, err := models.GetRssiMapFromBytes(data)
@@ -167,7 +172,13 @@ func (forwarder *BLEForwarder) isConnectedToServer() bool {
 	return forwarder.connectedAddr == forwarder.serverAddr
 }
 
-func newWriteForwardCharHandler(forwarder *BLEForwarder) *server.BLEWriteCharacteristic {
+func newReadRssiMapChar(forwarder *BLEForwarder) *server.BLEReadCharacteristic {
+	return &server.BLEReadCharacteristic{ReadRssiMapCharUUID, func(addr string, ctx context.Context) ([]byte, error) {
+		return forwarder.rssiMap.Data()
+	}, func() {}}
+}
+
+func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic {
 	return &server.BLEWriteCharacteristic{WriteForwardCharUUID, func(addr string, data []byte, err error) {
 		if err != nil {
 			// TODO: handle error
@@ -184,26 +195,64 @@ func newWriteForwardCharHandler(forwarder *BLEForwarder) *server.BLEWriteCharact
 				return
 			}
 		} else {
-			// TODO: unpack data and determine correct server characteristc request
+			r, err := models.GetForwarderRequestFromBytes(data)
+			if err != nil {
+				// TODO: handle error
+				return
+			}
+			if r.IsRead || !r.IsWrite {
+				// TODO: handle error
+				return
+			}
+			err = forwarder.forwardingClient.WriteValue(r.CharUUID, r.Payload)
+			if err != nil {
+				// TODO: handle error
+				return
+			}
 		}
 	}, func() {}}
 }
 
-func newReadForwardCharHandler(forwarder *BLEForwarder) *server.BLEReadCharacteristic {
-	return &server.BLEReadCharacteristic{ReadForwardCharUUID, func(addr string, ctx context.Context) ([]byte, error) {
+func newStartReadForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic {
+	return &server.BLEWriteCharacteristic{StartReadForwardCharUUID, func(addr string, data []byte, err error) {
+		if err != nil {
+			// TODO: handle error
+			return
+		}
+		if !forwarder.isConnected() {
+			// TODO: handle error
+			return
+		}
+		if !forwarder.isConnectedToServer() {
+			err := forwarder.forwardingClient.WriteValue(StartReadForwardCharUUID, data)
+			if err != nil {
+				// TODO: handle error
+				return
+			}
+		} else {
+			r, err := models.GetForwarderRequestFromBytes(data)
+			if err != nil {
+				// TODO: handle error
+				return
+			}
+			if r.IsWrite || !r.IsRead {
+				// TODO: handle error
+				return
+			}
+			forwarder.readCharUUIDChan <- r.CharUUID
+		}
+	}, func() {}}
+}
+
+func newEndReadForwardChar(forwarder *BLEForwarder) *server.BLEReadCharacteristic {
+	return &server.BLEReadCharacteristic{EndReadForwardCharUUID, func(addr string, ctx context.Context) ([]byte, error) {
 		if !forwarder.isConnected() {
 			return nil, errors.New("Forwarder is not connected")
 		}
 		if !forwarder.isConnectedToServer() {
-			return forwarder.forwardingClient.ReadValue(ReadForwardCharUUID)
+			return forwarder.forwardingClient.ReadValue(EndReadForwardCharUUID)
 		}
-		// TODO: unpack data and determine correct server characteristc request
-		return nil, nil
-	}, func() {}}
-}
-
-func newReadRssiMapCharHandler(forwarder *BLEForwarder) *server.BLEReadCharacteristic {
-	return &server.BLEReadCharacteristic{ReadRssiMapCharUUID, func(addr string, ctx context.Context) ([]byte, error) {
-		return forwarder.rssiMap.Data()
+		c := <-forwarder.readCharUUIDChan
+		return forwarder.forwardingClient.ReadValue(c)
 	}, func() {}}
 }
