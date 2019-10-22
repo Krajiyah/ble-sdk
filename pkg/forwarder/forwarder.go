@@ -28,19 +28,16 @@ const (
 
 // BLEForwarder is a struct used to handle mesh network behaviors for forwarder
 type BLEForwarder struct {
-	addr                    string
-	forwardingServer        *server.BLEServer
-	forwardingClient        *client.BLEClient
-	serverAddr              string
-	connectedAddr           string
-	rssiMap                 models.RssiMap
-	nextHopWriteForwardChar *ble.Characteristic
-	nextHopReadForwardChar  *ble.Characteristic
-	serverCharacterstics    map[string]*ble.Characteristic
+	addr             string
+	forwardingServer *server.BLEServer
+	forwardingClient *client.BLEClient
+	serverAddr       string
+	connectedAddr    string
+	rssiMap          models.RssiMap
 }
 
 // NewBLEForwarder is a function that creates a new ble forwarder
-func NewBLEForwarder(name string, addr string, secret string, serverAddr string, listener server.BLEServerStatusListener) (*BLEForwarder, error) {
+func NewBLEForwarder(name string, addr string, secret string, serverAddr string, listener models.BLEServerStatusListener) (*BLEForwarder, error) {
 	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
@@ -48,7 +45,6 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 	f := &BLEForwarder{
 		addr, nil, nil,
 		serverAddr, "", map[string]map[string]int{},
-		nil, nil, map[string]*ble.Characteristic{},
 	}
 	serv, err := server.NewBLEServerSharedDevice(d, name, secret, listener, []*server.BLEReadCharacteristic{
 		newReadForwardCharHandler(f),
@@ -153,33 +149,13 @@ func (forwarder *BLEForwarder) keepTryConnect(mutex *sync.Mutex, addr string) er
 
 func (forwarder *BLEForwarder) connect(addr string) error {
 	forwarder.connectedAddr = ""
-	p, err := forwarder.forwardingClient.RawConnect(func(a ble.Advertisement) bool {
+	err := forwarder.forwardingClient.RawConnect(func(a ble.Advertisement) bool {
 		return util.AddrEqualAddr(a.Address().String(), addr)
 	})
 	if err != nil {
 		return err
 	}
 	forwarder.connectedAddr = addr
-	for _, s := range p.Services {
-		if !util.UuidEqualStr(s.UUID, server.MainServiceUUID) {
-			continue
-		}
-		if forwarder.connectedAddr == forwarder.serverAddr {
-			for _, c := range s.Characteristics {
-				forwarder.serverCharacterstics[c.UUID.String()] = c
-			}
-			break
-		} else {
-			for _, c := range s.Characteristics {
-				if util.UuidEqualStr(c.UUID, WriteForwardCharUUID) {
-					forwarder.nextHopWriteForwardChar = c
-				} else if util.UuidEqualStr(c.UUID, WriteForwardCharUUID) {
-					forwarder.nextHopReadForwardChar = c
-				}
-			}
-			break
-		}
-	}
 	return nil
 }
 
@@ -222,6 +198,7 @@ func newReadForwardCharHandler(forwarder *BLEForwarder) *server.BLEReadCharacter
 			return forwarder.forwardingClient.ReadValue(ReadForwardCharUUID)
 		}
 		// TODO: unpack data and determine correct server characteristc request
+		return nil, nil
 	}, func() {}}
 }
 

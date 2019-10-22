@@ -196,24 +196,20 @@ func (client *BLEClient) pingLoop() {
 }
 
 // RawConnect exposes underlying ble connection functionality
-func (client *BLEClient) RawConnect(filter ble.AdvFilter) (*ble.Profile, error) {
+func (client *BLEClient) RawConnect(filter ble.AdvFilter) error {
 	if client.cln != nil {
 		(*client.cln).CancelConnection()
 	}
 	cln, err := ble.Connect(client.ctx, filter)
 	client.cln = &cln
 	if err != nil {
-		return nil, err
+		return err
 	}
 	_, err = cln.ExchangeMTU(util.MTU)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return cln.DiscoverProfile(true)
-}
-
-func (client *BLEClient) connect() error {
-	p, err := client.RawConnect(client.filter)
+	p, err := cln.DiscoverProfile(true)
 	if err != nil {
 		return err
 	}
@@ -226,6 +222,10 @@ func (client *BLEClient) connect() error {
 		}
 	}
 	return nil
+}
+
+func (client *BLEClient) connect() error {
+	return client.RawConnect(client.filter)
 }
 
 func (client *BLEClient) getCharacteristic(uuid string) (*ble.Characteristic, error) {

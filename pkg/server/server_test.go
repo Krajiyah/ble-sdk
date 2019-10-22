@@ -16,6 +16,15 @@ var errs []error
 var state map[string]BLEClientState
 var logs []ClientLogRequest
 
+type testBLEServerStatusListener struct{}
+
+func (l testBLEServerStatusListener) OnServerStatusChanged(s BLEServerStatus, err error) {
+	errs = append(errs, err)
+}
+func (l testBLEServerStatusListener) OnClientStateMapChanged(m map[string]BLEClientState) { state = m }
+func (l testBLEServerStatusListener) OnClientLog(r ClientLogRequest)                      { logs = append(logs, r) }
+func (l testBLEServerStatusListener) OnReadOrWriteError(err error)                        { errs = append(errs, err) }
+
 func assertSimilar(t *testing.T, x int64, y int64) {
 	diff := x - y
 	if diff < 0 {
@@ -25,13 +34,7 @@ func assertSimilar(t *testing.T, x int64, y int64) {
 }
 
 func getTestServer() *BLEServer {
-	l := BLEServerStatusListener{
-		func(s BLEServerStatus, err error) { errs = append(errs, err) },
-		func(m map[string]BLEClientState) { state = m },
-		func(r ClientLogRequest) { logs = append(logs, r) },
-		func(err error) { errs = append(errs, err) },
-	}
-	return &BLEServer{"SomeName", "passwd123", Running, map[string]BLEClientState{}, util.NewPacketAggregator(), l}
+	return &BLEServer{"SomeName", "passwd123", Running, map[string]BLEClientState{}, util.NewPacketAggregator(), testBLEServerStatusListener{}}
 }
 
 func dummyReadChar() *BLEReadCharacteristic {

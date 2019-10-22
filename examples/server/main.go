@@ -18,6 +18,21 @@ const (
 // BLESecret is a compile time var (ldflag)
 var BLESecret string
 
+type myServerListener struct{}
+
+func (l myServerListener) OnServerStatusChanged(s models.BLEServerStatus, err error) {
+	fmt.Println(fmt.Sprintf("Server status changed: %s, Error: %s", s, err))
+}
+func (l myServerListener) OnClientStateMapChanged(m map[string]models.BLEClientState) {
+	fmt.Println(fmt.Sprintf("Client status changed: %+v", m))
+}
+func (l myServerListener) OnClientLog(r models.ClientLogRequest) {
+	fmt.Println(fmt.Sprintf("Client pushed log entry: %+v", r))
+}
+func (l myServerListener) OnReadOrWriteError(err error) {
+	fmt.Println(fmt.Sprintf("There was an error in handling a read or write operations from a characteristic: %s", err))
+}
+
 func main() {
 	if BLESecret == "" {
 		fmt.Println("please compile this with BLESecret as ldflag")
@@ -47,22 +62,8 @@ func main() {
 			}
 		}},
 	}
-	l := server.BLEServerStatusListener{
-		func(s models.BLEServerStatus, err error) {
-			fmt.Println(fmt.Sprintf("Server status changed: %s, Error: %s", s, err))
-		},
-		func(m map[string]models.BLEClientState) {
-			fmt.Println(fmt.Sprintf("Client status changed: %+v", m))
-		},
-		func(r models.ClientLogRequest) {
-			fmt.Println(fmt.Sprintf("Client pushed log entry: %+v", r))
-		},
-		func(err error) {
-			fmt.Println(fmt.Sprintf("There was an error in handling a read or write operations from a characteristic: %s", err))
-		},
-	}
 	fmt.Println("Starting BLE server...")
-	serv, err := server.NewBLEServer(serviceName, BLESecret, l, moreReadChars, moreWriteChars)
+	serv, err := server.NewBLEServer(serviceName, BLESecret, myServerListener{}, moreReadChars, moreWriteChars)
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble server: " + err.Error())
 	}

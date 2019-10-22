@@ -49,6 +49,13 @@ func (rw *mockRspWriter) SetStatus(status ble.ATTError) {}
 func (rw *mockRspWriter) Len() int                      { return testReadHandlerBuffer.Len() }
 func (rw *mockRspWriter) Cap() int                      { return testReadHandlerBuffer.Cap() }
 
+type testBlankListener struct{}
+
+func (l testBlankListener) OnServerStatusChanged(s BLEServerStatus, err error)  {}
+func (l testBlankListener) OnClientStateMapChanged(m map[string]BLEClientState) {}
+func (l testBlankListener) OnClientLog(r ClientLogRequest)                      {}
+func (l testBlankListener) OnReadOrWriteError(err error)                        {}
+
 func getRandBytes(t *testing.T) []byte {
 	b := make([]byte, util.MTU*3)
 	_, err := rand.Read(b)
@@ -57,13 +64,7 @@ func getRandBytes(t *testing.T) []byte {
 }
 
 func getDummyServer() *BLEServer {
-	l := BLEServerStatusListener{
-		func(s BLEServerStatus, err error) {},
-		func(m map[string]BLEClientState) {},
-		func(r ClientLogRequest) {},
-		func(err error) {},
-	}
-	return &BLEServer{"SomeName", "passwd123", Running, map[string]BLEClientState{}, util.NewPacketAggregator(), l}
+	return &BLEServer{"SomeName", "passwd123", Running, map[string]BLEClientState{}, util.NewPacketAggregator(), testBlankListener{}}
 }
 
 func getMockReq(data []byte) ble.Request {

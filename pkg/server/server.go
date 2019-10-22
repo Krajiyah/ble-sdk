@@ -34,14 +34,6 @@ type BLEServer struct {
 	listener         BLEServerStatusListener
 }
 
-// BLEServerStatusListener is an struct which can be used to implement custom state change listeners for server or for clients
-type BLEServerStatusListener struct {
-	OnServerStatusChanged   func(BLEServerStatus, error)
-	OnClientStateMapChanged func(map[string]BLEClientState)
-	OnClientLog             func(ClientLogRequest)
-	OnReadOrWriteError      func(error)
-}
-
 // NewBLEServer creates a new BLEService
 func NewBLEServer(name string, secret string, listener BLEServerStatusListener,
 	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, error) {
