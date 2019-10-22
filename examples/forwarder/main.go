@@ -27,12 +27,18 @@ func (l myServerListener) OnClientStateMapChanged(m map[string]models.BLEClientS
 func (l myServerListener) OnClientLog(r models.ClientLogRequest)                      {}
 func (l myServerListener) OnReadOrWriteError(err error)                               {}
 
+type myListener struct{}
+
+func (l myListener) OnConnectionError(err error)  {}
+func (l myListener) OnReadOrWriteError(err error) {}
+func (l myListener) OnError(err error)            {}
+
 func main() {
 	if BLESecret == "" || BLEForwarderAddr == "" || BLEServerAddr == "" {
 		fmt.Println("please compile this with BLESecret, BLEForwarderAddr, and BLEServerAddr as ldflag")
 		return
 	}
-	forward, err := forwarder.NewBLEForwarder(serviceName, BLEForwarderAddr, BLESecret, BLEServerAddr, myServerListener{})
+	forward, err := forwarder.NewBLEForwarder(serviceName, BLEForwarderAddr, BLESecret, BLEServerAddr, myServerListener{}, myListener{})
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble client: " + err.Error())
 	}
