@@ -12,4 +12,5 @@ sudo: false
 install: true
 script:
   - make
-  - make -B test
+  - make -B test > report.txt
+  - scripts/check_cov.sh
