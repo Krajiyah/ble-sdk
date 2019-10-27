@@ -49,7 +49,8 @@ func NewBLEServerSharedDevice(device ble.Device, name string, secret string, lis
 	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, error) {
 	server := &BLEServer{name, secret, Running, map[string]BLEClientState{}, util.NewPacketAggregator(), listener}
 	ble.SetDefaultDevice(device)
-	if err := ble.AddService(getService(server, moreReadChars, moreWriteChars)); err != nil {
+	err := ble.AddService(getService(server, moreReadChars, moreWriteChars))
+	if err != nil {
 		return nil, err
 	}
 	return server, nil
@@ -81,17 +82,21 @@ func getService(server *BLEServer, moreReadChars []*BLEReadCharacteristic, moreW
 	readChars := []*BLEReadCharacteristic{
 		newTimeSyncChar(server),
 	}
-	readChars = append(readChars, moreReadChars...)
-	for _, char := range readChars {
-		service.AddCharacteristic(constructReadChar(server, char))
+	if moreReadChars != nil {
+		readChars = append(readChars, moreReadChars...)
+		for _, char := range readChars {
+			service.AddCharacteristic(constructReadChar(server, char))
+		}
 	}
 	writeChars := []*BLEWriteCharacteristic{
 		newClientStatusChar(server),
 		newClientLogChar(server),
 	}
-	writeChars = append(writeChars, moreWriteChars...)
-	for _, char := range writeChars {
-		service.AddCharacteristic(constructWriteChar(server, char))
+	if moreWriteChars != nil {
+		writeChars = append(writeChars, moreWriteChars...)
+		for _, char := range writeChars {
+			service.AddCharacteristic(constructWriteChar(server, char))
+		}
 	}
 	return service
 }

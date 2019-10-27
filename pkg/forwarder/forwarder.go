@@ -51,7 +51,7 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 	}
 	f := &BLEForwarder{
 		addr, nil, nil,
-		serverAddr, "", "", map[string]map[string]int{},
+		serverAddr, "", "", models.RssiMap{},
 		make(chan string),
 		listener,
 	}
@@ -135,9 +135,8 @@ func (forwarder *BLEForwarder) refreshShortestPathLoop(mutex *sync.Mutex) {
 	for {
 		time.Sleep(shortestPathRefreshInterval)
 		path, err := util.ShortestPathToServer(forwarder.addr, forwarder.serverAddr, forwarder.rssiMap)
-		nextHopAddr := path[0]
-		if err == nil && forwarder.toConnectAddr != nextHopAddr {
-			forwarder.toConnectAddr = nextHopAddr
+		if err == nil && forwarder.toConnectAddr != path[0] {
+			forwarder.toConnectAddr = path[0]
 			err := forwarder.keepTryConnect(mutex, forwarder.toConnectAddr)
 			if err != nil {
 				forwarder.listener.OnConnectionError(err)

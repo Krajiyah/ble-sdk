@@ -46,6 +46,11 @@ func NewBLEClient(addr string, secret string, serverAddr string, onConnected fun
 	return NewBLEClientSharedDevice(d, addr, secret, serverAddr, onConnected, onDisconnected)
 }
 
+// SetMockCoreClient will set fake core ble.Client is needed (not required)
+func (client *BLEClient) SetMockCoreClient(c *ble.Client) {
+	client.cln = c
+}
+
 // NewBLEClientSharedDevice is a function that creates a new ble client
 func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, serverAddr string, onConnected func(int, int), onDisconnected func()) (*BLEClient, error) {
 	ble.SetDefaultDevice(device)
