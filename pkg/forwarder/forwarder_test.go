@@ -9,7 +9,6 @@ import (
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"gotest.tools/assert"
-	// "gotest.tools/assert"
 )
 
 const (
