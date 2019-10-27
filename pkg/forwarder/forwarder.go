@@ -76,68 +76,74 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 
 // Run is a method that runs the forwarder forever
 func (forwarder *BLEForwarder) Run() error {
-	go forwarder.scanLoop()
+	forwarder.scanAndUpdateLoops()
 	return forwarder.forwardingServer.Run()
 }
 
-func (forwarder *BLEForwarder) scanLoop() {
+func (forwarder *BLEForwarder) scanAndUpdateLoops() {
 	forwarder.rssiMap[forwarder.addr] = map[string]int{}
 	c := make(chan string)
 	connectionMutex := &sync.Mutex{}
-	go func() {
-		for {
-			time.Sleep(scanInterval)
-			forwarder.forwardingClient.RawScan(func(a ble.Advertisement) {
-				rssi := a.RSSI()
-				addr := a.Address().String()
-				forwarder.rssiMap[forwarder.addr][addr] = rssi
-				if isForwarderOrServer(a) {
-					c <- addr
-				}
-			})
+	go forwarder.scanLoop(c)
+	go forwarder.updateRssiMapLoop(connectionMutex, c)
+	go forwarder.refreshShortestPathLoop(connectionMutex)
+}
+
+func (forwarder *BLEForwarder) scanLoop(c chan string) {
+	for {
+		time.Sleep(scanInterval)
+		forwarder.forwardingClient.RawScan(func(a ble.Advertisement) {
+			rssi := a.RSSI()
+			addr := a.Address().String()
+			forwarder.rssiMap[forwarder.addr][addr] = rssi
+			if isForwarderOrServer(a) {
+				c <- addr
+			}
+		})
+	}
+}
+
+func (forwarder *BLEForwarder) updateRssiMapLoop(mutex *sync.Mutex, c chan string) {
+	for {
+		addr := <-c
+		err := forwarder.keepTryConnect(mutex, addr)
+		if err != nil {
+			forwarder.listener.OnConnectionError(err)
+			continue
 		}
-	}()
-	go func() {
-		for {
-			addr := <-c
-			err := forwarder.keepTryConnect(connectionMutex, addr)
+		data, err := forwarder.forwardingClient.ReadValue(ReadRssiMapCharUUID)
+		if err != nil {
+			forwarder.listener.OnConnectionError(err)
+			continue
+		}
+		rssiMap, err := models.GetRssiMapFromBytes(data)
+		if err != nil {
+			forwarder.listener.OnError(err)
+			continue
+		}
+		forwarder.rssiMap.Merge(rssiMap)
+		if forwarder.toConnectAddr != "" {
+			err := forwarder.keepTryConnect(mutex, forwarder.toConnectAddr)
 			if err != nil {
 				forwarder.listener.OnConnectionError(err)
-				continue
 			}
-			data, err := forwarder.forwardingClient.ReadValue(ReadRssiMapCharUUID)
+		}
+	}
+}
+
+func (forwarder *BLEForwarder) refreshShortestPathLoop(mutex *sync.Mutex) {
+	for {
+		time.Sleep(shortestPathRefreshInterval)
+		path, err := util.ShortestPathToServer(forwarder.addr, forwarder.serverAddr, forwarder.rssiMap)
+		nextHopAddr := path[0]
+		if err == nil && forwarder.toConnectAddr != nextHopAddr {
+			forwarder.toConnectAddr = nextHopAddr
+			err := forwarder.keepTryConnect(mutex, forwarder.toConnectAddr)
 			if err != nil {
 				forwarder.listener.OnConnectionError(err)
-				continue
-			}
-			rssiMap, err := models.GetRssiMapFromBytes(data)
-			if err != nil {
-				forwarder.listener.OnError(err)
-				continue
-			}
-			forwarder.rssiMap.Merge(rssiMap)
-			if forwarder.toConnectAddr != "" {
-				err := forwarder.keepTryConnect(connectionMutex, forwarder.toConnectAddr)
-				if err != nil {
-					forwarder.listener.OnConnectionError(err)
-				}
 			}
 		}
-	}()
-	go func() {
-		for {
-			time.Sleep(shortestPathRefreshInterval)
-			path, err := util.ShortestPathToServer(forwarder.addr, forwarder.serverAddr, forwarder.rssiMap)
-			nextHopAddr := path[0]
-			if err == nil && forwarder.toConnectAddr != nextHopAddr {
-				forwarder.toConnectAddr = nextHopAddr
-				err := forwarder.keepTryConnect(connectionMutex, forwarder.toConnectAddr)
-				if err != nil {
-					forwarder.listener.OnConnectionError(err)
-				}
-			}
-		}
-	}()
+	}
 }
 
 func isForwarderOrServer(a ble.Advertisement) bool {
