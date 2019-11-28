@@ -20,6 +20,14 @@ const (
 	PingInterval = time.Second * 1
 )
 
+// BLEClientInt is a interface used to abstract BLEClient
+type BLEClientInt interface {
+	RawScan(func(ble.Advertisement)) error
+	ReadValue(string) ([]byte, error)
+	RawConnect(ble.AdvFilter) error
+	WriteValue(string, []byte) error
+}
+
 // BLEClient is a struct used to handle client connection to BLEServer
 type BLEClient struct {
 	addr               string
@@ -44,11 +52,6 @@ func NewBLEClient(addr string, secret string, serverAddr string, onConnected fun
 		return nil, err
 	}
 	return NewBLEClientSharedDevice(d, addr, secret, serverAddr, onConnected, onDisconnected)
-}
-
-// SetMockCoreClient will set fake core ble.Client is needed (not required)
-func (client *BLEClient) SetMockCoreClient(c *ble.Client) {
-	client.cln = c
 }
 
 // NewBLEClientSharedDevice is a function that creates a new ble client
@@ -91,7 +94,7 @@ func (client *BLEClient) Log(log ClientLogRequest) error {
 }
 
 // ReadValue will read packeted data from ble server from given uuid
-func (client *BLEClient) ReadValue(uuid string) ([]byte, error) {
+func (client BLEClient) ReadValue(uuid string) ([]byte, error) {
 	c, err := client.getCharacteristic(uuid)
 	if err != nil {
 		return nil, err
@@ -112,7 +115,7 @@ func (client *BLEClient) ReadValue(uuid string) ([]byte, error) {
 }
 
 // WriteValue will write data (which is parsed to packets) to ble server to given uuid
-func (client *BLEClient) WriteValue(uuid string, data []byte) error {
+func (client BLEClient) WriteValue(uuid string, data []byte) error {
 	c, err := client.getCharacteristic(uuid)
 	if err != nil {
 		return err
@@ -149,7 +152,7 @@ func (client *BLEClient) filter(a ble.Advertisement) bool {
 }
 
 // RawScan exposes underlying BLE scanner
-func (client *BLEClient) RawScan(handle func(ble.Advertisement)) error {
+func (client BLEClient) RawScan(handle func(ble.Advertisement)) error {
 	return ble.Scan(client.ctx, true, handle, nil)
 }
 
@@ -200,8 +203,7 @@ func (client *BLEClient) pingLoop() {
 	}
 }
 
-// RawConnect exposes underlying ble connection functionality
-func (client *BLEClient) RawConnect(filter ble.AdvFilter) error {
+func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 	if client.cln != nil {
 		(*client.cln).CancelConnection()
 	}
@@ -227,6 +229,20 @@ func (client *BLEClient) RawConnect(filter ble.AdvFilter) error {
 		}
 	}
 	return nil
+}
+
+// RawConnect exposes underlying ble connection functionality
+func (client BLEClient) RawConnect(filter ble.AdvFilter) error {
+	var err error
+	util.TryCatchBlock{
+		Try: func() {
+			err = client.rawConnect(filter)
+		},
+		Catch: func(e error) {
+			err = e
+		},
+	}.Do()
+	return err
 }
 
 func (client *BLEClient) connect() error {

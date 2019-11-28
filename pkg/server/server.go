@@ -24,6 +24,11 @@ const (
 	PollingInterval = time.Second * 2
 )
 
+// BLEServerInt is a interface used to abstract BLEServer
+type BLEServerInt interface {
+	Run() error
+}
+
 // BLEServer is the struct used for instantiating a ble server
 type BLEServer struct {
 	name             string

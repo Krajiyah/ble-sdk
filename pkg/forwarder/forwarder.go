@@ -33,8 +33,8 @@ const (
 // BLEForwarder is a struct used to handle mesh network behaviors for forwarder
 type BLEForwarder struct {
 	addr             string
-	forwardingServer *server.BLEServer
-	forwardingClient *client.BLEClient
+	forwardingServer server.BLEServerInt
+	forwardingClient client.BLEClientInt
 	serverAddr       string
 	connectedAddr    string
 	toConnectAddr    string

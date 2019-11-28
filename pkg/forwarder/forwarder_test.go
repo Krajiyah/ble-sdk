@@ -5,9 +5,7 @@ import (
 	"time"
 
 	"github.com/Krajiyah/ble-sdk/internal"
-	"github.com/Krajiyah/ble-sdk/pkg/client"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
-	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"gotest.tools/assert"
 )
 
@@ -24,16 +22,6 @@ func (l dummyListener) OnConnectionError(err error)  {}
 func (l dummyListener) OnReadOrWriteError(err error) {}
 func (l dummyListener) OnError(err error)            {}
 
-type dummyServerListener struct{}
-
-func (l dummyServerListener) OnServerStatusChanged(s BLEServerStatus, err error)  {}
-func (l dummyServerListener) OnClientStateMapChanged(m map[string]BLEClientState) {}
-func (l dummyServerListener) OnClientLog(r ClientLogRequest)                      {}
-func (l dummyServerListener) OnReadOrWriteError(err error)                        {}
-
-func dummyClientOnConnected(attempts int, rssi int) {}
-func dummyClientOnDisconnected()                    {}
-
 func getDummyForwarder(t *testing.T, rssiMap RssiMap) *BLEForwarder {
 	f := &BLEForwarder{
 		testAddr, nil, nil,
@@ -42,23 +30,26 @@ func getDummyForwarder(t *testing.T, rssiMap RssiMap) *BLEForwarder {
 		dummyListener{},
 	}
 	c := internal.NewDummyCoreClient(testAddr)
-	d := internal.NewDummyDevice(rssiMap)
 	var err error
-	f.forwardingClient, err = client.NewBLEClientSharedDevice(d, testAddr, testSecret, testServerAddr, dummyClientOnConnected, dummyClientOnDisconnected)
+	// f.forwardingClient, err = client.NewBLEClientSharedDevice(d, testAddr, testSecret, testServerAddr, dummyClientOnConnected, dummyClientOnDisconnected)
 	assert.NilError(t, err)
-	f.forwardingClient.SetMockCoreClient(&c)
-	f.forwardingServer, err = server.NewBLEServerSharedDevice(d, testServerName, testSecret, dummyServerListener{}, nil, nil)
+	// f.forwardingServer, err = server.NewBLEServerSharedDevice(d, testServerName, testSecret, dummyServerListener{}, nil, nil)
 	assert.NilError(t, err)
 	return f
 }
 
 func TestScanAndUpdateLoops(t *testing.T) {
-	expectedRssiMap := RssiMap{} // TODO: ... make scenario
+	expectedRssiMap := RssiMap{
+		testAddr: map[string]int{
+			testServerAddr: -90,
+		},
+	}
 	forwarder := getDummyForwarder(t, expectedRssiMap)
 	forwarder.scanAndUpdateLoops()
 	time.Sleep(scanInterval)
 	time.Sleep(shortestPathRefreshInterval)
+	// select {}
+	assert.Equal(t, forwarder.rssiMap, expectedRssiMap)
 	assert.Equal(t, forwarder.toConnectAddr, forwarder.serverAddr)
 	assert.Equal(t, forwarder.connectedAddr, forwarder.serverAddr)
-	assert.Equal(t, forwarder.rssiMap, expectedRssiMap)
 }
