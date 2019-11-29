@@ -11,16 +11,16 @@ func abs(x int) int {
 	return x * -1
 }
 
-func rememberHash(s string, mem map[int]string, reverseMem map[string]int, numNodes int) (int, int) {
+func rememberHash(s string, mem map[int]string, reverseMem map[string]int, numNodes int) (int, bool, int) {
 	var h int
 	var ok bool
 	if h, ok = reverseMem[s]; !ok {
 		h = numNodes
+		numNodes = numNodes + 1
 	}
 	mem[h] = s
 	reverseMem[s] = h
-	numNodes = numNodes + 1
-	return h, numNodes
+	return h, !ok, numNodes
 }
 
 // ShortestPathToServer tells forwarder which path to take to forward packets to server
@@ -31,16 +31,29 @@ func ShortestPathToServer(forwarderAddr string, serverAddr string, rssiMap map[s
 	numNodes := 0
 	var dst int
 	var src int
+	var newNode bool
 	for addr := range rssiMap {
-		src, numNodes = rememberHash(addr, hashMem, reverseHashMem, numNodes)
-		graph.AddVertex(src)
+		src, newNode, numNodes = rememberHash(addr, hashMem, reverseHashMem, numNodes)
+		if newNode {
+			graph.AddVertex(src)
+		}
 		for dstAddr := range rssiMap[addr] {
-			dst, numNodes = rememberHash(dstAddr, hashMem, reverseHashMem, numNodes)
-			graph.AddArc(src, dst, int64(abs(rssiMap[addr][dstAddr])))
+			dst, newNode, numNodes = rememberHash(dstAddr, hashMem, reverseHashMem, numNodes)
+			if newNode {
+				graph.AddVertex(dst)
+			}
+			v := int64(abs(rssiMap[addr][dstAddr]))
+			graph.AddArc(src, dst, v)
 		}
 	}
-	src, numNodes = rememberHash(forwarderAddr, hashMem, reverseHashMem, numNodes)
-	dst, numNodes = rememberHash(serverAddr, hashMem, reverseHashMem, numNodes)
+	src, newNode, numNodes = rememberHash(forwarderAddr, hashMem, reverseHashMem, numNodes)
+	if newNode {
+		graph.AddVertex(src)
+	}
+	dst, newNode, numNodes = rememberHash(serverAddr, hashMem, reverseHashMem, numNodes)
+	if newNode {
+		graph.AddVertex(dst)
+	}
 	_, err := graph.GetVertex(src)
 	if err != nil {
 		return nil, err
@@ -53,7 +66,7 @@ func ShortestPathToServer(forwarderAddr string, serverAddr string, rssiMap map[s
 	if err != nil {
 		return nil, err
 	}
-	ret := make([]string, len(shortest.Path))
+	ret := []string{}
 	for ele := range shortest.Path {
 		ret = append(ret, hashMem[ele])
 	}

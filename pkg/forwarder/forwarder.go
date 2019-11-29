@@ -96,7 +96,7 @@ func (forwarder *BLEForwarder) scanLoop(c chan string) {
 			rssi := a.RSSI()
 			addr := a.Address().String()
 			forwarder.rssiMap[forwarder.addr][addr] = rssi
-			if isForwarderOrServer(a) {
+			if addr != forwarder.serverAddr && isForwarder(a) {
 				c <- addr
 			}
 		})
@@ -135,8 +135,8 @@ func (forwarder *BLEForwarder) refreshShortestPathLoop(mutex *sync.Mutex) {
 	for {
 		time.Sleep(shortestPathRefreshInterval)
 		path, err := util.ShortestPathToServer(forwarder.addr, forwarder.serverAddr, forwarder.rssiMap)
-		if err == nil && forwarder.toConnectAddr != path[0] {
-			forwarder.toConnectAddr = path[0]
+		if err == nil && len(path) >= 2 && forwarder.toConnectAddr != path[1] {
+			forwarder.toConnectAddr = path[1]
 			err := forwarder.keepTryConnect(mutex, forwarder.toConnectAddr)
 			if err != nil {
 				forwarder.listener.OnConnectionError(err)
@@ -145,7 +145,7 @@ func (forwarder *BLEForwarder) refreshShortestPathLoop(mutex *sync.Mutex) {
 	}
 }
 
-func isForwarderOrServer(a ble.Advertisement) bool {
+func isForwarder(a ble.Advertisement) bool {
 	for _, service := range a.Services() {
 		if util.UuidEqualStr(service, server.MainServiceUUID) {
 			return true
