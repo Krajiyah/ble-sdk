@@ -1,7 +1,8 @@
 package forwarder
 
 import (
-	"errors"
+	"fmt"
+	"github.com/pkg/errors"
 	"sync"
 	"time"
 
@@ -92,61 +93,80 @@ func (forwarder *BLEForwarder) scanLoop() {
 		time.Sleep(scanInterval)
 		forwarder.forwardingClient.RawScan(func(a ble.Advertisement) {
 			mutex.Lock()
-			forwarder.onScanned(a)
+			err := forwarder.onScanned(a)
+			if err != nil {
+				forwarder.listener.OnError(err)
+			}
 			mutex.Unlock()
 		})
 	}
 }
 
-func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) {
+func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	rssi := a.RSSI()
 	addr := a.Address().String()
 	diff := forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
 	if diff {
 		if addr != forwarder.serverAddr && isForwarder(a) {
-			// forwarder.updateRssiMap(addr)
+			return forwarder.updateRssiMap(addr)
 		}
-		forwarder.refreshShortestPath()
+		return forwarder.refreshShortestPath()
 	}
+	return nil
 }
 
-func (forwarder *BLEForwarder) updateRssiMap(addr string) {
+func wrapError(e1, e2 error) error {
+	if e2 == nil {
+		return e1
+	}
+	return errors.Wrap(e1, e2.Error())
+}
+
+func (forwarder *BLEForwarder) updateRssiMap(addr string) error {
 	err := forwarder.keepTryConnect(addr)
 	if err != nil {
-		forwarder.listener.OnConnectionError(err)
-		return
+		e := forwarder.reconnect()
+		return wrapError(err, e)
 	}
 	data, err := forwarder.forwardingClient.ReadValue(ReadRssiMapCharUUID)
 	if err != nil {
-		forwarder.listener.OnConnectionError(err)
-		return
+		e := forwarder.reconnect()
+		return wrapError(err, e)
 	}
 	rssiMap, err := models.GetRssiMapFromBytes(data)
 	if err != nil {
-		forwarder.listener.OnError(err)
-		return
+		e := forwarder.reconnect()
+		return wrapError(err, e)
 	}
 	forwarder.rssiMap.Merge(rssiMap)
-	if forwarder.toConnectAddr != "" {
-		err := forwarder.keepTryConnect(forwarder.toConnectAddr)
-		if err != nil {
-			forwarder.listener.OnConnectionError(err)
-		}
-	}
+	return forwarder.reconnect()
 }
 
-func (forwarder *BLEForwarder) refreshShortestPath() {
+func (forwarder *BLEForwarder) reconnect() error {
+	if forwarder.toConnectAddr == "" {
+		return nil
+	}
+	return forwarder.keepTryConnect(forwarder.toConnectAddr)
+}
+
+func (forwarder *BLEForwarder) refreshShortestPath() error {
 	path, err := util.ShortestPath(forwarder.rssiMap, forwarder.addr, forwarder.serverAddr)
-	if err == nil && len(path) >= 2 && forwarder.toConnectAddr != path[1] {
-		nextHop := path[1]
+	if err != nil {
+		return err
+	}
+	if len(path) < 2 {
+		return fmt.Errorf("Invalid path to server: %s", path)
+	}
+	nextHop := path[1]
+	if forwarder.toConnectAddr != nextHop {
 		forwarder.toConnectAddr = nextHop
 		err := forwarder.keepTryConnect(nextHop)
-		if err != nil {
-			forwarder.listener.OnConnectionError(err)
-		} else {
+		if err == nil {
 			forwarder.listener.OnNextHopChanged(nextHop)
 		}
+		return err
 	}
+	return nil
 }
 
 func isForwarder(a ble.Advertisement) bool {

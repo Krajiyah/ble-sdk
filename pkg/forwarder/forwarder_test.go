@@ -11,21 +11,19 @@ import (
 )
 
 const (
+	invalidAddr    = "33:22:33:44:55:66"
 	testServerName = "Some Name"
 	testAddr       = "11:22:33:44:55:66"
+	testAddr2      = "44:22:33:44:55:66"
 	testSecret     = "passwd123"
 	testServerAddr = "22:22:33:44:55:66"
 )
 
-var (
-	nextHop           = make(chan string)
-	mockedReadValue   = []byte{}
-	mockedWriteBuffer = [][]byte{}
-)
+type dummyListener struct {
+	nextHop chan string
+}
 
-type dummyListener struct{}
-
-func (l dummyListener) OnNextHopChanged(addr string) { nextHop <- addr }
+func (l dummyListener) OnNextHopChanged(addr string) { l.nextHop <- addr }
 func (l dummyListener) OnConnectionError(err error)  {}
 func (l dummyListener) OnReadOrWriteError(err error) {}
 func (l dummyListener) OnError(err error)            {}
@@ -56,7 +54,9 @@ func (a dummyAdv) RSSI() int                    { return a.rssi }
 func (a dummyAdv) Address() ble.Addr            { return a.addr }
 
 type dummyClient struct {
-	dummyRssiMap RssiMap
+	dummyRssiMap      RssiMap
+	mockedReadValue   []byte
+	mockedWriteBuffer [][]byte
 }
 
 func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
@@ -69,13 +69,13 @@ func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
 }
 
 func (c dummyClient) ReadValue(string) ([]byte, error) {
-	return mockedReadValue, nil
+	return c.mockedReadValue, nil
 }
 
 func (c dummyClient) RawConnect(ble.AdvFilter) error { return nil }
 
 func (c dummyClient) WriteValue(char string, data []byte) error {
-	mockedWriteBuffer = append(mockedWriteBuffer, data)
+	c.mockedWriteBuffer = append(c.mockedWriteBuffer, data)
 	return nil
 }
 
@@ -83,25 +83,64 @@ type dummyServer struct{}
 
 func (s dummyServer) Run() error { return nil }
 
-func getDummyForwarder(t *testing.T, rssiMap RssiMap) *BLEForwarder {
-	f := newBLEForwarder(testAddr, testServerAddr, dummyListener{})
-	f.forwardingClient = dummyClient{rssiMap}
-	f.forwardingServer = dummyServer{}
-	return f
+type testStructs struct {
+	forwarder         *BLEForwarder
+	nextHop           chan string
+	mockedReadValue   []byte
+	mockedWriteBuffer [][]byte
 }
 
-func TestScanLoopAndRefreshLoop(t *testing.T) {
+func getDummyForwarder(t *testing.T, addr string, rssiMap RssiMap) testStructs {
+	nextHop := make(chan string)
+	mockedReadValue := []byte{}
+	mockedWriteBuffer := [][]byte{}
+	f := newBLEForwarder(addr, testServerAddr, dummyListener{nextHop})
+	f.forwardingClient = dummyClient{rssiMap, mockedReadValue, mockedWriteBuffer}
+	f.forwardingServer = dummyServer{}
+	return testStructs{f, nextHop, mockedReadValue, mockedWriteBuffer}
+}
+
+func TestSingleForwarder(t *testing.T) {
 	expectedRssiMap := RssiMap{
 		testAddr: map[string]int{
-			testServerAddr:      -90,
-			"33:22:33:44:55:66": -10000,
+			testServerAddr: -90,
+			invalidAddr:    -10000,
 		},
 	}
-	forwarder := getDummyForwarder(t, expectedRssiMap)
+	s := getDummyForwarder(t, testAddr, expectedRssiMap)
+	forwarder, nextHop := s.forwarder, s.nextHop
 	forwarder.Run()
 	addr := <-nextHop
 	assert.Equal(t, addr, forwarder.serverAddr)
 	assert.DeepEqual(t, forwarder.rssiMap, expectedRssiMap)
 	assert.Equal(t, forwarder.toConnectAddr, forwarder.serverAddr)
 	assert.Equal(t, forwarder.connectedAddr, forwarder.serverAddr)
+}
+
+func TestDoubleForwarder(t *testing.T) {
+	expectedRssiMap := RssiMap{
+		testAddr: map[string]int{
+			testServerAddr: -90,
+			testAddr2:      -30,
+		},
+		testAddr2: map[string]int{
+			testServerAddr: -10,
+		},
+	}
+	s1 := getDummyForwarder(t, testAddr, expectedRssiMap)
+	s2 := getDummyForwarder(t, testAddr2, expectedRssiMap)
+	f1, nextHop1 := s1.forwarder, s1.nextHop
+	f2, nextHop2 := s2.forwarder, s2.nextHop
+	f1.Run()
+	f2.Run()
+	addr2 := <-nextHop2
+	assert.Equal(t, addr2, f2.serverAddr)
+	assert.DeepEqual(t, f2.rssiMap, expectedRssiMap)
+	assert.Equal(t, f2.toConnectAddr, f2.serverAddr)
+	assert.Equal(t, f2.connectedAddr, f2.serverAddr)
+	addr1 := <-nextHop1
+	assert.Equal(t, addr1, testAddr2)
+	assert.DeepEqual(t, f1.rssiMap, expectedRssiMap)
+	assert.Equal(t, f1.toConnectAddr, testAddr2)
+	assert.Equal(t, f1.connectedAddr, testAddr2)
 }
