@@ -13,6 +13,21 @@ func (rm *RssiMap) Data() ([]byte, error) {
 	return encode(rm)
 }
 
+// Set will update the map and return if there was a diff
+func (rm *RssiMap) Set(src, dst string, new int) bool {
+	diff := true
+	actualRM := *rm
+	if x, ok := actualRM[src]; ok {
+		if old, ok := x[dst]; ok {
+			if old == new {
+				diff = false
+			}
+		}
+	}
+	actualRM[src][dst] = new
+	return diff
+}
+
 // Merge will write input rssiMap to this rssiMap
 func (rm *RssiMap) Merge(o *RssiMap) {
 	actualRM := *rm

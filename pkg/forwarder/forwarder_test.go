@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Krajiyah/ble-sdk/pkg/server"
+
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/currantlabs/ble"
 	"gotest.tools/assert"
@@ -41,13 +43,16 @@ func (addr dummyAddr) String() string { return addr.addr }
 func (a dummyAdv) LocalName() string              { return "" }
 func (a dummyAdv) ManufacturerData() []byte       { return nil }
 func (a dummyAdv) ServiceData() []ble.ServiceData { return nil }
-func (a dummyAdv) Services() []ble.UUID           { return nil }
-func (a dummyAdv) OverflowService() []ble.UUID    { return nil }
-func (a dummyAdv) TxPowerLevel() int              { return 0 }
-func (a dummyAdv) Connectable() bool              { return true }
-func (a dummyAdv) SolicitedService() []ble.UUID   { return nil }
-func (a dummyAdv) RSSI() int                      { return a.rssi }
-func (a dummyAdv) Address() ble.Addr              { return a.addr }
+func (a dummyAdv) Services() []ble.UUID {
+	u, _ := ble.Parse(server.MainServiceUUID)
+	return []ble.UUID{u}
+}
+func (a dummyAdv) OverflowService() []ble.UUID  { return nil }
+func (a dummyAdv) TxPowerLevel() int            { return 0 }
+func (a dummyAdv) Connectable() bool            { return true }
+func (a dummyAdv) SolicitedService() []ble.UUID { return nil }
+func (a dummyAdv) RSSI() int                    { return a.rssi }
+func (a dummyAdv) Address() ble.Addr            { return a.addr }
 
 type dummyClient struct {
 	dummyRssiMap RssiMap
@@ -78,12 +83,7 @@ type dummyServer struct{}
 func (s dummyServer) Run() error { return nil }
 
 func getDummyForwarder(t *testing.T, rssiMap RssiMap) *BLEForwarder {
-	f := &BLEForwarder{
-		testAddr, nil, nil,
-		testServerAddr, "", "", RssiMap{},
-		make(chan string),
-		dummyListener{},
-	}
+	f := newBLEForwarder(testAddr, testServerAddr, dummyListener{})
 	f.forwardingClient = dummyClient{rssiMap}
 	f.forwardingServer = dummyServer{}
 	return f
@@ -93,13 +93,12 @@ func TestScanLoopAndRefreshLoop(t *testing.T) {
 	expectedRssiMap := RssiMap{
 		testAddr: map[string]int{
 			testServerAddr:      -90,
-			"33:22:33:44:55:66": -99,
+			"33:22:33:44:55:66": -10000,
 		},
 	}
 	forwarder := getDummyForwarder(t, expectedRssiMap)
-	forwarder.scanAndUpdateLoops()
-	time.Sleep(scanInterval)
-	time.Sleep(shortestPathRefreshInterval)
+	forwarder.Run()
+	time.Sleep(scanInterval + (time.Millisecond * 250))
 	assert.DeepEqual(t, forwarder.rssiMap, expectedRssiMap)
 	assert.Equal(t, forwarder.toConnectAddr, forwarder.serverAddr)
 	assert.Equal(t, forwarder.connectedAddr, forwarder.serverAddr)
