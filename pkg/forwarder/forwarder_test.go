@@ -2,7 +2,6 @@ package forwarder
 
 import (
 	"testing"
-	"time"
 
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 
@@ -19,12 +18,14 @@ const (
 )
 
 var (
+	nextHop           = make(chan string)
 	mockedReadValue   = []byte{}
 	mockedWriteBuffer = [][]byte{}
 )
 
 type dummyListener struct{}
 
+func (l dummyListener) OnNextHopChanged(addr string) { nextHop <- addr }
 func (l dummyListener) OnConnectionError(err error)  {}
 func (l dummyListener) OnReadOrWriteError(err error) {}
 func (l dummyListener) OnError(err error)            {}
@@ -98,7 +99,8 @@ func TestScanLoopAndRefreshLoop(t *testing.T) {
 	}
 	forwarder := getDummyForwarder(t, expectedRssiMap)
 	forwarder.Run()
-	time.Sleep(scanInterval + (time.Millisecond * 250))
+	addr := <-nextHop
+	assert.Equal(t, addr, forwarder.serverAddr)
 	assert.DeepEqual(t, forwarder.rssiMap, expectedRssiMap)
 	assert.Equal(t, forwarder.toConnectAddr, forwarder.serverAddr)
 	assert.Equal(t, forwarder.connectedAddr, forwarder.serverAddr)

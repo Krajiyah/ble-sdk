@@ -59,7 +59,7 @@ func TestShortestPathCase3(t *testing.T) {
 			e: 4,
 		},
 		e: map[string]int{
-			b: 200,
+			b: 2,
 		},
 		d: map[string]int{
 			f: 3,

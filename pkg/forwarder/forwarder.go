@@ -104,7 +104,7 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) {
 	diff := forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
 	if diff {
 		if addr != forwarder.serverAddr && isForwarder(a) {
-			forwarder.updateRssiMap(addr)
+			// forwarder.updateRssiMap(addr)
 		}
 		forwarder.refreshShortestPath()
 	}
@@ -143,6 +143,8 @@ func (forwarder *BLEForwarder) refreshShortestPath() {
 		err := forwarder.keepTryConnect(nextHop)
 		if err != nil {
 			forwarder.listener.OnConnectionError(err)
+		} else {
+			forwarder.listener.OnNextHopChanged(nextHop)
 		}
 	}
 }
