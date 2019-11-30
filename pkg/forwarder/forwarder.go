@@ -102,44 +102,46 @@ func (forwarder *BLEForwarder) scanLoop() {
 	}
 }
 
-func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
-	rssi := a.RSSI()
-	addr := a.Address().String()
-	diff := forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
-	if diff {
-		if addr != forwarder.serverAddr && isForwarder(a) {
-			return forwarder.updateRssiMap(addr)
-		}
-		return forwarder.refreshShortestPath()
-	}
-	return nil
-}
-
 func wrapError(e1, e2 error) error {
+	if e1 == nil {
+		return e2
+	}
 	if e2 == nil {
 		return e1
 	}
 	return errors.Wrap(e1, e2.Error())
 }
 
+func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
+	rssi := a.RSSI()
+	addr := a.Address().String()
+	diff := forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
+	if diff {
+		if addr != forwarder.serverAddr && isForwarder(a) {
+			err := forwarder.updateRssiMap(addr)
+			e := forwarder.reconnect()
+			return wrapError(err, e)
+		}
+		return forwarder.refreshShortestPath()
+	}
+	return nil
+}
+
 func (forwarder *BLEForwarder) updateRssiMap(addr string) error {
 	err := forwarder.keepTryConnect(addr)
 	if err != nil {
-		e := forwarder.reconnect()
-		return wrapError(err, e)
+		return err
 	}
 	data, err := forwarder.forwardingClient.ReadValue(ReadRssiMapCharUUID)
 	if err != nil {
-		e := forwarder.reconnect()
-		return wrapError(err, e)
+		return err
 	}
 	rssiMap, err := models.GetRssiMapFromBytes(data)
 	if err != nil {
-		e := forwarder.reconnect()
-		return wrapError(err, e)
+		return err
 	}
 	forwarder.rssiMap.Merge(rssiMap)
-	return forwarder.reconnect()
+	return nil
 }
 
 func (forwarder *BLEForwarder) reconnect() error {
