@@ -38,7 +38,7 @@ type BLEForwarder struct {
 	serverAddr       string
 	connectedAddr    string
 	toConnectAddr    string
-	rssiMap          models.RssiMap
+	rssiMap          *models.RssiMap
 	readCharUUIDChan chan string
 	listener         models.BLEForwarderListener
 }
@@ -46,7 +46,7 @@ type BLEForwarder struct {
 func newBLEForwarder(addr, serverAddr string, listener models.BLEForwarderListener) *BLEForwarder {
 	return &BLEForwarder{
 		addr, nil, nil,
-		serverAddr, "", "", models.RssiMap{},
+		serverAddr, "", "", &models.RssiMap{},
 		make(chan string),
 		listener,
 	}
@@ -82,7 +82,6 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 
 // Run is a method that runs the forwarder forever
 func (forwarder *BLEForwarder) Run() error {
-	forwarder.rssiMap[forwarder.addr] = map[string]int{}
 	go forwarder.scanLoop()
 	return forwarder.forwardingServer.Run()
 }
@@ -115,16 +114,19 @@ func wrapError(e1, e2 error) error {
 func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	rssi := a.RSSI()
 	addr := a.Address().String()
-	diff := forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
-	if diff {
-		if addr != forwarder.serverAddr && isForwarder(a) {
-			err := forwarder.updateRssiMap(addr)
-			e := forwarder.reconnect()
-			return wrapError(err, e)
-		}
-		return forwarder.refreshShortestPath()
+	forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
+	isF := isForwarder(a)
+	var err error
+	if addr != forwarder.serverAddr && isF {
+		err = forwarder.updateRssiMap(addr)
+		e := forwarder.reconnect()
+		err = wrapError(err, e)
 	}
-	return nil
+	if addr == forwarder.serverAddr || isF {
+		e := forwarder.refreshShortestPath()
+		err = wrapError(err, e)
+	}
+	return err
 }
 
 func (forwarder *BLEForwarder) updateRssiMap(addr string) error {
@@ -152,7 +154,7 @@ func (forwarder *BLEForwarder) reconnect() error {
 }
 
 func (forwarder *BLEForwarder) refreshShortestPath() error {
-	path, err := util.ShortestPath(forwarder.rssiMap, forwarder.addr, forwarder.serverAddr)
+	path, err := util.ShortestPath(*forwarder.rssiMap, forwarder.addr, forwarder.serverAddr)
 	if err != nil {
 		return err
 	}
@@ -162,13 +164,9 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 	nextHop := path[1]
 	if forwarder.toConnectAddr != nextHop {
 		forwarder.toConnectAddr = nextHop
-		err := forwarder.keepTryConnect(nextHop)
-		if err == nil {
-			forwarder.listener.OnNextHopChanged(nextHop)
-		}
-		return err
+		err = forwarder.keepTryConnect(nextHop)
 	}
-	return nil
+	return err
 }
 
 func isForwarder(a ble.Advertisement) bool {

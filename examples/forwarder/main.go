@@ -29,7 +29,6 @@ func (l myServerListener) OnReadOrWriteError(err error)                         
 
 type myListener struct{}
 
-func (l myListener) OnNextHopChanged(addr string) {}
 func (l myListener) OnConnectionError(err error)  {}
 func (l myListener) OnReadOrWriteError(err error) {}
 func (l myListener) OnError(err error)            {}

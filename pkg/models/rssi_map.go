@@ -13,19 +13,13 @@ func (rm *RssiMap) Data() ([]byte, error) {
 	return encode(rm)
 }
 
-// Set will update the map and return if there was a diff
-func (rm *RssiMap) Set(src, dst string, new int) bool {
-	diff := true
+// Set will update the map
+func (rm *RssiMap) Set(src, dst string, new int) {
 	actualRM := *rm
-	if x, ok := actualRM[src]; ok {
-		if old, ok := x[dst]; ok {
-			if old == new {
-				diff = false
-			}
-		}
+	if _, ok := actualRM[src]; !ok {
+		actualRM[src] = map[string]int{}
 	}
 	actualRM[src][dst] = new
-	return diff
 }
 
 // Merge will write input rssiMap to this rssiMap
@@ -34,7 +28,7 @@ func (rm *RssiMap) Merge(o *RssiMap) {
 	actualO := *o
 	for addr := range actualO {
 		for nestedAddr := range actualO[addr] {
-			actualRM[addr][nestedAddr] = actualO[addr][nestedAddr]
+			actualRM.Set(addr, nestedAddr, actualO[addr][nestedAddr])
 		}
 	}
 }
