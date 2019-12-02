@@ -145,10 +145,7 @@ func TestIsForwarder(t *testing.T) {
 	assert.Equal(t, IsForwarder(DummyAdv{DummyAddr{testServerAddr}, testRSSI}), true)
 }
 
-func TestUnixTS(t *testing.T) {
-	client, dummyClient := getDummyClient()
-
-	// mock server read
+func mockUnixTS(t *testing.T, buffer *bytes.Buffer) int64 {
 	pa := util.NewPacketAggregator()
 	expected := util.UnixTS()
 	encData, err := util.Encrypt([]byte(strconv.Itoa(int(expected))), testSecret)
@@ -157,9 +154,17 @@ func TestUnixTS(t *testing.T) {
 	assert.NilError(t, err)
 	var isLastPacket bool
 	data, isLastPacket, err := pa.PopPacketDataFromStream(guid)
-	dummyClient.mockedReadCharData.Write(data)
+	buffer.Write(data)
 	assert.NilError(t, err)
 	assert.Assert(t, isLastPacket)
+	return expected
+}
+
+func TestUnixTS(t *testing.T) {
+	client, dummyClient := getDummyClient()
+
+	// mock server read
+	expected := mockUnixTS(t, dummyClient.mockedReadCharData)
 
 	// test client read
 	setCharacteristic(client, util.TimeSyncUUID)
@@ -219,4 +224,15 @@ func TestScanLoop(t *testing.T) {
 	go client.scan()
 	time.Sleep(ScanInterval + (ScanInterval / 2))
 	assert.DeepEqual(t, client.rssiMap, testRssiMap)
+}
+
+func TestRun(t *testing.T) {
+	client := getTestClient()
+	client.Run()
+	duration := PingInterval + (PingInterval / 4)
+	time.Sleep(duration)
+	c := (*(client.cln)).(dummyCoreClient)
+	ts := mockUnixTS(t, c.mockedReadCharData)
+	time.Sleep(duration)
+	assert.Assert(t, client.UnixTS() > ts, "UnixTS must be after mocked TS")
 }

@@ -123,7 +123,7 @@ func (client *BLEClient) isConnectedToForwarder() bool {
 }
 
 // ReadValue will read packeted data from ble server from given uuid
-func (client BLEClient) ReadValue(uuid string) ([]byte, error) {
+func (client *BLEClient) ReadValue(uuid string) ([]byte, error) {
 	if !client.isConnectedToForwarder() {
 		return client.readValue(uuid)
 	}
@@ -140,7 +140,7 @@ func (client BLEClient) ReadValue(uuid string) ([]byte, error) {
 	return client.readValue(util.EndReadForwardCharUUID)
 }
 
-func (client BLEClient) readValue(uuid string) ([]byte, error) {
+func (client *BLEClient) readValue(uuid string) ([]byte, error) {
 	c, err := client.getCharacteristic(uuid)
 	if err != nil {
 		return nil, err
@@ -161,7 +161,7 @@ func (client BLEClient) readValue(uuid string) ([]byte, error) {
 }
 
 // WriteValue will write data (which is parsed to packets) to ble server to given uuid
-func (client BLEClient) WriteValue(uuid string, data []byte) error {
+func (client *BLEClient) WriteValue(uuid string, data []byte) error {
 	if !client.isConnectedToForwarder() {
 		return client.writeValue(uuid, data)
 	}
@@ -173,7 +173,7 @@ func (client BLEClient) WriteValue(uuid string, data []byte) error {
 	return client.writeValue(util.WriteForwardCharUUID, payload)
 }
 
-func (client BLEClient) writeValue(uuid string, data []byte) error {
+func (client *BLEClient) writeValue(uuid string, data []byte) error {
 	c, err := client.getCharacteristic(uuid)
 	if err != nil {
 		return err
@@ -239,7 +239,7 @@ func (client *BLEClient) filter(a ble.Advertisement) bool {
 }
 
 // RawScan exposes underlying BLE scanner
-func (client BLEClient) RawScan(handle func(ble.Advertisement)) error {
+func (client *BLEClient) RawScan(handle func(ble.Advertisement)) error {
 	return client.bleConnector.Scan(client.ctx, true, handle, nil)
 }
 
@@ -320,7 +320,7 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 }
 
 // RawConnect exposes underlying ble connection functionality
-func (client BLEClient) RawConnect(filter ble.AdvFilter) error {
+func (client *BLEClient) RawConnect(filter ble.AdvFilter) error {
 	return util.Optimize(func() error {
 		return client.rawConnect(filter)
 	})
