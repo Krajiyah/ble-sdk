@@ -20,6 +20,23 @@ const (
 	PingInterval = time.Second * 1
 )
 
+type bleConnector interface {
+	Connect(context.Context, ble.AdvFilter) (ble.Client, error)
+	Scan(context.Context, bool, ble.AdvHandler, ble.AdvFilter) error
+}
+
+type stdBleConnector struct{}
+
+// Connect implemented via BLE core lib
+func (bc stdBleConnector) Connect(ctx context.Context, f ble.AdvFilter) (ble.Client, error) {
+	return ble.Connect(ctx, f)
+}
+
+// Scan implemented via BLE core lib
+func (bc stdBleConnector) Scan(ctx context.Context, b bool, h ble.AdvHandler, f ble.AdvFilter) error {
+	return ble.Scan(ctx, b, h, f)
+}
+
 // BLEClientInt is a interface used to abstract BLEClient
 type BLEClientInt interface {
 	RawScan(func(ble.Advertisement)) error
@@ -44,12 +61,14 @@ type BLEClient struct {
 	packetAggregator   util.PacketAggregator
 	onConnected        func(int, int)
 	onDisconnected     func()
+	bleConnector       bleConnector
 }
 
 func newBLEClient(addr string, secret string, serverAddr string, onConnected func(int, int), onDisconnected func()) *BLEClient {
 	return &BLEClient{
 		addr, secret, Disconnected, 0, nil, serverAddr, "", &RssiMap{}, util.MakeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
+		stdBleConnector{},
 	}
 }
 
@@ -171,7 +190,7 @@ func (client *BLEClient) filter(a ble.Advertisement) bool {
 
 // RawScan exposes underlying BLE scanner
 func (client BLEClient) RawScan(handle func(ble.Advertisement)) error {
-	return ble.Scan(client.ctx, true, handle, nil)
+	return client.bleConnector.Scan(client.ctx, true, handle, nil)
 }
 
 func (client *BLEClient) scan() {
@@ -224,7 +243,7 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 	if client.cln != nil {
 		(*client.cln).CancelConnection()
 	}
-	cln, err := ble.Connect(client.ctx, filter)
+	cln, err := client.bleConnector.Connect(client.ctx, filter)
 	client.cln = &cln
 	if err != nil {
 		return err

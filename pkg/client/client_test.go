@@ -155,3 +155,7 @@ func TestLog(t *testing.T) {
 	assert.NilError(t, err)
 	assert.DeepEqual(t, *actual, expected)
 }
+
+func TestConnectLoop(t *testing.T) {
+
+}
