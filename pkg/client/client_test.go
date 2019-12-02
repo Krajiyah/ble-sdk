@@ -5,10 +5,12 @@ import (
 	"strconv"
 	"testing"
 
+	. "github.com/Krajiyah/ble-sdk/internal"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
+	"golang.org/x/net/context"
 	"gotest.tools/assert"
 )
 
@@ -16,12 +18,18 @@ const (
 	testAddr       = "11:22:33:44:55:66"
 	testServerAddr = "22:22:33:44:55:66"
 	testSecret     = "test123"
+	testRSSI       = -50
 )
 
 var (
-	attempts       = 0
-	rssi           = 0
-	isDisconnected = false
+	attempts     = 0
+	rssi         = 0
+	serviceUUIDs = []string{}
+	testRssiMap  = &RssiMap{
+		testAddr: map[string]int{
+			testServerAddr: testRSSI,
+		},
+	}
 )
 
 type dummyCoreClient struct {
@@ -42,13 +50,23 @@ func (c dummyCoreClient) WriteCharacteristic(char *ble.Characteristic, value []b
 	*c.mockedWriteCharData = append(*c.mockedWriteCharData, buf)
 	return nil
 }
-func (c dummyCoreClient) Address() ble.Addr                                          { return ble.NewAddr(c.testAddr) }
-func (c dummyCoreClient) Name() string                                               { return "some name" }
-func (c dummyCoreClient) Profile() *ble.Profile                                      { return nil }
-func (c dummyCoreClient) DiscoverProfile(force bool) (*ble.Profile, error)           { return nil, nil }
-func (c dummyCoreClient) DiscoverServices(filter []ble.UUID) ([]*ble.Service, error) { return nil, nil }
+func (c dummyCoreClient) Address() ble.Addr { return ble.NewAddr(c.testAddr) }
+func (c dummyCoreClient) Name() string      { return "some name" }
+func (c dummyCoreClient) Profile() *ble.Profile {
+	return &ble.Profile{
+		Services: GetTestServices(serviceUUIDs),
+	}
+}
+func (c dummyCoreClient) DiscoverProfile(force bool) (*ble.Profile, error) {
+	return &ble.Profile{
+		Services: GetTestServices(serviceUUIDs),
+	}, nil
+}
+func (c dummyCoreClient) DiscoverServices(filter []ble.UUID) ([]*ble.Service, error) {
+	return GetTestServices(serviceUUIDs), nil
+}
 func (c dummyCoreClient) DiscoverIncludedServices(filter []ble.UUID, s *ble.Service) ([]*ble.Service, error) {
-	return nil, nil
+	return GetTestServices(serviceUUIDs), nil
 }
 func (c dummyCoreClient) DiscoverCharacteristics(filter []ble.UUID, s *ble.Service) ([]*ble.Characteristic, error) {
 	return nil, nil
@@ -61,8 +79,8 @@ func (c dummyCoreClient) ReadLongCharacteristic(char *ble.Characteristic) ([]byt
 }
 func (c dummyCoreClient) ReadDescriptor(d *ble.Descriptor) ([]byte, error)  { return nil, nil }
 func (c dummyCoreClient) WriteDescriptor(d *ble.Descriptor, v []byte) error { return nil }
-func (c dummyCoreClient) ReadRSSI() int                                     { return 0 }
-func (c dummyCoreClient) ExchangeMTU(rxMTU int) (txMTU int, err error)      { return 0, nil }
+func (c dummyCoreClient) ReadRSSI() int                                     { return testRSSI }
+func (c dummyCoreClient) ExchangeMTU(rxMTU int) (txMTU int, err error)      { return util.MTU, nil }
 func (c dummyCoreClient) Subscribe(char *ble.Characteristic, ind bool, h ble.NotificationHandler) error {
 	return nil
 }
@@ -70,6 +88,27 @@ func (c dummyCoreClient) Unsubscribe(char *ble.Characteristic, ind bool) error {
 func (c dummyCoreClient) ClearSubscriptions() error                            { return nil }
 func (c dummyCoreClient) CancelConnection() error                              { return nil }
 func (c dummyCoreClient) Disconnected() <-chan struct{}                        { return nil }
+
+type testBleConnector struct {
+	addr    string
+	rssiMap *RssiMap
+}
+
+func (bc testBleConnector) filter(fn func(addr string, rssi int)) {
+	for k, v := range (*bc.rssiMap)[bc.addr] {
+		fn(k, v)
+	}
+}
+
+func (bc testBleConnector) Connect(_ context.Context, f ble.AdvFilter) (ble.Client, error) {
+	bc.filter(func(addr string, rssi int) { f(DummyAdv{DummyAddr{addr}, rssi}) })
+	return newDummyCoreClient(testAddr), nil
+}
+
+func (bc testBleConnector) Scan(_ context.Context, _ bool, h ble.AdvHandler, _ ble.AdvFilter) error {
+	bc.filter(func(addr string, rssi int) { h(DummyAdv{DummyAddr{addr}, rssi}) })
+	return nil
+}
 
 func setCharacteristic(client *BLEClient, uuid string) {
 	u, err := ble.Parse(uuid)
@@ -82,15 +121,18 @@ func setCharacteristic(client *BLEClient, uuid string) {
 func dummyOnConnected(a int, r int) {
 	attempts = a
 	rssi = r
-	isDisconnected = false
 }
 
-func dummyOnDisconnected() {
-	isDisconnected = true
+func dummyOnDisconnected() {}
+
+func getTestClient() *BLEClient {
+	client := newBLEClient(testAddr, testSecret, testServerAddr, dummyOnConnected, dummyOnDisconnected)
+	client.bleConnector = testBleConnector{testAddr, testRssiMap}
+	return client
 }
 
 func getDummyClient() (*BLEClient, *dummyCoreClient) {
-	client := newBLEClient(testAddr, testSecret, testServerAddr, dummyOnConnected, dummyOnDisconnected)
+	client := getTestClient()
 	cc := newDummyCoreClient(testAddr)
 	var c ble.Client
 	c = cc
@@ -157,5 +199,8 @@ func TestLog(t *testing.T) {
 }
 
 func TestConnectLoop(t *testing.T) {
-
+	client := getTestClient()
+	client.connectLoop()
+	assert.Equal(t, attempts, 1)
+	assert.Equal(t, rssi, testRSSI)
 }

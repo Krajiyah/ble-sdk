@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/Krajiyah/ble-sdk/internal"
 	"github.com/Krajiyah/ble-sdk/pkg/client"
 	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/server"
@@ -37,31 +38,6 @@ func (l dummyListener) OnConnectionError(err error)  {}
 func (l dummyListener) OnReadOrWriteError(err error) {}
 func (l dummyListener) OnError(err error)            {}
 
-type dummyAdv struct {
-	addr ble.Addr
-	rssi int
-}
-
-type dummyAddr struct {
-	addr string
-}
-
-func (addr dummyAddr) String() string { return addr.addr }
-
-func (a dummyAdv) LocalName() string              { return "" }
-func (a dummyAdv) ManufacturerData() []byte       { return nil }
-func (a dummyAdv) ServiceData() []ble.ServiceData { return nil }
-func (a dummyAdv) Services() []ble.UUID {
-	u, _ := ble.Parse(server.MainServiceUUID)
-	return []ble.UUID{u}
-}
-func (a dummyAdv) OverflowService() []ble.UUID  { return nil }
-func (a dummyAdv) TxPowerLevel() int            { return 0 }
-func (a dummyAdv) Connectable() bool            { return true }
-func (a dummyAdv) SolicitedService() []ble.UUID { return nil }
-func (a dummyAdv) RSSI() int                    { return a.rssi }
-func (a dummyAdv) Address() ble.Addr            { return a.addr }
-
 type dummyClient struct {
 	addr              string
 	dummyRssiMap      RssiMap
@@ -71,7 +47,7 @@ type dummyClient struct {
 
 func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
 	for k, v := range c.dummyRssiMap[c.addr] {
-		f(dummyAdv{dummyAddr{k}, v})
+		f(DummyAdv{DummyAddr{k}, v})
 	}
 	return nil
 }
@@ -132,7 +108,7 @@ func mockReadBuffer(t *testing.T, rssiMap *RssiMap, buffer *bytes.Buffer) {
 
 func scan(f *BLEForwarder, mutex *sync.Mutex, rssiMap RssiMap, addr string) {
 	for k, v := range rssiMap[addr] {
-		f.onScanned(dummyAdv{dummyAddr{k}, v})
+		f.onScanned(DummyAdv{DummyAddr{k}, v})
 	}
 }
 

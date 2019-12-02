@@ -125,7 +125,7 @@ func (client BLEClient) ReadValue(uuid string) ([]byte, error) {
 	}
 	guid := ""
 	for !client.packetAggregator.HasDataFromPacketStream(guid) {
-		packetData, err := (*client.cln).ReadCharacteristic(c)
+		packetData, err := client.optimizedReadChar(c)
 		if err != nil {
 			return nil, err
 		}
@@ -159,12 +159,28 @@ func (client BLEClient) WriteValue(uuid string, data []byte) error {
 		if err != nil {
 			return err
 		}
-		err = (*client.cln).WriteCharacteristic(c, packetData, true)
+		err = client.optimizedWriteChar(c, packetData)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error) {
+	var data []byte
+	var err error
+	err = util.Optimize(func() error {
+		data, err = (*client.cln).ReadCharacteristic(c)
+		return err
+	})
+	return data, err
+}
+
+func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) error {
+	return util.Optimize(func() error {
+		return (*client.cln).WriteCharacteristic(c, data, true)
+	})
 }
 
 // IsForwarder is a filter which indicates if advertisement is from BLEForwarder
@@ -216,7 +232,8 @@ func (client *BLEClient) connectLoop() {
 		err = client.connect()
 	}
 	client.status = Connected
-	client.onConnected(client.connectionAttempts, (*client.rssiMap)[client.addr][client.connectedAddr])
+	rssi := (*client.rssiMap)[client.addr][client.connectedAddr]
+	client.onConnected(client.connectionAttempts, rssi)
 }
 
 func (client *BLEClient) pingLoop() {
