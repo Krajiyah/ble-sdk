@@ -59,7 +59,7 @@ type dummyClient struct {
 	addr              string
 	dummyRssiMap      RssiMap
 	mockedReadValue   *bytes.Buffer
-	mockedWriteBuffer []*bytes.Buffer
+	mockedWriteBuffer *[]*bytes.Buffer
 }
 
 func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
@@ -77,7 +77,7 @@ func (c dummyClient) RawConnect(ble.AdvFilter) error { return nil }
 
 func (c dummyClient) WriteValue(char string, data []byte) error {
 	buf := bytes.NewBuffer(data)
-	c.mockedWriteBuffer = append(c.mockedWriteBuffer, buf)
+	*c.mockedWriteBuffer = append(*c.mockedWriteBuffer, buf)
 	return nil
 }
 
@@ -88,12 +88,12 @@ func (s dummyServer) Run() error { return nil }
 type testStructs struct {
 	forwarder         *BLEForwarder
 	mockedReadValue   *bytes.Buffer
-	mockedWriteBuffer []*bytes.Buffer
+	mockedWriteBuffer *[]*bytes.Buffer
 }
 
 func getDummyForwarder(t *testing.T, addr string, rssiMap RssiMap) *testStructs {
 	mockedReadValue := bytes.NewBuffer([]byte{})
-	mockedWriteBuffer := []*bytes.Buffer{}
+	mockedWriteBuffer := &[]*bytes.Buffer{}
 	f := newBLEForwarder(addr, testServerAddr, dummyListener{})
 	f.forwardingClient = dummyClient{addr, rssiMap, mockedReadValue, mockedWriteBuffer}
 	f.forwardingServer = dummyServer{}
@@ -176,4 +176,46 @@ func TestRssiMapChar(t *testing.T) {
 	actualRM, err := models.GetRssiMapFromBytes(data)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, rm, *actualRM)
+}
+
+func TestWriteChar(t *testing.T) {
+	expectedRssiMap := RssiMap{
+		testAddr: map[string]int{
+			testServerAddr: -90,
+			testAddr2:      -30,
+		},
+		testAddr2: map[string]int{
+			testAddr:       -5,
+			testServerAddr: -10,
+		},
+	}
+	s1 := getDummyForwarder(t, testAddr, expectedRssiMap)
+	s2 := getDummyForwarder(t, testAddr2, expectedRssiMap)
+	f1, mockedReadValue1, mockedWriteBuffer1 := s1.forwarder, s1.mockedReadValue, s1.mockedWriteBuffer
+	f2, mockedReadValue2, mockedWriteBuffer2 := s2.forwarder, s2.mockedReadValue, s2.mockedWriteBuffer
+	mockReadBuffer(t, &expectedRssiMap, mockedReadValue2)
+	mockReadBuffer(t, &expectedRssiMap, mockedReadValue1)
+	f1.Run()
+	f2.Run()
+	time.Sleep(scanInterval * 2)
+
+	// mimic client write to forwarder
+	log := models.ClientLogRequest{invalidAddr, Info, "Hello World!"}
+	logData, err := log.Data()
+	assert.NilError(t, err)
+	req := models.ForwarderRequest{server.ClientLogUUID, logData, false, true}
+	data, err := req.Data()
+	assert.NilError(t, err)
+	_, writeChars1 := getChars(f1)
+	char1 := writeChars1[0]
+	char1.HandleWrite(invalidAddr, data, nil)
+	assert.Equal(t, len(*mockedWriteBuffer1), 1)
+	assert.DeepEqual(t, (*mockedWriteBuffer1)[0].Bytes(), data)
+
+	// mimic 2nd forwarder passing on data to server and unpacking forwarder request
+	_, writeChars2 := getChars(f2)
+	char2 := writeChars2[0]
+	char2.HandleWrite(testAddr, data, nil)
+	assert.Equal(t, len(*mockedWriteBuffer2), 1)
+	assert.DeepEqual(t, (*mockedWriteBuffer2)[0].Bytes(), logData)
 }
