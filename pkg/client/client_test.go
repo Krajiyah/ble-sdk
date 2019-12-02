@@ -141,6 +141,10 @@ func getDummyClient() (*BLEClient, *dummyCoreClient) {
 	return client, &dc
 }
 
+func TestIsForwarder(t *testing.T) {
+	assert.Equal(t, IsForwarder(DummyAdv{DummyAddr{testServerAddr}, testRSSI}), true)
+}
+
 func TestUnixTS(t *testing.T) {
 	client, dummyClient := getDummyClient()
 
