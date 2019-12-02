@@ -236,3 +236,11 @@ func TestRun(t *testing.T) {
 	time.Sleep(duration)
 	assert.Assert(t, client.UnixTS() > ts, "UnixTS must be after mocked TS")
 }
+
+func TestForwardedWrite(t *testing.T) {
+	// TODO: ...
+}
+
+func TestForwardedRead(t *testing.T) {
+	// TODO: ...
+}

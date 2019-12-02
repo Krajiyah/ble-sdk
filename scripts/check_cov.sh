@@ -2,7 +2,7 @@
 
 cov=$(cat report.txt | tail -n 1 | tr -s '\t' | sed 's/\t/ /g' | cut -d ' ' -f 3 | tr -d '%')
 cov=${cov%.*}
-if (($cov < 70)); then
+if (($cov < 65)); then
     echo ""
     echo ""
     echo "==========================ERROR=============================="
