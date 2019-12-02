@@ -33,22 +33,23 @@ const (
 
 // BLEForwarder is a struct used to handle mesh network behaviors for forwarder
 type BLEForwarder struct {
-	addr             string
-	forwardingServer server.BLEServerInt
-	forwardingClient client.BLEClientInt
-	serverAddr       string
-	connectedAddr    string
-	toConnectAddr    string
-	rssiMap          *models.RssiMap
-	readCharUUIDChan chan string
-	listener         models.BLEForwarderListener
+	addr              string
+	forwardingServer  server.BLEServerInt
+	forwardingClient  client.BLEClientInt
+	serverAddr        string
+	connectedAddr     string
+	toConnectAddr     string
+	rssiMap           *models.RssiMap
+	readCharUUIDMutex *sync.Mutex
+	readCharUUID      string
+	listener          models.BLEForwarderListener
 }
 
 func newBLEForwarder(addr, serverAddr string, listener models.BLEForwarderListener) *BLEForwarder {
 	return &BLEForwarder{
 		addr, nil, nil,
 		serverAddr, "", "", &models.RssiMap{},
-		make(chan string),
+		&sync.Mutex{}, "",
 		listener,
 	}
 }
@@ -281,7 +282,8 @@ func newStartReadForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteri
 				forwarder.listener.OnError(errors.New(errInvalidForwardReq))
 				return
 			}
-			forwarder.readCharUUIDChan <- r.CharUUID
+			forwarder.readCharUUIDMutex.Lock()
+			forwarder.readCharUUID = r.CharUUID
 		}
 	}, noop}
 }
@@ -294,7 +296,8 @@ func newEndReadForwardChar(forwarder *BLEForwarder) *server.BLEReadCharacteristi
 		if !forwarder.isConnectedToServer() {
 			return forwarder.forwardingClient.ReadValue(EndReadForwardCharUUID)
 		}
-		c := <-forwarder.readCharUUIDChan
-		return forwarder.forwardingClient.ReadValue(c)
+		data, err := forwarder.forwardingClient.ReadValue(forwarder.readCharUUID)
+		forwarder.readCharUUIDMutex.Unlock()
+		return data, err
 	}, noop}
 }
