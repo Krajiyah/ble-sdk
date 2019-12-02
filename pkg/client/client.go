@@ -18,6 +18,8 @@ const (
 	ScanInterval = time.Millisecond * 500
 	// PingInterval is the rate at which ble clients will let ble server know of its state
 	PingInterval = time.Second * 1
+	// ForwardedReadDelay is the delay between start and end read requests
+	ForwardedReadDelay = time.Millisecond * 500
 )
 
 type bleConnector interface {
@@ -117,8 +119,29 @@ func (client *BLEClient) Log(log ClientLogRequest) error {
 	return client.WriteValue(server.ClientLogUUID, b)
 }
 
+func (client *BLEClient) isConnectedToForwarder() bool {
+	return client.connectedAddr != "" && client.connectedAddr != client.serverAddr
+}
+
 // ReadValue will read packeted data from ble server from given uuid
 func (client BLEClient) ReadValue(uuid string) ([]byte, error) {
+	if !client.isConnectedToForwarder() {
+		return client.readValue(uuid)
+	}
+	req := ForwarderRequest{uuid, nil, true, false}
+	data, err := req.Data()
+	if err != nil {
+		return nil, err
+	}
+	err = client.WriteValue(util.StartReadForwardCharUUID, data)
+	if err != nil {
+		return nil, err
+	}
+	time.Sleep(ForwardedReadDelay)
+	return client.readValue(util.EndReadForwardCharUUID)
+}
+
+func (client BLEClient) readValue(uuid string) ([]byte, error) {
 	c, err := client.getCharacteristic(uuid)
 	if err != nil {
 		return nil, err
@@ -140,6 +163,18 @@ func (client BLEClient) ReadValue(uuid string) ([]byte, error) {
 
 // WriteValue will write data (which is parsed to packets) to ble server to given uuid
 func (client BLEClient) WriteValue(uuid string, data []byte) error {
+	if !client.isConnectedToForwarder() {
+		return client.writeValue(uuid, data)
+	}
+	req := ForwarderRequest{uuid, data, false, true}
+	payload, err := req.Data()
+	if err != nil {
+		return err
+	}
+	return client.writeValue(util.WriteForwardCharUUID, payload)
+}
+
+func (client BLEClient) writeValue(uuid string, data []byte) error {
 	c, err := client.getCharacteristic(uuid)
 	if err != nil {
 		return err

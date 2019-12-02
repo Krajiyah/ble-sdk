@@ -240,7 +240,7 @@ func TestStartEndReadChars(t *testing.T) {
 	data, err = readChar1.HandleRead(clientAddr, context.Background())
 	assert.NilError(t, err)
 	assert.DeepEqual(t, data, ts)
-	assert.Equal(t, lastReadChar, EndReadForwardCharUUID)
+	assert.Equal(t, lastReadChar, util.EndReadForwardCharUUID)
 
 	// mimic 2nd forwarder reading from server
 	mockedReadValue2.Reset()

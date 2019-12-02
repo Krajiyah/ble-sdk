@@ -17,14 +17,6 @@ import (
 )
 
 const (
-	// WriteForwardCharUUID represents UUID for ble characteristic which handles forwarding of writes
-	WriteForwardCharUUID = "00030000-0003-1000-8000-00805F9B34FB"
-	// StartReadForwardCharUUID represents UUID for ble characteristic which handles forwarding of reads
-	StartReadForwardCharUUID = "00030000-0004-1000-8000-00805F9B34FB"
-	// EndReadForwardCharUUID represents UUID for ble characteristic which handles forwarding of reads
-	EndReadForwardCharUUID = "00030000-0006-1000-8000-00805F9B34FB"
-	// ReadRssiMapCharUUID represents UUID for ble characteristic which handles forwarding of reads
-	ReadRssiMapCharUUID  = "00030000-0005-1000-8000-00805F9B34FB"
 	maxConnectAttempts   = 5
 	errNotConnected      = "Forwarder is not connected"
 	errInvalidForwardReq = "Invalid forwarding request"
@@ -138,7 +130,7 @@ func (forwarder *BLEForwarder) updateRssiMap(addr string) error {
 	if err != nil {
 		return err
 	}
-	data, err := forwarder.forwardingClient.ReadValue(ReadRssiMapCharUUID)
+	data, err := forwarder.forwardingClient.ReadValue(util.ReadRssiMapCharUUID)
 	if err != nil {
 		return err
 	}
@@ -206,13 +198,13 @@ func (forwarder *BLEForwarder) isConnectedToServer() bool {
 func noop() {}
 
 func newReadRssiMapChar(forwarder *BLEForwarder) *server.BLEReadCharacteristic {
-	return &server.BLEReadCharacteristic{ReadRssiMapCharUUID, func(addr string, ctx context.Context) ([]byte, error) {
+	return &server.BLEReadCharacteristic{util.ReadRssiMapCharUUID, func(addr string, ctx context.Context) ([]byte, error) {
 		return forwarder.rssiMap.Data()
 	}, noop}
 }
 
 func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic {
-	return &server.BLEWriteCharacteristic{WriteForwardCharUUID, func(addr string, data []byte, err error) {
+	return &server.BLEWriteCharacteristic{util.WriteForwardCharUUID, func(addr string, data []byte, err error) {
 		if err != nil {
 			forwarder.listener.OnReadOrWriteError(err)
 			return
@@ -222,7 +214,7 @@ func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic
 			return
 		}
 		if !forwarder.isConnectedToServer() {
-			err := forwarder.forwardingClient.WriteValue(WriteForwardCharUUID, data)
+			err := forwarder.forwardingClient.WriteValue(util.WriteForwardCharUUID, data)
 			if err != nil {
 				forwarder.listener.OnReadOrWriteError(err)
 				return
@@ -247,7 +239,7 @@ func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic
 }
 
 func newStartReadForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic {
-	return &server.BLEWriteCharacteristic{StartReadForwardCharUUID, func(addr string, data []byte, err error) {
+	return &server.BLEWriteCharacteristic{util.StartReadForwardCharUUID, func(addr string, data []byte, err error) {
 		if err != nil {
 			forwarder.listener.OnReadOrWriteError(err)
 			return
@@ -257,7 +249,7 @@ func newStartReadForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteri
 			return
 		}
 		if !forwarder.isConnectedToServer() {
-			err := forwarder.forwardingClient.WriteValue(StartReadForwardCharUUID, data)
+			err := forwarder.forwardingClient.WriteValue(util.StartReadForwardCharUUID, data)
 			if err != nil {
 				forwarder.listener.OnReadOrWriteError(err)
 				return
@@ -279,12 +271,12 @@ func newStartReadForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteri
 }
 
 func newEndReadForwardChar(forwarder *BLEForwarder) *server.BLEReadCharacteristic {
-	return &server.BLEReadCharacteristic{EndReadForwardCharUUID, func(addr string, ctx context.Context) ([]byte, error) {
+	return &server.BLEReadCharacteristic{util.EndReadForwardCharUUID, func(addr string, ctx context.Context) ([]byte, error) {
 		if !forwarder.isConnected() {
 			return nil, errors.New(errNotConnected)
 		}
 		if !forwarder.isConnectedToServer() {
-			return forwarder.forwardingClient.ReadValue(EndReadForwardCharUUID)
+			return forwarder.forwardingClient.ReadValue(util.EndReadForwardCharUUID)
 		}
 		data, err := forwarder.forwardingClient.ReadValue(forwarder.readCharUUID)
 		forwarder.readCharUUIDMutex.Unlock()
