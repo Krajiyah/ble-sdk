@@ -2,9 +2,12 @@ package forwarder
 
 import (
 	"bytes"
+	"context"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
@@ -153,4 +156,24 @@ func TestDoubleForwarder(t *testing.T) {
 	assert.Equal(t, f1.connectedAddr, testAddr2)
 	assert.Equal(t, f2.toConnectAddr, f2.serverAddr)
 	assert.Equal(t, f2.connectedAddr, f2.serverAddr)
+}
+
+func TestRssiMapChar(t *testing.T) {
+	rm := RssiMap{
+		testAddr: map[string]int{
+			testServerAddr: -90,
+			invalidAddr:    -10000,
+		},
+	}
+	s := getDummyForwarder(t, testAddr, rm)
+	s.forwarder.Run()
+	time.Sleep(scanInterval + (scanInterval / 2))
+	assert.DeepEqual(t, *s.forwarder.rssiMap, rm)
+	readChars, _ := getChars(s.forwarder)
+	char := readChars[1]
+	data, err := char.HandleRead(testAddr2, context.Background())
+	assert.NilError(t, err)
+	actualRM, err := models.GetRssiMapFromBytes(data)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, rm, *actualRM)
 }

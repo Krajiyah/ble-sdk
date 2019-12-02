@@ -52,6 +52,16 @@ func newBLEForwarder(addr, serverAddr string, listener models.BLEForwarderListen
 	}
 }
 
+func getChars(f *BLEForwarder) ([]*server.BLEReadCharacteristic, []*server.BLEWriteCharacteristic) {
+	return []*server.BLEReadCharacteristic{
+			newEndReadForwardChar(f),
+			newReadRssiMapChar(f),
+		}, []*server.BLEWriteCharacteristic{
+			newWriteForwardChar(f),
+			newStartReadForwardChar(f),
+		}
+}
+
 // NewBLEForwarder is a function that creates a new ble forwarder
 func NewBLEForwarder(name string, addr string, secret string, serverAddr string, serverListener models.BLEServerStatusListener, listener models.BLEForwarderListener) (*BLEForwarder, error) {
 	d, err := linux.NewDevice()
@@ -59,19 +69,12 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 		return nil, err
 	}
 	f := newBLEForwarder(addr, serverAddr, listener)
-	readChars := []*server.BLEReadCharacteristic{
-		newEndReadForwardChar(f),
-		newReadRssiMapChar(f),
-	}
-	writeChars := []*server.BLEWriteCharacteristic{
-		newWriteForwardChar(f),
-		newStartReadForwardChar(f),
-	}
+	readChars, writeChars := getChars(f)
 	serv, err := server.NewBLEServerSharedDevice(d, name, secret, serverListener, readChars, writeChars)
 	if err != nil {
 		return nil, err
 	}
-	clien, err := client.NewBLEClientSharedDevice(d, addr, secret, serverAddr, func(attempts int, rssi int) {}, func() {})
+	clien, err := client.NewBLEClientSharedDevice(d, addr, secret, serverAddr, func(attempts int, rssi int) {}, noop)
 	if err != nil {
 		return nil, err
 	}
