@@ -7,7 +7,6 @@ import (
 
 	. "github.com/Krajiyah/ble-sdk/internal"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
-	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
 	"golang.org/x/net/context"
@@ -24,7 +23,7 @@ const (
 var (
 	attempts     = 0
 	rssi         = 0
-	serviceUUIDs = []string{}
+	serviceUUIDs = []string{util.ClientStateUUID, util.TimeSyncUUID, util.ClientLogUUID}
 	testRssiMap  = &RssiMap{
 		testAddr: map[string]int{
 			testServerAddr: testRSSI,
@@ -162,7 +161,7 @@ func TestUnixTS(t *testing.T) {
 	assert.Assert(t, isLastPacket)
 
 	// test client read
-	setCharacteristic(client, server.TimeSyncUUID)
+	setCharacteristic(client, util.TimeSyncUUID)
 	ts, err := client.getUnixTS()
 	assert.NilError(t, err)
 	assert.Equal(t, ts, expected)
@@ -172,7 +171,7 @@ func TestLog(t *testing.T) {
 	client, dummyClient := getDummyClient()
 
 	// test client write
-	setCharacteristic(client, server.ClientLogUUID)
+	setCharacteristic(client, util.ClientLogUUID)
 	expected := ClientLogRequest{"SomeAddress", Info, "Some Message"}
 	err := client.Log(expected)
 	assert.NilError(t, err)

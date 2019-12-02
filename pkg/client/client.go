@@ -6,7 +6,6 @@ import (
 	"time"
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
-	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux"
@@ -102,7 +101,7 @@ func (client *BLEClient) UnixTS() int64 {
 }
 
 func (client *BLEClient) getUnixTS() (int64, error) {
-	b, err := client.ReadValue(server.TimeSyncUUID)
+	b, err := client.ReadValue(util.TimeSyncUUID)
 	if err != nil {
 		return 0, err
 	}
@@ -116,7 +115,7 @@ func (client *BLEClient) getUnixTS() (int64, error) {
 // Log writes a log object to the ble server's log characteristic
 func (client *BLEClient) Log(log ClientLogRequest) error {
 	b, _ := log.Data()
-	return client.WriteValue(server.ClientLogUUID, b)
+	return client.WriteValue(util.ClientLogUUID, b)
 }
 
 func (client *BLEClient) isConnectedToForwarder() bool {
@@ -221,7 +220,7 @@ func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) 
 // IsForwarder is a filter which indicates if advertisement is from BLEForwarder
 func IsForwarder(a ble.Advertisement) bool {
 	for _, service := range a.Services() {
-		if util.UuidEqualStr(service, server.MainServiceUUID) {
+		if util.UuidEqualStr(service, util.MainServiceUUID) {
 			return true
 		}
 	}
@@ -276,7 +275,7 @@ func (client *BLEClient) pingLoop() {
 		time.Sleep(PingInterval)
 		req := &ClientStateRequest{*client.rssiMap}
 		b, _ := req.Data()
-		err := client.WriteValue(server.ClientStateUUID, b)
+		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {
 			client.connectLoop()
 			continue
@@ -309,7 +308,7 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 		return err
 	}
 	for _, s := range p.Services {
-		if util.UuidEqualStr(s.UUID, server.MainServiceUUID) {
+		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
 			for _, c := range s.Characteristics {
 				client.characteristics[c.UUID.String()] = c
 			}

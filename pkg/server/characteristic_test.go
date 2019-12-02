@@ -85,7 +85,7 @@ func TestWriteHandler(t *testing.T) {
 	assert.NilError(t, err)
 	shouldOnWriteNow := false
 	wasCalled := false
-	handler := generateWriteHandler(server, MainServiceUUID, func(addr string, actual []byte, err error) {
+	handler := generateWriteHandler(server, util.MainServiceUUID, func(addr string, actual []byte, err error) {
 		assert.Assert(t, shouldOnWriteNow)
 		assert.Equal(t, addr, dummyAddr)
 		assert.NilError(t, err)
@@ -112,7 +112,7 @@ func TestReadHandler(t *testing.T) {
 	server := getDummyServer()
 	expected := getRandBytes(t)
 	pa := util.NewPacketAggregator()
-	handler := generateReadHandler(server, MainServiceUUID, func(addr string, c context.Context) ([]byte, error) {
+	handler := generateReadHandler(server, util.MainServiceUUID, func(addr string, c context.Context) ([]byte, error) {
 		return expected, nil
 	})
 	guid := ""

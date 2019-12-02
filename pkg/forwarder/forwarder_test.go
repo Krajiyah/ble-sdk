@@ -11,7 +11,6 @@ import (
 	. "github.com/Krajiyah/ble-sdk/internal"
 	"github.com/Krajiyah/ble-sdk/pkg/client"
 	"github.com/Krajiyah/ble-sdk/pkg/models"
-	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
@@ -194,7 +193,7 @@ func TestWriteChar(t *testing.T) {
 	log := models.ClientLogRequest{clientAddr, Info, "Hello World!"}
 	logData, err := log.Data()
 	assert.NilError(t, err)
-	req := models.ForwarderRequest{server.ClientLogUUID, logData, false, true}
+	req := models.ForwarderRequest{util.ClientLogUUID, logData, false, true}
 	data, err := req.Data()
 	assert.NilError(t, err)
 	_, writeChars1 := getChars(f1)
@@ -217,7 +216,7 @@ func TestStartEndReadChars(t *testing.T) {
 	f2, mockedReadValue2, mockedWriteBuffer2 := s2.forwarder, s2.mockedReadValue, s2.mockedWriteBuffer
 
 	// mimic client write to forwarder (start read request)
-	req := models.ForwarderRequest{server.TimeSyncUUID, nil, true, false}
+	req := models.ForwarderRequest{util.TimeSyncUUID, nil, true, false}
 	data, err := req.Data()
 	assert.NilError(t, err)
 	readChars1, writeChars1 := getChars(f1)
@@ -249,5 +248,5 @@ func TestStartEndReadChars(t *testing.T) {
 	data, err = readChar2.HandleRead(testAddr, context.Background())
 	assert.NilError(t, err)
 	assert.DeepEqual(t, data, ts)
-	assert.Equal(t, lastReadChar, server.TimeSyncUUID)
+	assert.Equal(t, lastReadChar, util.TimeSyncUUID)
 }

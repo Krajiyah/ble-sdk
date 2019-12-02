@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"github.com/Krajiyah/ble-sdk/pkg/server"
+	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
 )
 
@@ -30,12 +30,12 @@ func (a DummyAdv) RSSI() int                    { return a.Rssi }
 func (a DummyAdv) Address() ble.Addr            { return a.Addr }
 
 func GetTestServiceUUIDs() []ble.UUID {
-	u, _ := ble.Parse(server.MainServiceUUID)
+	u, _ := ble.Parse(util.MainServiceUUID)
 	return []ble.UUID{u}
 }
 
 func GetTestServices(charUUIDs []string) []*ble.Service {
-	u, _ := ble.Parse(server.MainServiceUUID)
+	u, _ := ble.Parse(util.MainServiceUUID)
 	chars := []*ble.Characteristic{}
 	for _, uuid := range charUUIDs {
 		c := &ble.Characteristic{}
