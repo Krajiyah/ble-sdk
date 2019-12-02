@@ -165,6 +165,11 @@ func TestUnixTS(t *testing.T) {
 	ts, err := client.getUnixTS()
 	assert.NilError(t, err)
 	assert.Equal(t, ts, expected)
+
+	// test timesync
+	x := util.NewTimeSync(ts)
+	client.timeSync = &x
+	assert.Equal(t, client.UnixTS(), ts)
 }
 
 func TestLog(t *testing.T) {
