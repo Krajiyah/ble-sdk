@@ -36,13 +36,20 @@ type BLEClient struct {
 	connectionAttempts int
 	timeSync           *util.TimeSync
 	serverAddr         string
-	rssiMap            map[string]int
+	rssiMap            *RssiMap
 	ctx                context.Context
 	cln                *ble.Client
 	characteristics    map[string]*ble.Characteristic
 	packetAggregator   util.PacketAggregator
 	onConnected        func(int, int)
 	onDisconnected     func()
+}
+
+func newBLEClient(addr string, secret string, serverAddr string, onConnected func(int, int), onDisconnected func()) *BLEClient {
+	return &BLEClient{
+		addr, secret, Disconnected, 0, nil, serverAddr, &RssiMap{}, util.MakeINFContext(), nil,
+		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
+	}
 }
 
 // NewBLEClient is a function that creates a new ble client
@@ -57,10 +64,7 @@ func NewBLEClient(addr string, secret string, serverAddr string, onConnected fun
 // NewBLEClientSharedDevice is a function that creates a new ble client
 func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, serverAddr string, onConnected func(int, int), onDisconnected func()) (*BLEClient, error) {
 	ble.SetDefaultDevice(device)
-	return &BLEClient{
-		addr, secret, Disconnected, 0, nil, serverAddr, map[string]int{}, util.MakeINFContext(), nil,
-		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
-	}, nil
+	return newBLEClient(addr, secret, serverAddr, onConnected, onDisconnected), nil
 }
 
 // Run is a method that runs the connection from client to service
@@ -144,11 +148,10 @@ func (client BLEClient) WriteValue(uuid string, data []byte) error {
 }
 
 func (client *BLEClient) filter(a ble.Advertisement) bool {
-	b := util.AddrEqualAddr(a.Address().String(), client.serverAddr)
-	if b {
-		client.rssiMap[client.addr] = a.RSSI()
-	}
-	return b
+	addr := a.Address().String()
+	rssi := a.RSSI()
+	client.rssiMap.Set(client.addr, addr, rssi)
+	return util.AddrEqualAddr(addr, client.serverAddr)
 }
 
 // RawScan exposes underlying BLE scanner
@@ -157,13 +160,12 @@ func (client BLEClient) RawScan(handle func(ble.Advertisement)) error {
 }
 
 func (client *BLEClient) scan() {
-	client.rssiMap = map[string]int{}
 	for {
 		time.Sleep(ScanInterval)
 		client.RawScan(func(a ble.Advertisement) {
 			rssi := a.RSSI()
 			addr := a.Address().String()
-			client.rssiMap[addr] = rssi
+			client.rssiMap.Set(client.addr, addr, rssi)
 		})
 	}
 }
@@ -180,13 +182,13 @@ func (client *BLEClient) connectLoop() {
 		err = client.connect()
 	}
 	client.status = Connected
-	client.onConnected(client.connectionAttempts, client.rssiMap[client.addr])
+	client.onConnected(client.connectionAttempts, (*client.rssiMap)[client.addr][client.serverAddr])
 }
 
 func (client *BLEClient) pingLoop() {
 	for {
 		time.Sleep(PingInterval)
-		req := &ClientStateRequest{client.rssiMap}
+		req := &ClientStateRequest{*client.rssiMap}
 		b, _ := req.Data()
 		err := client.WriteValue(server.ClientStateUUID, b)
 		if err != nil {

@@ -90,10 +90,7 @@ func dummyOnDisconnected() {
 }
 
 func getDummyClient() (*BLEClient, *dummyCoreClient) {
-	client := &BLEClient{
-		testAddr, testSecret, Disconnected, 0, nil, testServerAddr, map[string]int{}, util.MakeINFContext(), nil,
-		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), dummyOnConnected, dummyOnDisconnected,
-	}
+	client := newBLEClient(testAddr, testSecret, testServerAddr, dummyOnConnected, dummyOnDisconnected)
 	cc := newDummyCoreClient(testAddr)
 	var c ble.Client
 	c = cc
