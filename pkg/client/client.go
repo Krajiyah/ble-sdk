@@ -310,7 +310,8 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 	for _, s := range p.Services {
 		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
 			for _, c := range s.Characteristics {
-				client.characteristics[c.UUID.String()] = c
+				uuid := util.UuidToStr(c.UUID)
+				client.characteristics[uuid] = c
 			}
 			break
 		}
