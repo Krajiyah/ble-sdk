@@ -15,8 +15,6 @@ require (
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/mgutz/logxi v0.0.0-20161027140823-aebf8a7d67ab // indirect
 	github.com/pkg/errors v0.8.1
-	github.com/starwander/GoFibonacciHeap v0.0.0-20190508061137-ba2e4f01000a // indirect
-	github.com/starwander/goraph v0.0.0-20190117062148-0fd368c3da06
 	github.com/stretchr/testify v1.4.0 // indirect
 	go4.org v0.0.0-20191010144846-132d2879e1e9 // indirect
 	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933
