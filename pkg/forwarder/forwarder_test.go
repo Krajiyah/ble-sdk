@@ -52,7 +52,9 @@ func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
 }
 
 func (c dummyClient) ReadValue(uuid string) ([]byte, error) {
-	lastReadChar = uuid
+	if uuid != util.ReadRssiMapCharUUID {
+		lastReadChar = uuid
+	}
 	return c.mockedReadValue.Bytes(), nil
 }
 
