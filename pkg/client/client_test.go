@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strconv"
 	"testing"
+	"time"
 
 	. "github.com/Krajiyah/ble-sdk/internal"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
@@ -211,4 +212,11 @@ func TestConnectLoop(t *testing.T) {
 	client.connectLoop()
 	assert.Equal(t, attempts, 1)
 	assert.Equal(t, rssi, testRSSI)
+}
+
+func TestScanLoop(t *testing.T) {
+	client := getTestClient()
+	go client.scan()
+	time.Sleep(ScanInterval + (ScanInterval / 2))
+	assert.DeepEqual(t, client.rssiMap, testRssiMap)
 }
