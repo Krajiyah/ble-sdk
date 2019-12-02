@@ -27,10 +27,6 @@ const (
 	testServerAddr = "22:22:33:44:55:66"
 )
 
-var (
-	lastReadChar string
-)
-
 type dummyListener struct{}
 
 func (l dummyListener) OnConnectionError(err error)  {}
@@ -52,9 +48,6 @@ func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
 }
 
 func (c dummyClient) ReadValue(uuid string) ([]byte, error) {
-	if uuid != util.ReadRssiMapCharUUID {
-		lastReadChar = uuid
-	}
 	return c.mockedReadValue.Bytes(), nil
 }
 
@@ -241,7 +234,6 @@ func TestStartEndReadChars(t *testing.T) {
 	data, err = readChar1.HandleRead(clientAddr, context.Background())
 	assert.NilError(t, err)
 	assert.DeepEqual(t, data, ts)
-	assert.Equal(t, lastReadChar, util.EndReadForwardCharUUID)
 
 	// mimic 2nd forwarder reading from server
 	mockedReadValue2.Reset()
@@ -250,5 +242,4 @@ func TestStartEndReadChars(t *testing.T) {
 	data, err = readChar2.HandleRead(testAddr, context.Background())
 	assert.NilError(t, err)
 	assert.DeepEqual(t, data, ts)
-	assert.Equal(t, lastReadChar, util.TimeSyncUUID)
 }
