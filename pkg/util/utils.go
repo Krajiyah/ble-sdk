@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	inf = 1000000
+	inf     = 1000000
+	timeout = time.Second * 5
 )
 
 func AddrEqualAddr(a string, b string) bool {
@@ -23,4 +24,19 @@ func UuidEqualStr(u ble.UUID, s string) bool {
 
 func MakeINFContext() context.Context {
 	return ble.WithSigHandler(context.WithTimeout(context.Background(), inf*time.Hour))
+}
+
+func Optimize(fn func() error) error {
+	return Timeout(func() error {
+		var err error
+		TryCatchBlock{
+			Try: func() {
+				err = fn()
+			},
+			Catch: func(e error) {
+				err = e
+			},
+		}.Do()
+		return err
+	}, timeout)
 }

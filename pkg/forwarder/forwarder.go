@@ -25,7 +25,6 @@ const (
 	EndReadForwardCharUUID = "00030000-0006-1000-8000-00805F9B34FB"
 	// ReadRssiMapCharUUID represents UUID for ble characteristic which handles forwarding of reads
 	ReadRssiMapCharUUID  = "00030000-0005-1000-8000-00805F9B34FB"
-	scanInterval         = time.Second * 2
 	maxConnectAttempts   = 5
 	errNotConnected      = "Forwarder is not connected"
 	errInvalidForwardReq = "Invalid forwarding request"
@@ -94,7 +93,7 @@ func (forwarder *BLEForwarder) Run() error {
 func (forwarder *BLEForwarder) scanLoop() {
 	mutex := &sync.Mutex{}
 	for {
-		time.Sleep(scanInterval)
+		time.Sleep(client.ScanInterval)
 		forwarder.forwardingClient.RawScan(func(a ble.Advertisement) {
 			mutex.Lock()
 			err := forwarder.onScanned(a)
@@ -120,7 +119,7 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	rssi := a.RSSI()
 	addr := a.Address().String()
 	forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
-	isF := isForwarder(a)
+	isF := client.IsForwarder(a)
 	var err error
 	if addr != forwarder.serverAddr && isF {
 		err = forwarder.updateRssiMap(addr)
@@ -172,15 +171,6 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 		err = forwarder.keepTryConnect(nextHop)
 	}
 	return err
-}
-
-func isForwarder(a ble.Advertisement) bool {
-	for _, service := range a.Services() {
-		if util.UuidEqualStr(service, server.MainServiceUUID) {
-			return true
-		}
-	}
-	return false
 }
 
 func (forwarder *BLEForwarder) keepTryConnect(addr string) error {

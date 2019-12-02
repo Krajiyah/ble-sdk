@@ -36,6 +36,7 @@ type BLEClient struct {
 	connectionAttempts int
 	timeSync           *util.TimeSync
 	serverAddr         string
+	connectedAddr      string
 	rssiMap            *RssiMap
 	ctx                context.Context
 	cln                *ble.Client
@@ -47,7 +48,7 @@ type BLEClient struct {
 
 func newBLEClient(addr string, secret string, serverAddr string, onConnected func(int, int), onDisconnected func()) *BLEClient {
 	return &BLEClient{
-		addr, secret, Disconnected, 0, nil, serverAddr, &RssiMap{}, util.MakeINFContext(), nil,
+		addr, secret, Disconnected, 0, nil, serverAddr, "", &RssiMap{}, util.MakeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
 	}
 }
@@ -147,11 +148,25 @@ func (client BLEClient) WriteValue(uuid string, data []byte) error {
 	return nil
 }
 
+// IsForwarder is a filter which indicates if advertisement is from BLEForwarder
+func IsForwarder(a ble.Advertisement) bool {
+	for _, service := range a.Services() {
+		if util.UuidEqualStr(service, server.MainServiceUUID) {
+			return true
+		}
+	}
+	return false
+}
+
 func (client *BLEClient) filter(a ble.Advertisement) bool {
 	addr := a.Address().String()
 	rssi := a.RSSI()
 	client.rssiMap.Set(client.addr, addr, rssi)
-	return util.AddrEqualAddr(addr, client.serverAddr)
+	b := util.AddrEqualAddr(addr, client.serverAddr) || IsForwarder(a)
+	if b {
+		client.connectedAddr = addr
+	}
+	return b
 }
 
 // RawScan exposes underlying BLE scanner
@@ -182,7 +197,7 @@ func (client *BLEClient) connectLoop() {
 		err = client.connect()
 	}
 	client.status = Connected
-	client.onConnected(client.connectionAttempts, (*client.rssiMap)[client.addr][client.serverAddr])
+	client.onConnected(client.connectionAttempts, (*client.rssiMap)[client.addr][client.connectedAddr])
 }
 
 func (client *BLEClient) pingLoop() {
@@ -235,16 +250,9 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 
 // RawConnect exposes underlying ble connection functionality
 func (client BLEClient) RawConnect(filter ble.AdvFilter) error {
-	var err error
-	util.TryCatchBlock{
-		Try: func() {
-			err = client.rawConnect(filter)
-		},
-		Catch: func(e error) {
-			err = e
-		},
-	}.Do()
-	return err
+	return util.Optimize(func() error {
+		return client.rawConnect(filter)
+	})
 }
 
 func (client *BLEClient) connect() error {

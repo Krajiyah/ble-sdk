@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Krajiyah/ble-sdk/pkg/client"
 	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
@@ -174,7 +175,7 @@ func TestRssiMapChar(t *testing.T) {
 	}
 	s := getDummyForwarder(t, testAddr, rm)
 	s.forwarder.Run()
-	time.Sleep(scanInterval + (scanInterval / 2))
+	time.Sleep(client.ScanInterval + (client.ScanInterval / 2))
 	assert.DeepEqual(t, *s.forwarder.rssiMap, rm)
 	readChars, _ := getChars(s.forwarder)
 	char := readChars[1]
@@ -204,7 +205,7 @@ func prepare2ForwarderState(t *testing.T) (*testStructs, *testStructs) {
 	mockReadBuffer(t, &expectedRssiMap, mockedReadValue1)
 	f1.Run()
 	f2.Run()
-	time.Sleep(scanInterval * 2)
+	time.Sleep(client.ScanInterval * 2)
 	return s1, s2
 }
 
