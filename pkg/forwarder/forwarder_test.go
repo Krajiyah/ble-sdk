@@ -3,12 +3,14 @@ package forwarder
 import (
 	"bytes"
 	"context"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/server"
+	"github.com/Krajiyah/ble-sdk/pkg/util"
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/currantlabs/ble"
@@ -16,7 +18,7 @@ import (
 )
 
 const (
-	invalidAddr    = "33:22:33:44:55:66"
+	clientAddr     = "33:22:33:44:55:66"
 	testServerName = "Some Name"
 	testAddr       = "11:22:33:44:55:66"
 	testAddr2      = "44:22:33:44:55:66"
@@ -58,6 +60,8 @@ func (a dummyAdv) Address() ble.Addr            { return a.addr }
 type dummyClient struct {
 	addr              string
 	dummyRssiMap      RssiMap
+	lastReadChar      *string
+	lastWriteChar     *string
 	mockedReadValue   *bytes.Buffer
 	mockedWriteBuffer *[]*bytes.Buffer
 }
@@ -69,13 +73,15 @@ func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
 	return nil
 }
 
-func (c dummyClient) ReadValue(string) ([]byte, error) {
+func (c dummyClient) ReadValue(uuid string) ([]byte, error) {
+	c.lastReadChar = &uuid
 	return c.mockedReadValue.Bytes(), nil
 }
 
 func (c dummyClient) RawConnect(ble.AdvFilter) error { return nil }
 
 func (c dummyClient) WriteValue(char string, data []byte) error {
+	c.lastWriteChar = &char
 	buf := bytes.NewBuffer(data)
 	*c.mockedWriteBuffer = append(*c.mockedWriteBuffer, buf)
 	return nil
@@ -87,6 +93,8 @@ func (s dummyServer) Run() error { return nil }
 
 type testStructs struct {
 	forwarder         *BLEForwarder
+	lastReadChar      *string
+	lastWriteChar     *string
 	mockedReadValue   *bytes.Buffer
 	mockedWriteBuffer *[]*bytes.Buffer
 }
@@ -95,9 +103,9 @@ func getDummyForwarder(t *testing.T, addr string, rssiMap RssiMap) *testStructs 
 	mockedReadValue := bytes.NewBuffer([]byte{})
 	mockedWriteBuffer := &[]*bytes.Buffer{}
 	f := newBLEForwarder(addr, testServerAddr, dummyListener{})
-	f.forwardingClient = dummyClient{addr, rssiMap, mockedReadValue, mockedWriteBuffer}
+	f.forwardingClient = dummyClient{addr, rssiMap, nil, nil, mockedReadValue, mockedWriteBuffer}
 	f.forwardingServer = dummyServer{}
-	return &testStructs{f, mockedReadValue, mockedWriteBuffer}
+	return &testStructs{f, nil, nil, mockedReadValue, mockedWriteBuffer}
 }
 
 func TestSingleForwarder(t *testing.T) {
@@ -105,7 +113,7 @@ func TestSingleForwarder(t *testing.T) {
 	expectedRssiMap := RssiMap{
 		testAddr: map[string]int{
 			testServerAddr: -90,
-			invalidAddr:    -10000,
+			clientAddr:     -10000,
 		},
 	}
 	s := getDummyForwarder(t, testAddr, expectedRssiMap)
@@ -162,7 +170,7 @@ func TestRssiMapChar(t *testing.T) {
 	rm := RssiMap{
 		testAddr: map[string]int{
 			testServerAddr: -90,
-			invalidAddr:    -10000,
+			clientAddr:     -10000,
 		},
 	}
 	s := getDummyForwarder(t, testAddr, rm)
@@ -178,7 +186,7 @@ func TestRssiMapChar(t *testing.T) {
 	assert.DeepEqual(t, rm, *actualRM)
 }
 
-func TestWriteChar(t *testing.T) {
+func prepare2ForwarderState(t *testing.T) (*testStructs, *testStructs) {
 	expectedRssiMap := RssiMap{
 		testAddr: map[string]int{
 			testServerAddr: -90,
@@ -191,16 +199,23 @@ func TestWriteChar(t *testing.T) {
 	}
 	s1 := getDummyForwarder(t, testAddr, expectedRssiMap)
 	s2 := getDummyForwarder(t, testAddr2, expectedRssiMap)
-	f1, mockedReadValue1, mockedWriteBuffer1 := s1.forwarder, s1.mockedReadValue, s1.mockedWriteBuffer
-	f2, mockedReadValue2, mockedWriteBuffer2 := s2.forwarder, s2.mockedReadValue, s2.mockedWriteBuffer
+	f1, mockedReadValue1, _ := s1.forwarder, s1.mockedReadValue, s1.mockedWriteBuffer
+	f2, mockedReadValue2, _ := s2.forwarder, s2.mockedReadValue, s2.mockedWriteBuffer
 	mockReadBuffer(t, &expectedRssiMap, mockedReadValue2)
 	mockReadBuffer(t, &expectedRssiMap, mockedReadValue1)
 	f1.Run()
 	f2.Run()
 	time.Sleep(scanInterval * 2)
+	return s1, s2
+}
+
+func TestWriteChar(t *testing.T) {
+	s1, s2 := prepare2ForwarderState(t)
+	f1, _, mockedWriteBuffer1 := s1.forwarder, s1.mockedReadValue, s1.mockedWriteBuffer
+	f2, _, mockedWriteBuffer2 := s2.forwarder, s2.mockedReadValue, s2.mockedWriteBuffer
 
 	// mimic client write to forwarder
-	log := models.ClientLogRequest{invalidAddr, Info, "Hello World!"}
+	log := models.ClientLogRequest{clientAddr, Info, "Hello World!"}
 	logData, err := log.Data()
 	assert.NilError(t, err)
 	req := models.ForwarderRequest{server.ClientLogUUID, logData, false, true}
@@ -208,7 +223,7 @@ func TestWriteChar(t *testing.T) {
 	assert.NilError(t, err)
 	_, writeChars1 := getChars(f1)
 	char1 := writeChars1[0]
-	char1.HandleWrite(invalidAddr, data, nil)
+	char1.HandleWrite(clientAddr, data, nil)
 	assert.Equal(t, len(*mockedWriteBuffer1), 1)
 	assert.DeepEqual(t, (*mockedWriteBuffer1)[0].Bytes(), data)
 
@@ -218,4 +233,43 @@ func TestWriteChar(t *testing.T) {
 	char2.HandleWrite(testAddr, data, nil)
 	assert.Equal(t, len(*mockedWriteBuffer2), 1)
 	assert.DeepEqual(t, (*mockedWriteBuffer2)[0].Bytes(), logData)
+}
+
+func TestStartEndReadChars(t *testing.T) {
+	s1, s2 := prepare2ForwarderState(t)
+	f1, lastReadChar1, mockedReadValue1, mockedWriteBuffer1 := s1.forwarder, s1.lastReadChar, s1.mockedReadValue, s1.mockedWriteBuffer
+	f2, lastReadChar2, mockedReadValue2, mockedWriteBuffer2 := s2.forwarder, s2.lastReadChar, s2.mockedReadValue, s2.mockedWriteBuffer
+
+	// mimic client write to forwarder (start read request)
+	req := models.ForwarderRequest{server.TimeSyncUUID, nil, true, false}
+	data, err := req.Data()
+	assert.NilError(t, err)
+	readChars1, writeChars1 := getChars(f1)
+	writeChar1 := writeChars1[1]
+	writeChar1.HandleWrite(clientAddr, data, nil)
+	assert.Equal(t, len(*mockedWriteBuffer1), 1)
+	assert.DeepEqual(t, (*mockedWriteBuffer1)[0].Bytes(), data)
+
+	// mimic 2nd forwarder preparing for end read request
+	readChars2, writeChars2 := getChars(f2)
+	writeChar2 := writeChars2[1]
+	writeChar2.HandleWrite(testAddr, data, nil)
+	assert.Equal(t, len(*mockedWriteBuffer2), 0)
+
+	// mimic client read from forwarder (end read request)
+	ts := []byte(strconv.FormatInt(util.UnixTS(), 10))
+	mockedReadValue1.Write(ts)
+	readChar1 := readChars1[0]
+	data, err = readChar1.HandleRead(clientAddr, context.Background())
+	assert.NilError(t, err)
+	assert.DeepEqual(t, data, ts)
+	assert.Equal(t, lastReadChar1, EndReadForwardCharUUID)
+
+	// mimic 2nd forwarder reading from server
+	mockedReadValue2.Write(ts)
+	readChar2 := readChars2[0]
+	data, err = readChar2.HandleRead(testAddr, context.Background())
+	assert.NilError(t, err)
+	assert.DeepEqual(t, data, ts)
+	assert.Equal(t, lastReadChar2, server.TimeSyncUUID)
 }

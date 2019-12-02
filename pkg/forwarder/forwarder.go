@@ -2,9 +2,10 @@ package forwarder
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/Krajiyah/ble-sdk/pkg/client"
 	"github.com/Krajiyah/ble-sdk/pkg/models"
