@@ -17,3 +17,6 @@
 
 # Go Dependencies
 vendor
+
+# Dev Env
+.vscode

@@ -16,6 +16,15 @@ var errs []error
 var state map[string]BLEClientState
 var logs []ClientLogRequest
 
+type testBLEServerStatusListener struct{}
+
+func (l testBLEServerStatusListener) OnServerStatusChanged(s BLEServerStatus, err error) {
+	errs = append(errs, err)
+}
+func (l testBLEServerStatusListener) OnClientStateMapChanged(m map[string]BLEClientState) { state = m }
+func (l testBLEServerStatusListener) OnClientLog(r ClientLogRequest)                      { logs = append(logs, r) }
+func (l testBLEServerStatusListener) OnReadOrWriteError(err error)                        { errs = append(errs, err) }
+
 func assertSimilar(t *testing.T, x int64, y int64) {
 	diff := x - y
 	if diff < 0 {
@@ -25,13 +34,7 @@ func assertSimilar(t *testing.T, x int64, y int64) {
 }
 
 func getTestServer() *BLEServer {
-	l := BLEServerStatusListener{
-		func(s BLEServerStatus, err error) { errs = append(errs, err) },
-		func(m map[string]BLEClientState) { state = m },
-		func(r ClientLogRequest) { logs = append(logs, r) },
-		func(err error) { errs = append(errs, err) },
-	}
-	return &BLEServer{"SomeName", "passwd123", Running, map[string]BLEClientState{}, util.NewPacketAggregator(), l}
+	return newBLEServer("SomeName", "passwd123", testBLEServerStatusListener{})
 }
 
 func dummyReadChar() *BLEReadCharacteristic {
@@ -57,7 +60,7 @@ func TestStatusSetters(t *testing.T) {
 	assert.Equal(t, len(errs), 1)
 	assert.DeepEqual(t, errs[0].Error(), expected.Error())
 	addr := "someaddr"
-	s := BLEClientState{Disconnected, map[string]int{}}
+	s := BLEClientState{Disconnected, RssiMap{}}
 	server.setClientState(addr, s)
 	expectedState := map[string]BLEClientState{}
 	expectedState[addr] = s
@@ -98,7 +101,7 @@ func TestClientStatusChar(t *testing.T) {
 	server := getTestServer()
 	char := newClientStatusChar(server)
 	addr := "some addr"
-	m := map[string]int{"some other addr": -80}
+	m := RssiMap{addr: map[string]int{"some other addr": -80}}
 	req := ClientStateRequest{m}
 	b, err := req.Data()
 	assert.NilError(t, err)
@@ -106,5 +109,5 @@ func TestClientStatusChar(t *testing.T) {
 	char.HandleWrite(addr, b, nil)
 	assert.DeepEqual(t, server.clientStateMap, map[string]BLEClientState{addr: BLEClientState{Connected, m}})
 	time.Sleep(PollingInterval * 3)
-	assert.DeepEqual(t, server.clientStateMap, map[string]BLEClientState{addr: BLEClientState{Disconnected, map[string]int{}}})
+	assert.DeepEqual(t, server.clientStateMap, map[string]BLEClientState{addr: BLEClientState{Disconnected, RssiMap{}}})
 }
