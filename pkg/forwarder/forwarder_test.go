@@ -194,15 +194,19 @@ func TestWriteChar(t *testing.T) {
 	_, writeChars1 := getChars(f1)
 	char1 := writeChars1[0]
 	char1.HandleWrite(clientAddr, data, nil)
-	assert.Equal(t, len(*mockedWriteBuffer1), 1)
-	assert.DeepEqual(t, (*mockedWriteBuffer1)[0].Bytes(), data)
+	buffers1 := *mockedWriteBuffer1
+	assert.Equal(t, len(buffers1), 1)
+	bufferData1 := buffers1[0].Bytes()
+	assert.DeepEqual(t, bufferData1, data)
 
 	// mimic 2nd forwarder passing on data to server and unpacking forwarder request
 	_, writeChars2 := getChars(f2)
 	char2 := writeChars2[0]
 	char2.HandleWrite(testAddr, data, nil)
-	assert.Equal(t, len(*mockedWriteBuffer2), 1)
-	assert.DeepEqual(t, (*mockedWriteBuffer2)[0].Bytes(), logData)
+	buffers2 := *mockedWriteBuffer2
+	assert.Equal(t, len(buffers2), 1)
+	bufferData2 := buffers2[0].Bytes()
+	assert.DeepEqual(t, bufferData2, logData)
 }
 
 func TestStartEndReadChars(t *testing.T) {
