@@ -34,7 +34,7 @@ func assertSimilar(t *testing.T, x int64, y int64) {
 }
 
 func getTestServer() *BLEServer {
-	return &BLEServer{"SomeName", "passwd123", Running, map[string]BLEClientState{}, util.NewPacketAggregator(), testBLEServerStatusListener{}}
+	return newBLEServer("SomeName", "passwd123", testBLEServerStatusListener{})
 }
 
 func dummyReadChar() *BLEReadCharacteristic {

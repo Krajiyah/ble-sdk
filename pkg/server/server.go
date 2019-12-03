@@ -41,10 +41,17 @@ func NewBLEServer(name string, secret string, listener BLEServerStatusListener,
 	return NewBLEServerSharedDevice(d, name, secret, listener, moreReadChars, moreWriteChars)
 }
 
+func newBLEServer(name string, secret string, listener BLEServerStatusListener) *BLEServer {
+	return &BLEServer{
+		name, secret, Running,
+		map[string]BLEClientState{}, util.NewPacketAggregator(), listener,
+	}
+}
+
 // NewBLEServerSharedDevice creates a new BLEService using shared ble device
 func NewBLEServerSharedDevice(device ble.Device, name string, secret string, listener BLEServerStatusListener,
 	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, error) {
-	server := &BLEServer{name, secret, Running, map[string]BLEClientState{}, util.NewPacketAggregator(), listener}
+	server := newBLEServer(name, secret, listener)
 	ble.SetDefaultDevice(device)
 	err := ble.AddService(getService(server, moreReadChars, moreWriteChars))
 	if err != nil {
