@@ -221,14 +221,16 @@ func TestStartEndReadChars(t *testing.T) {
 	readChars1, writeChars1 := getChars(f1)
 	writeChar1 := writeChars1[1]
 	writeChar1.HandleWrite(clientAddr, data, nil)
-	assert.Equal(t, len(*mockedWriteBuffer1), 1)
-	assert.DeepEqual(t, (*mockedWriteBuffer1)[0].Bytes(), data)
+	buffer1 := *mockedWriteBuffer1
+	assert.Equal(t, len(buffer1), 1)
+	assert.DeepEqual(t, buffer1[0].Bytes(), data)
 
 	// mimic 2nd forwarder preparing for end read request
 	readChars2, writeChars2 := getChars(f2)
 	writeChar2 := writeChars2[1]
 	writeChar2.HandleWrite(testAddr, data, nil)
-	assert.Equal(t, len(*mockedWriteBuffer2), 0)
+	buffer2 := *mockedWriteBuffer2
+	assert.Equal(t, len(buffer2), 0)
 
 	// mimic client read from forwarder (end read request)
 	ts := []byte(strconv.FormatInt(util.UnixTS(), 10))
