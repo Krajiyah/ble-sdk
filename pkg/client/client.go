@@ -132,7 +132,7 @@ func (client *BLEClient) ReadValue(uuid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = client.WriteValue(util.StartReadForwardCharUUID, data)
+	err = client.writeValue(util.StartReadForwardCharUUID, data)
 	if err != nil {
 		return nil, err
 	}

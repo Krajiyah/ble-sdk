@@ -15,10 +15,11 @@ import (
 )
 
 const (
-	testAddr       = "11:22:33:44:55:66"
-	testServerAddr = "22:22:33:44:55:66"
-	testSecret     = "test123"
-	testRSSI       = -50
+	testAddr          = "11:22:33:44:55:66"
+	testServerAddr    = "22:22:33:44:55:66"
+	testForwarderAddr = "33:22:33:44:55:66"
+	testSecret        = "test123"
+	testRSSI          = -50
 )
 
 var (
@@ -31,6 +32,24 @@ var (
 		},
 	}
 )
+
+func setServerConnection() {
+	serviceUUIDs = []string{util.ClientStateUUID, util.TimeSyncUUID, util.ClientLogUUID}
+	testRssiMap = &RssiMap{
+		testAddr: map[string]int{
+			testServerAddr: testRSSI,
+		},
+	}
+}
+
+func setForwarderConnection() {
+	serviceUUIDs = []string{util.WriteForwardCharUUID, util.StartReadForwardCharUUID, util.EndReadForwardCharUUID}
+	testRssiMap = &RssiMap{
+		testAddr: map[string]int{
+			testForwarderAddr: testRSSI,
+		},
+	}
+}
 
 type dummyCoreClient struct {
 	testAddr            string
@@ -131,12 +150,17 @@ func getTestClient() *BLEClient {
 	return client
 }
 
-func getDummyClient() (*BLEClient, *dummyCoreClient) {
+func getDummyClient(connectedAddr string) (*BLEClient, *dummyCoreClient) {
 	client := getTestClient()
 	cc := newDummyCoreClient(testAddr)
 	var c ble.Client
 	c = cc
 	client.cln = &c
+	client.connectedAddr = connectedAddr
+	client.characteristics = map[string]*ble.Characteristic{}
+	for _, uuid := range serviceUUIDs {
+		client.characteristics[uuid] = nil
+	}
 	dc := cc.(dummyCoreClient)
 	return client, &dc
 }
@@ -160,8 +184,26 @@ func mockUnixTS(t *testing.T, buffer *bytes.Buffer) int64 {
 	return expected
 }
 
+func getWriteBufferData(t *testing.T, secret string, buffers *[]*bytes.Buffer) []byte {
+	pa := util.NewPacketAggregator()
+	var guid string
+	var err error
+	for _, buffer := range *buffers {
+		guid, err = pa.AddPacketFromPacketBytes(buffer.Bytes())
+		assert.NilError(t, err)
+	}
+	ok := pa.HasDataFromPacketStream(guid)
+	assert.Assert(t, ok)
+	encData, err := pa.PopAllDataFromPackets(guid)
+	assert.NilError(t, err)
+	data, err := util.Decrypt(encData, secret)
+	assert.NilError(t, err)
+	return data
+}
+
 func TestUnixTS(t *testing.T) {
-	client, dummyClient := getDummyClient()
+	setServerConnection()
+	client, dummyClient := getDummyClient(testServerAddr)
 
 	// mock server read
 	expected := mockUnixTS(t, dummyClient.mockedReadCharData)
@@ -179,7 +221,8 @@ func TestUnixTS(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	client, dummyClient := getDummyClient()
+	setServerConnection()
+	client, dummyClient := getDummyClient(testServerAddr)
 
 	// test client write
 	setCharacteristic(client, util.ClientLogUUID)
@@ -188,31 +231,14 @@ func TestLog(t *testing.T) {
 	assert.NilError(t, err)
 
 	// mock write to server
-	data, err := expected.Data()
-	assert.NilError(t, err)
-	encData, err := util.Encrypt(data, client.secret)
-	assert.NilError(t, err)
-	pa := util.NewPacketAggregator()
-	guid1, err := pa.AddPacketFromPacketBytes((*(dummyClient.mockedWriteCharData))[0].Bytes())
-	assert.NilError(t, err)
-	guid2, err := pa.AddPacketFromPacketBytes((*(dummyClient.mockedWriteCharData))[1].Bytes())
-	assert.NilError(t, err)
-	guid3, err := pa.AddPacketFromPacketBytes((*(dummyClient.mockedWriteCharData))[2].Bytes())
-	assert.NilError(t, err)
-	assert.Equal(t, guid1, guid2)
-	assert.Equal(t, guid1, guid3)
-	ok := pa.HasDataFromPacketStream(guid1)
-	assert.Assert(t, ok)
-	encData, err = pa.PopAllDataFromPackets(guid1)
-	assert.NilError(t, err)
-	data, err = util.Decrypt(encData, client.secret)
-	assert.NilError(t, err)
+	data := getWriteBufferData(t, client.secret, dummyClient.mockedWriteCharData)
 	actual, err := GetClientLogRequestFromBytes(data)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, *actual, expected)
 }
 
 func TestConnectLoop(t *testing.T) {
+	setServerConnection()
 	client := getTestClient()
 	client.connectLoop()
 	assert.Equal(t, attempts, 1)
@@ -220,6 +246,7 @@ func TestConnectLoop(t *testing.T) {
 }
 
 func TestScanLoop(t *testing.T) {
+	setServerConnection()
 	client := getTestClient()
 	go client.scan()
 	time.Sleep(ScanInterval + (ScanInterval / 2))
@@ -227,6 +254,7 @@ func TestScanLoop(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
+	setServerConnection()
 	client := getTestClient()
 	client.Run()
 	duration := PingInterval + (PingInterval / 4)
@@ -238,9 +266,33 @@ func TestRun(t *testing.T) {
 }
 
 func TestForwardedWrite(t *testing.T) {
-	// TODO: ...
+	setForwarderConnection()
+	client, dummyCoreClient := getDummyClient(testForwarderAddr)
+	req := ClientLogRequest{testAddr, Info, "Hello World!"}
+	expectedData, err := req.Data()
+	assert.NilError(t, err)
+	err = client.Log(req)
+	assert.NilError(t, err)
+	data := getWriteBufferData(t, client.secret, dummyCoreClient.mockedWriteCharData)
+	r, err := GetForwarderRequestFromBytes(data)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, r.Payload, expectedData)
 }
 
 func TestForwardedRead(t *testing.T) {
-	// TODO: ...
+	setForwarderConnection()
+	client, dummyClient := getDummyClient(testForwarderAddr)
+
+	// mock forwarder read
+	expected := mockUnixTS(t, dummyClient.mockedReadCharData)
+
+	ts, err := client.getUnixTS()
+	assert.NilError(t, err)
+	assert.Equal(t, ts, expected)
+
+	// check that it started read before doing the end read
+	data := getWriteBufferData(t, client.secret, dummyClient.mockedWriteCharData)
+	r, err := GetForwarderRequestFromBytes(data)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, *r, ForwarderRequest{util.TimeSyncUUID, nil, true, false})
 }
