@@ -17,6 +17,11 @@ func NewRssiMap() RssiMap {
 	return RssiMap{data: map[string]map[string]int{}, mutex: sync.RWMutex{}}
 }
 
+// NewRssiMapFromRaw will return newly init struct
+func NewRssiMapFromRaw(raw map[string]map[string]int) RssiMap {
+	return RssiMap{data: raw, mutex: sync.RWMutex{}}
+}
+
 // Data will return serialized form of struct as bytes
 func (rm *RssiMap) Data() ([]byte, error) {
 	return encode(rm.GetAll())
