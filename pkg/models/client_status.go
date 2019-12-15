@@ -17,5 +17,5 @@ func (s BLEClientStatus) String() string {
 // BLEClientState is representation of ble client's state
 type BLEClientState struct {
 	Status  BLEClientStatus
-	RssiMap RssiMap
+	RssiMap map[string]map[string]int
 }

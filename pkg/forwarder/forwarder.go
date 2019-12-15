@@ -37,9 +37,10 @@ type BLEForwarder struct {
 }
 
 func newBLEForwarder(addr, serverAddr string, listener models.BLEForwarderListener) *BLEForwarder {
+	rm := models.NewRssiMap()
 	return &BLEForwarder{
 		addr, nil, nil,
-		serverAddr, "", "", &models.RssiMap{},
+		serverAddr, "", "", &rm,
 		&sync.Mutex{}, "",
 		listener,
 	}
@@ -150,7 +151,7 @@ func (forwarder *BLEForwarder) reconnect() error {
 }
 
 func (forwarder *BLEForwarder) refreshShortestPath() error {
-	path, err := util.ShortestPath(*forwarder.rssiMap, forwarder.addr, forwarder.serverAddr)
+	path, err := util.ShortestPath(forwarder.rssiMap.GetAll(), forwarder.addr, forwarder.serverAddr)
 	if err != nil {
 		return err
 	}

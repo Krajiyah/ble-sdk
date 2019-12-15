@@ -26,29 +26,19 @@ var (
 	attempts     = 0
 	rssi         = 0
 	serviceUUIDs = []string{util.ClientStateUUID, util.TimeSyncUUID, util.ClientLogUUID}
-	testRssiMap  = &RssiMap{
-		testAddr: map[string]int{
-			testServerAddr: testRSSI,
-		},
-	}
+	testRssiMap  = NewRssiMap()
 )
 
 func setServerConnection() {
 	serviceUUIDs = []string{util.ClientStateUUID, util.TimeSyncUUID, util.ClientLogUUID}
-	testRssiMap = &RssiMap{
-		testAddr: map[string]int{
-			testServerAddr: testRSSI,
-		},
-	}
+	testRssiMap = NewRssiMap()
+	testRssiMap.Set(testAddr, testServerAddr, testRSSI)
 }
 
 func setForwarderConnection() {
 	serviceUUIDs = []string{util.WriteForwardCharUUID, util.StartReadForwardCharUUID, util.EndReadForwardCharUUID}
-	testRssiMap = &RssiMap{
-		testAddr: map[string]int{
-			testForwarderAddr: testRSSI,
-		},
-	}
+	testRssiMap = NewRssiMap()
+	testRssiMap.Set(testAddr, testForwarderAddr, testRSSI)
 }
 
 type dummyCoreClient struct {
@@ -114,7 +104,7 @@ type testBleConnector struct {
 }
 
 func (bc testBleConnector) filter(fn func(addr string, rssi int)) {
-	for k, v := range (*bc.rssiMap)[bc.addr] {
+	for k, v := range bc.rssiMap.GetAll()[bc.addr] {
 		fn(k, v)
 	}
 }
@@ -146,7 +136,7 @@ func dummyOnDisconnected() {}
 
 func getTestClient() *BLEClient {
 	client := newBLEClient(testAddr, testSecret, testServerAddr, true, dummyOnConnected, dummyOnDisconnected)
-	client.bleConnector = testBleConnector{testAddr, testRssiMap}
+	client.bleConnector = testBleConnector{testAddr, &testRssiMap}
 	return client
 }
 
@@ -250,7 +240,7 @@ func TestScanLoop(t *testing.T) {
 	client := getTestClient()
 	go client.scan()
 	time.Sleep(ScanInterval + (ScanInterval / 2))
-	assert.DeepEqual(t, client.rssiMap, testRssiMap)
+	assert.DeepEqual(t, client.rssiMap.GetAll(), testRssiMap.GetAll())
 }
 
 func TestRun(t *testing.T) {

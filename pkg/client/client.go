@@ -72,8 +72,9 @@ func (client *BLEClient) GetChars() map[string]*ble.Characteristic {
 }
 
 func newBLEClient(addr string, secret string, serverAddr string, doForwarding bool, onConnected func(int, int), onDisconnected func()) *BLEClient {
+	rm := NewRssiMap()
 	return &BLEClient{
-		addr, secret, Disconnected, 0, doForwarding, nil, serverAddr, "", &RssiMap{}, util.MakeINFContext(), nil,
+		addr, secret, Disconnected, 0, doForwarding, nil, serverAddr, "", &rm, util.MakeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
 		stdBleConnector{},
 	}
@@ -272,14 +273,15 @@ func (client *BLEClient) connectLoop() {
 		err = client.connect()
 	}
 	client.status = Connected
-	rssi := (*client.rssiMap)[client.addr][client.connectedAddr]
+	rssi, _ := client.rssiMap.Get(client.addr, client.connectedAddr)
 	client.onConnected(client.connectionAttempts, rssi)
 }
 
 func (client *BLEClient) pingLoop() {
 	for {
 		time.Sleep(PingInterval)
-		req := &ClientStateRequest{*client.rssiMap}
+		m := client.rssiMap.GetAll()
+		req := &ClientStateRequest{m}
 		b, _ := req.Data()
 		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {
