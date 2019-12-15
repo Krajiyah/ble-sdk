@@ -128,6 +128,10 @@ func (client *BLEClient) Log(log ClientLogRequest) error {
 }
 
 func (client *BLEClient) isConnectedToForwarder() bool {
+	fmt.Println("info...........")
+	fmt.Println(client.connectedAddr)
+	fmt.Println(client.serverAddr)
+	fmt.Println("sooo????")
 	return client.doForwarding && client.connectedAddr != "" && client.connectedAddr != client.serverAddr
 }
 
