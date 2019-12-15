@@ -66,6 +66,11 @@ type BLEClient struct {
 	bleConnector       bleConnector
 }
 
+// TODO: remove
+func (client *BLEClient) GetChars() map[string]*ble.Characteristic {
+	return client.characteristics
+}
+
 func newBLEClient(addr string, secret string, serverAddr string, doForwarding bool, onConnected func(int, int), onDisconnected func()) *BLEClient {
 	return &BLEClient{
 		addr, secret, Disconnected, 0, doForwarding, nil, serverAddr, "", &RssiMap{}, util.MakeINFContext(), nil,
