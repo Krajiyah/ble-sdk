@@ -274,9 +274,6 @@ func (client *BLEClient) connectLoop() {
 	for err != nil {
 		client.connectionAttempts++
 		err = client.connect()
-		if err != nil {
-			fmt.Println("Error connecting: " + err.Error())
-		}
 	}
 	client.status = Connected
 	fmt.Println("Getting....")
@@ -310,11 +307,12 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 	if client.cln != nil {
 		(*client.cln).CancelConnection()
 	}
-	fmt.Println("Do actual connect..,...")
+	fmt.Println("do actual connect...")
 	cln, err := client.bleConnector.Connect(client.ctx, filter)
 	client.cln = &cln
 	if err != nil {
-		fmt.Println("error connecting: " + err.Error())
+		fmt.Println("error connecting: ")
+		fmt.Println(err)
 		return err
 	}
 	fmt.Println("actually connected!")
