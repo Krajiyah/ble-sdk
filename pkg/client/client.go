@@ -60,7 +60,7 @@ type BLEClient struct {
 	rssiMap            *RssiMap
 	ctx                context.Context
 	cln                *ble.Client
-	characteristics    map[string]*ble.Characteristic
+	characteristics    *map[string]*ble.Characteristic
 	packetAggregator   util.PacketAggregator
 	onConnected        func(int, int)
 	onDisconnected     func()
@@ -69,14 +69,14 @@ type BLEClient struct {
 
 // TODO: remove
 func (client *BLEClient) GetChars() map[string]*ble.Characteristic {
-	return client.characteristics
+	return *client.characteristics
 }
 
 func newBLEClient(addr string, secret string, serverAddr string, doForwarding bool, onConnected func(int, int), onDisconnected func()) *BLEClient {
 	rm := NewRssiMap()
 	return &BLEClient{
 		addr, secret, Disconnected, 0, doForwarding, nil, serverAddr, "", &rm, util.MakeINFContext(), nil,
-		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
+		&map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
 		stdBleConnector{},
 	}
 }
@@ -328,7 +328,7 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
 			for _, c := range s.Characteristics {
 				uuid := util.UuidToStr(c.UUID)
-				client.characteristics[uuid] = c
+				(*client.characteristics)[uuid] = c
 			}
 			break
 		}
@@ -348,7 +348,7 @@ func (client *BLEClient) connect() error {
 }
 
 func (client *BLEClient) getCharacteristic(uuid string) (*ble.Characteristic, error) {
-	if c, ok := client.characteristics[uuid]; ok {
+	if c, ok := (*client.characteristics)[uuid]; ok {
 		return c, nil
 	}
 	return nil, errors.New("No such uuid in characteristics advertised from server")
