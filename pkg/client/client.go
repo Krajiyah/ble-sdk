@@ -122,7 +122,7 @@ func (client *BLEClient) Log(log ClientLogRequest) error {
 }
 
 func (client *BLEClient) isConnectedToForwarder() bool {
-	return client.doForwarding && client.connectedAddr != "" && !util.UuidEqualStr(ble.MustParse(client.serverAddr), client.connectedAddr)
+	return client.doForwarding && client.connectedAddr != "" && !util.AddrEqualAddr(client.serverAddr, client.connectedAddr)
 }
 
 // ReadValue will read packeted data from ble server from given uuid
