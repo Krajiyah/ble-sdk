@@ -154,8 +154,11 @@ func (client *BLEClient) readValue(uuid string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("Got packet data (# bytes) from read char: " + string(len(packetData)))
+		fmt.Printf("Got packet data (# bytes) from read char: %d\n", len(packetData))
 		guid, err = client.packetAggregator.AddPacketFromPacketBytes(packetData)
+		if err != nil {
+			return nil, err
+		}
 	}
 	encData, err := client.packetAggregator.PopAllDataFromPackets(guid)
 	if err != nil {

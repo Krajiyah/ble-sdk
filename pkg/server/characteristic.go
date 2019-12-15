@@ -98,7 +98,7 @@ func generateReadHandler(server *BLEServer, uuid string, load func(string, conte
 			req.Conn().SetContext(ctx)
 		}
 		if err == nil {
-			fmt.Println("Wrote data to read char: " + string(packetData))
+			fmt.Printf("Wrote data to read char: %d\n", len(packetData))
 			rsp.Write(packetData)
 		} else {
 			fmt.Println(fmt.Sprintf("Ooooooof: %s", err.Error()))
