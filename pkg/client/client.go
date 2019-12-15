@@ -273,6 +273,7 @@ func (client *BLEClient) connectLoop() {
 	err := errors.New("")
 	for err != nil {
 		client.connectionAttempts++
+		fmt.Println("attempting...")
 		err = client.connect()
 	}
 	client.status = Connected
