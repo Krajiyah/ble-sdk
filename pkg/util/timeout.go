@@ -2,24 +2,30 @@ package util
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
 // Timeout is a utility method used to timeout function calls after the specified interval
 func Timeout(fn func() error, duration time.Duration) error {
-	var err error
-	ch := make(chan bool, 1)
-	defer close(ch)
+	err := make(chan error, 1)
 	go func() {
-		err = fn()
-		ch <- true
+		e := fn()
+		err <- e
+		if e != nil {
+			fmt.Println("OOOF ERR: " + e.Error())
+		}
 	}()
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
 	select {
-	case <-ch:
-		return err
-	case <-timer.C:
+	case ret := <-err:
+		close(err)
+		if ret != nil {
+			fmt.Println("RAW ERR: " + ret.Error())
+		}
+		return ret
+	case <-time.After(duration):
+		close(err)
+		fmt.Println("TIMEOUT ERR")
 		return errors.New("Timeout")
 	}
 }
