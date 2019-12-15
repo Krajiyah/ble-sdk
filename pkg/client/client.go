@@ -99,8 +99,9 @@ func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, ser
 // Run is a method that runs the connection from client to service
 func (client *BLEClient) Run() {
 	client.connectLoop()
-	go client.scan()
-	go client.pingLoop()
+	// TODO: bring back
+	// go client.scan()
+	// go client.pingLoop()
 }
 
 // UnixTS returns the current time synced timestamp from the ble service
@@ -251,19 +252,19 @@ func (client *BLEClient) RawScan(handle func(ble.Advertisement)) error {
 	return client.bleConnector.Scan(client.ctx, true, handle, nil)
 }
 
-func (client *BLEClient) scan() {
-	for {
-		time.Sleep(ScanInterval)
-		err := client.RawScan(func(a ble.Advertisement) {
-			rssi := a.RSSI()
-			addr := a.Address().String()
-			client.rssiMap.Set(client.addr, addr, rssi)
-		})
-		if err != nil {
-			fmt.Println("Scan error: " + err.Error())
-		}
-	}
-}
+// func (client *BLEClient) scan() {
+// 	for {
+// 		time.Sleep(ScanInterval)
+// 		err := client.RawScan(func(a ble.Advertisement) {
+// 			rssi := a.RSSI()
+// 			addr := a.Address().String()
+// 			client.rssiMap.Set(client.addr, addr, rssi)
+// 		})
+// 		if err != nil {
+// 			fmt.Println("Scan error: " + err.Error())
+// 		}
+// 	}
+// }
 
 func (client *BLEClient) connectLoop() {
 	client.status = Disconnected
@@ -283,26 +284,26 @@ func (client *BLEClient) connectLoop() {
 	client.onConnected(client.connectionAttempts, rssi)
 }
 
-func (client *BLEClient) pingLoop() {
-	for {
-		time.Sleep(PingInterval)
-		m := client.rssiMap.GetAll()
-		req := &ClientStateRequest{m}
-		b, _ := req.Data()
-		err := client.WriteValue(util.ClientStateUUID, b)
-		if err != nil {
-			client.connectLoop()
-			continue
-		}
-		initTS, err := client.getUnixTS()
-		if err != nil {
-			client.connectLoop()
-			continue
-		}
-		timeSync := util.NewTimeSync(initTS)
-		client.timeSync = &timeSync
-	}
-}
+// func (client *BLEClient) pingLoop() {
+// 	for {
+// 		time.Sleep(PingInterval)
+// 		m := client.rssiMap.GetAll()
+// 		req := &ClientStateRequest{m}
+// 		b, _ := req.Data()
+// 		err := client.WriteValue(util.ClientStateUUID, b)
+// 		if err != nil {
+// 			client.connectLoop()
+// 			continue
+// 		}
+// 		initTS, err := client.getUnixTS()
+// 		if err != nil {
+// 			client.connectLoop()
+// 			continue
+// 		}
+// 		timeSync := util.NewTimeSync(initTS)
+// 		client.timeSync = &timeSync
+// 	}
+// }
 
 func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 	if client.cln != nil {
@@ -349,8 +350,9 @@ func (client *BLEClient) connect() error {
 }
 
 func (client *BLEClient) getCharacteristic(uuid string) (*ble.Characteristic, error) {
-	if c, ok := (*client.characteristics)[uuid]; ok {
+	m := *client.characteristics
+	if c, ok := m[uuid]; ok {
 		return c, nil
 	}
-	return nil, errors.New("No such uuid in characteristics advertised from server")
+	return nil, fmt.Errorf("No such uuid (%s) in characteristics (%v) advertised from server.", uuid, m)
 }
