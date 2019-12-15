@@ -2,6 +2,7 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -262,9 +263,8 @@ func (client *BLEClient) scan() {
 }
 
 func (client *BLEClient) connectLoop() {
-	client.status = Connected
+	client.status = Disconnected
 	if client.connectionAttempts > 0 {
-		client.status = Disconnected
 		client.onDisconnected()
 	}
 	err := errors.New("")
@@ -273,7 +273,9 @@ func (client *BLEClient) connectLoop() {
 		err = client.connect()
 	}
 	client.status = Connected
+	fmt.Println("Getting....")
 	rssi, _ := client.rssiMap.Get(client.addr, client.connectedAddr)
+	fmt.Println("woooo!")
 	client.onConnected(client.connectionAttempts, rssi)
 }
 
