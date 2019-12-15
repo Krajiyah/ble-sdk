@@ -346,9 +346,16 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 
 // RawConnect exposes underlying ble connection functionality
 func (client *BLEClient) RawConnect(filter ble.AdvFilter) error {
-	return util.Optimize(func() error {
-		return client.rawConnect(filter)
-	})
+	var err error
+	util.TryCatchBlock{
+		Try: func() {
+			err = client.rawConnect(filter)
+		},
+		Catch: func(e error) {
+			err = e
+		},
+	}.Do()
+	return err
 }
 
 func (client *BLEClient) connect() error {
