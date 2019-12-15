@@ -254,11 +254,14 @@ func (client *BLEClient) RawScan(handle func(ble.Advertisement)) error {
 func (client *BLEClient) scan() {
 	for {
 		time.Sleep(ScanInterval)
-		client.RawScan(func(a ble.Advertisement) {
+		err := client.RawScan(func(a ble.Advertisement) {
 			rssi := a.RSSI()
 			addr := a.Address().String()
 			client.rssiMap.Set(client.addr, addr, rssi)
 		})
+		if err != nil {
+			fmt.Println("Scan error: " + err.Error())
+		}
 	}
 }
 
@@ -311,6 +314,7 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 	cln, err := client.bleConnector.Connect(client.ctx, filter)
 	client.cln = &cln
 	if err != nil {
+		fmt.Println("error connecting: " + err.Error())
 		return err
 	}
 	fmt.Println("actually connected!")
