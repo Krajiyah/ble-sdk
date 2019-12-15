@@ -60,23 +60,18 @@ type BLEClient struct {
 	rssiMap            *RssiMap
 	ctx                context.Context
 	cln                *ble.Client
-	characteristics    *map[string]*ble.Characteristic
+	characteristics    map[string]*ble.Characteristic
 	packetAggregator   util.PacketAggregator
 	onConnected        func(int, int)
 	onDisconnected     func()
 	bleConnector       bleConnector
 }
 
-// TODO: remove
-func (client *BLEClient) GetChars() map[string]*ble.Characteristic {
-	return *client.characteristics
-}
-
 func newBLEClient(addr string, secret string, serverAddr string, doForwarding bool, onConnected func(int, int), onDisconnected func()) *BLEClient {
 	rm := NewRssiMap()
 	return &BLEClient{
 		addr, secret, Disconnected, 0, doForwarding, nil, serverAddr, "", &rm, util.MakeINFContext(), nil,
-		&map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
+		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
 		stdBleConnector{},
 	}
 }
@@ -99,9 +94,8 @@ func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, ser
 // Run is a method that runs the connection from client to service
 func (client *BLEClient) Run() {
 	client.connectLoop()
-	// TODO: bring back
-	// go client.scan()
-	// go client.pingLoop()
+	go client.scan()
+	go client.pingLoop()
 }
 
 // UnixTS returns the current time synced timestamp from the ble service
@@ -256,19 +250,19 @@ func (client *BLEClient) RawScan(handle func(ble.Advertisement)) error {
 	return client.bleConnector.Scan(client.ctx, true, handle, nil)
 }
 
-// func (client *BLEClient) scan() {
-// 	for {
-// 		time.Sleep(ScanInterval)
-// 		err := client.RawScan(func(a ble.Advertisement) {
-// 			rssi := a.RSSI()
-// 			addr := a.Address().String()
-// 			client.rssiMap.Set(client.addr, addr, rssi)
-// 		})
-// 		if err != nil {
-// 			fmt.Println("Scan error: " + err.Error())
-// 		}
-// 	}
-// }
+func (client *BLEClient) scan() {
+	for {
+		time.Sleep(ScanInterval)
+		err := client.RawScan(func(a ble.Advertisement) {
+			rssi := a.RSSI()
+			addr := a.Address().String()
+			client.rssiMap.Set(client.addr, addr, rssi)
+		})
+		if err != nil {
+			fmt.Println("Scan error: " + err.Error())
+		}
+	}
+}
 
 func (client *BLEClient) connectLoop() {
 	client.status = Disconnected
@@ -292,26 +286,26 @@ func (client *BLEClient) connectLoop() {
 	client.onConnected(client.connectionAttempts, rssi)
 }
 
-// func (client *BLEClient) pingLoop() {
-// 	for {
-// 		time.Sleep(PingInterval)
-// 		m := client.rssiMap.GetAll()
-// 		req := &ClientStateRequest{m}
-// 		b, _ := req.Data()
-// 		err := client.WriteValue(util.ClientStateUUID, b)
-// 		if err != nil {
-// 			client.connectLoop()
-// 			continue
-// 		}
-// 		initTS, err := client.getUnixTS()
-// 		if err != nil {
-// 			client.connectLoop()
-// 			continue
-// 		}
-// 		timeSync := util.NewTimeSync(initTS)
-// 		client.timeSync = &timeSync
-// 	}
-// }
+func (client *BLEClient) pingLoop() {
+	for {
+		time.Sleep(PingInterval)
+		m := client.rssiMap.GetAll()
+		req := &ClientStateRequest{m}
+		b, _ := req.Data()
+		err := client.WriteValue(util.ClientStateUUID, b)
+		if err != nil {
+			client.connectLoop()
+			continue
+		}
+		initTS, err := client.getUnixTS()
+		if err != nil {
+			client.connectLoop()
+			continue
+		}
+		timeSync := util.NewTimeSync(initTS)
+		client.timeSync = &timeSync
+	}
+}
 
 func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 	if client.cln != nil {
@@ -336,7 +330,7 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
 			for _, c := range s.Characteristics {
 				uuid := util.UuidToStr(c.UUID)
-				(*client.characteristics)[uuid] = c
+				client.characteristics[uuid] = c
 			}
 			break
 		}
@@ -363,9 +357,8 @@ func (client *BLEClient) connect() error {
 }
 
 func (client *BLEClient) getCharacteristic(uuid string) (*ble.Characteristic, error) {
-	m := *client.characteristics
-	if c, ok := m[uuid]; ok {
+	if c, ok := client.characteristics[uuid]; ok {
 		return c, nil
 	}
-	return nil, fmt.Errorf("No such uuid (%s) in characteristics (%v) advertised from server.", uuid, m)
+	return nil, fmt.Errorf("No such uuid (%s) in characteristics (%v) advertised from server.", uuid, client.characteristics)
 }
