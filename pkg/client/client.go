@@ -304,11 +304,13 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 	if client.cln != nil {
 		(*client.cln).CancelConnection()
 	}
+	fmt.Println("Do actual connect..,...")
 	cln, err := client.bleConnector.Connect(client.ctx, filter)
 	client.cln = &cln
 	if err != nil {
 		return err
 	}
+	fmt.Println("actually connected!")
 	_, err = cln.ExchangeMTU(util.MTU)
 	if err != nil {
 		return err
