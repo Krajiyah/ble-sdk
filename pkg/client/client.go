@@ -210,10 +210,10 @@ func (client *BLEClient) writeValue(uuid string, data []byte) error {
 
 func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error) {
 	var data []byte
-	var err error
-	err = util.Optimize(func() error {
-		data, err = (*client.cln).ReadCharacteristic(c)
-		return err
+	err := util.Optimize(func() error {
+		dat, e := (*client.cln).ReadCharacteristic(c)
+		data = dat
+		return e
 	})
 	return data, err
 }
