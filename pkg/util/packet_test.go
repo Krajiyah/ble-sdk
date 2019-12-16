@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 
@@ -29,10 +30,15 @@ func getSamplePacket() BLEPacket {
 	return packet
 }
 
+func assertMTU(t *testing.T, data []byte) {
+	assert.Check(t, len(data) < MTU, fmt.Sprintf("Packet data (%d) should be within MTU (%d)", len(data), MTU))
+}
+
 func TestAddPacketAndGetPacketStreams(t *testing.T) {
 	packet := getSamplePacket()
 	packetData, err := packet.Data()
 	assert.NilError(t, err)
+	assertMTU(t, packetData)
 	pa := NewPacketAggregator()
 	g, err := pa.AddPacketFromPacketBytes(packetData)
 	assert.NilError(t, err)

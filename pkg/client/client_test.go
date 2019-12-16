@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -166,11 +167,15 @@ func mockUnixTS(t *testing.T, buffer *bytes.Buffer) int64 {
 	assert.NilError(t, err)
 	guid, err := pa.AddData(encData)
 	assert.NilError(t, err)
-	var isLastPacket bool
-	data, isLastPacket, err := pa.PopPacketDataFromStream(guid)
-	buffer.Write(data)
-	assert.NilError(t, err)
-	assert.Assert(t, isLastPacket)
+	isLastPacket := false
+	for !isLastPacket {
+		var err error
+		var data []byte
+		data, isLastPacket, err = pa.PopPacketDataFromStream(guid)
+		fmt.Println(len(data))
+		assert.NilError(t, err)
+		buffer.Write(data)
+	}
 	return expected
 }
 
@@ -247,11 +252,10 @@ func TestRun(t *testing.T) {
 	setServerConnection()
 	client := getTestClient()
 	client.Run()
-	duration := PingInterval + (PingInterval / 4)
-	time.Sleep(duration)
+	time.Sleep(afterConnectionDelay)
 	c := (*(client.cln)).(dummyCoreClient)
 	ts := mockUnixTS(t, c.mockedReadCharData)
-	time.Sleep(duration)
+	time.Sleep(PingInterval + (PingInterval / 4))
 	assert.Assert(t, client.UnixTS() > ts, "UnixTS must be after mocked TS")
 }
 

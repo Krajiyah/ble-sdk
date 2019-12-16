@@ -19,7 +19,8 @@ const (
 	// PingInterval is the rate at which ble clients will let ble server know of its state
 	PingInterval = time.Second * 1
 	// ForwardedReadDelay is the delay between start and end read requests
-	ForwardedReadDelay = time.Millisecond * 500
+	ForwardedReadDelay   = time.Millisecond * 500
+	afterConnectionDelay = time.Millisecond * 250
 )
 
 type bleConnector interface {
@@ -94,6 +95,7 @@ func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, ser
 // Run is a method that runs the connection from client to service
 func (client *BLEClient) Run() {
 	client.connectLoop()
+	time.Sleep(afterConnectionDelay)
 	go client.scan()
 	go client.pingLoop()
 }
@@ -295,11 +297,13 @@ func (client *BLEClient) pingLoop() {
 		b, _ := req.Data()
 		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {
+			fmt.Println("Test1: " + err.Error())
 			client.connectLoop()
 			continue
 		}
 		initTS, err := client.getUnixTS()
 		if err != nil {
+			fmt.Println("Test2: " + err.Error())
 			client.connectLoop()
 			continue
 		}

@@ -55,7 +55,7 @@ func getPacketsFromData(data []byte) []BLEPacket {
 	l := []BLEPacket{}
 	guid := getUUID()
 	checksum := getChecksum(data)
-	chunks := splitBytes(data, MTU)
+	chunks := splitBytes(data, MTU/4)
 	total := len(chunks)
 	for i := 0; i < total; i++ {
 		p := BLEPacket{}
