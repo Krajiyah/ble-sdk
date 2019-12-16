@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Krajiyah/ble-sdk/pkg/models"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
@@ -69,6 +70,19 @@ func (server *BLEServer) Run() error {
 		server.setClientState(addr, BLEClientState{Status: Disconnected, RssiMap: map[string]map[string]int{}})
 	}
 	return err
+}
+
+// GetRssiMap returns the current state of the network from server perspective
+func (server *BLEServer) GetRssiMap() *RssiMap {
+	ret := models.NewRssiMap()
+	for addr := range server.clientStateMap {
+		for a := range server.clientStateMap[addr].RssiMap {
+			for b := range server.clientStateMap[addr].RssiMap[a] {
+				ret.Set(a, b, server.clientStateMap[addr].RssiMap[a][b])
+			}
+		}
+	}
+	return &ret
 }
 
 func (server *BLEServer) setStatus(status BLEServerStatus, err error) {
