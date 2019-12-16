@@ -156,7 +156,6 @@ func (client *BLEClient) readValue(uuid string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("Got packet data (# bytes) from read char: %d\n", len(packetData))
 		guid, err = client.packetAggregator.AddPacketFromPacketBytes(packetData)
 		if err != nil {
 			return nil, err
@@ -214,7 +213,6 @@ func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error
 	var data []byte
 	err := util.Optimize(func() error {
 		dat, e := (*client.cln).ReadCharacteristic(c)
-		fmt.Printf("Read raw data: %d\n", len(dat))
 		data = dat
 		return e
 	})
@@ -256,14 +254,11 @@ func (client *BLEClient) RawScan(handle func(ble.Advertisement)) error {
 func (client *BLEClient) scan() {
 	for {
 		time.Sleep(ScanInterval)
-		err := client.RawScan(func(a ble.Advertisement) {
+		client.RawScan(func(a ble.Advertisement) {
 			rssi := a.RSSI()
 			addr := a.Address().String()
 			client.rssiMap.Set(client.addr, addr, rssi)
 		})
-		if err != nil {
-			fmt.Println("Scan error: " + err.Error())
-		}
 	}
 }
 
@@ -275,17 +270,10 @@ func (client *BLEClient) connectLoop() {
 	err := errors.New("")
 	for err != nil {
 		client.connectionAttempts++
-		fmt.Println("attempting...")
 		err = client.connect()
-		if err != nil {
-			fmt.Println("error attempting: ")
-			fmt.Println(err)
-		}
 	}
 	client.status = Connected
-	fmt.Println("Getting....")
 	rssi, _ := client.rssiMap.Get(client.addr, client.connectedAddr)
-	fmt.Println("woooo!")
 	client.onConnected(client.connectionAttempts, rssi)
 }
 
@@ -297,13 +285,11 @@ func (client *BLEClient) pingLoop() {
 		b, _ := req.Data()
 		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {
-			fmt.Println("Test1: " + err.Error())
 			client.connectLoop()
 			continue
 		}
 		initTS, err := client.getUnixTS()
 		if err != nil {
-			fmt.Println("Test2: " + err.Error())
 			client.connectLoop()
 			continue
 		}
@@ -316,13 +302,11 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 	if client.cln != nil {
 		(*client.cln).CancelConnection()
 	}
-	fmt.Println("do actual connect...")
 	cln, err := client.bleConnector.Connect(client.ctx, filter)
 	client.cln = &cln
 	if err != nil {
 		return err
 	}
-	fmt.Println("actually connected!")
 	_, err = cln.ExchangeMTU(util.MTU)
 	if err != nil {
 		return err

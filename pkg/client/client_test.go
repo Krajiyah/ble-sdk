@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -172,7 +171,6 @@ func mockUnixTS(t *testing.T, buffer *bytes.Buffer) int64 {
 		var err error
 		var data []byte
 		data, isLastPacket, err = pa.PopPacketDataFromStream(guid)
-		fmt.Println(len(data))
 		assert.NilError(t, err)
 		buffer.Write(data)
 	}
