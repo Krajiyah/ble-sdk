@@ -212,6 +212,7 @@ func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error
 	var data []byte
 	err := util.Optimize(func() error {
 		dat, e := (*client.cln).ReadCharacteristic(c)
+		fmt.Printf("Read raw data: %d\n", len(dat))
 		data = dat
 		return e
 	})
