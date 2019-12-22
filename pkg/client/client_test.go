@@ -210,7 +210,9 @@ func TestUnixTS(t *testing.T) {
 	// test timesync
 	x := util.NewTimeSync(ts)
 	client.timeSync = &x
-	assert.Equal(t, client.UnixTS(), ts)
+	actual, err := client.UnixTS()
+	assert.NilError(t, err)
+	assert.Equal(t, actual, ts)
 }
 
 func TestLog(t *testing.T) {
@@ -254,7 +256,9 @@ func TestRun(t *testing.T) {
 	c := (*(client.cln)).(dummyCoreClient)
 	ts := mockUnixTS(t, c.mockedReadCharData)
 	time.Sleep(PingInterval + (PingInterval / 4))
-	assert.Assert(t, client.UnixTS() > ts, "UnixTS must be after mocked TS")
+	actual, err := client.UnixTS()
+	assert.NilError(t, err)
+	assert.Assert(t, actual > ts, "UnixTS must be after mocked TS")
 }
 
 func TestForwardedWrite(t *testing.T) {

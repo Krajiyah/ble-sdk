@@ -101,8 +101,11 @@ func (client *BLEClient) Run() {
 }
 
 // UnixTS returns the current time synced timestamp from the ble service
-func (client *BLEClient) UnixTS() int64 {
-	return client.timeSync.TS()
+func (client *BLEClient) UnixTS() (int64, error) {
+	if client.timeSync == nil {
+		return 0, errors.New("Time not syncronized yet")
+	}
+	return client.timeSync.TS(), nil
 }
 
 func (client *BLEClient) getUnixTS() (int64, error) {
