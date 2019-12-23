@@ -7,7 +7,9 @@ import (
 )
 
 func TestClientStateRequest(t *testing.T) {
-	expected := ClientStateRequest{RssiMap{"someOtherAddr": map[string]int{"someAddr": -90}}}
+	rm := NewRssiMap()
+	rm.Set("someOtherAddr", "someAddr", -90)
+	expected := ClientStateRequest{rm.GetAll()}
 	enc, err := expected.Data()
 	assert.NilError(t, err)
 	actual, err := GetClientStateRequestFromBytes(enc)

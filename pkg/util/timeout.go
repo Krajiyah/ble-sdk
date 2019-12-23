@@ -7,19 +7,22 @@ import (
 
 // Timeout is a utility method used to timeout function calls after the specified interval
 func Timeout(fn func() error, duration time.Duration) error {
-	var err error
-	ch := make(chan bool, 1)
-	defer close(ch)
-	go func() {
-		err = fn()
-		ch <- true
+	err := make(chan error, 1)
+	closed := false
+	defer func() {
+		close(err)
+		closed = true
 	}()
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
+	go func() {
+		e := fn()
+		if !closed {
+			err <- e
+		}
+	}()
 	select {
-	case <-ch:
-		return err
-	case <-timer.C:
+	case ret := <-err:
+		return ret
+	case <-time.After(duration):
 		return errors.New("Timeout")
 	}
 }

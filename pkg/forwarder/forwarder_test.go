@@ -41,7 +41,7 @@ type dummyClient struct {
 }
 
 func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
-	for k, v := range c.dummyRssiMap[c.addr] {
+	for k, v := range c.dummyRssiMap.GetAll()[c.addr] {
 		f(DummyAdv{DummyAddr{k}, v})
 	}
 	return nil
@@ -80,16 +80,13 @@ func getDummyForwarder(t *testing.T, addr string, rssiMap RssiMap) *testStructs 
 
 func TestSingleForwarder(t *testing.T) {
 	mutex := &sync.Mutex{}
-	expectedRssiMap := RssiMap{
-		testAddr: map[string]int{
-			testServerAddr: -90,
-			clientAddr:     -10000,
-		},
-	}
+	expectedRssiMap := models.NewRssiMap()
+	expectedRssiMap.Set(testAddr, testServerAddr, -90)
+	expectedRssiMap.Set(testAddr, clientAddr, -10000)
 	s := getDummyForwarder(t, testAddr, expectedRssiMap)
 	forwarder := s.forwarder
 	scan(forwarder, mutex, expectedRssiMap, testAddr)
-	assert.DeepEqual(t, *forwarder.rssiMap, expectedRssiMap)
+	assert.DeepEqual(t, forwarder.rssiMap.GetAll(), expectedRssiMap.GetAll())
 	assert.Equal(t, forwarder.toConnectAddr, forwarder.serverAddr)
 	assert.Equal(t, forwarder.connectedAddr, forwarder.serverAddr)
 }
@@ -101,23 +98,18 @@ func mockReadBuffer(t *testing.T, rssiMap *RssiMap, buffer *bytes.Buffer) {
 }
 
 func scan(f *BLEForwarder, mutex *sync.Mutex, rssiMap RssiMap, addr string) {
-	for k, v := range rssiMap[addr] {
+	for k, v := range rssiMap.GetAll()[addr] {
 		f.onScanned(DummyAdv{DummyAddr{k}, v})
 	}
 }
 
 func TestDoubleForwarder(t *testing.T) {
 	mutex := &sync.Mutex{}
-	expectedRssiMap := RssiMap{
-		testAddr: map[string]int{
-			testServerAddr: -90,
-			testAddr2:      -30,
-		},
-		testAddr2: map[string]int{
-			testAddr:       -5,
-			testServerAddr: -10,
-		},
-	}
+	expectedRssiMap := models.NewRssiMap()
+	expectedRssiMap.Set(testAddr, testServerAddr, -90)
+	expectedRssiMap.Set(testAddr, testAddr2, -30)
+	expectedRssiMap.Set(testAddr2, testAddr, -5)
+	expectedRssiMap.Set(testAddr2, testServerAddr, -10)
 	s1 := getDummyForwarder(t, testAddr, expectedRssiMap)
 	s2 := getDummyForwarder(t, testAddr2, expectedRssiMap)
 	f1, mockedReadValue1 := s1.forwarder, s1.mockedReadValue
@@ -128,8 +120,8 @@ func TestDoubleForwarder(t *testing.T) {
 	mockReadBuffer(t, f2.rssiMap, mockedReadValue1)
 	scan(f1, mutex, expectedRssiMap, testAddr)
 	scan(f2, mutex, expectedRssiMap, testAddr2)
-	assert.DeepEqual(t, *f1.rssiMap, expectedRssiMap)
-	assert.DeepEqual(t, *f2.rssiMap, expectedRssiMap)
+	assert.DeepEqual(t, f1.rssiMap.GetAll(), expectedRssiMap.GetAll())
+	assert.DeepEqual(t, f2.rssiMap.GetAll(), expectedRssiMap.GetAll())
 	assert.Equal(t, f1.toConnectAddr, testAddr2)
 	assert.Equal(t, f1.connectedAddr, testAddr2)
 	assert.Equal(t, f2.toConnectAddr, f2.serverAddr)
@@ -137,36 +129,27 @@ func TestDoubleForwarder(t *testing.T) {
 }
 
 func TestRssiMapChar(t *testing.T) {
-	rm := RssiMap{
-		testAddr: map[string]int{
-			testServerAddr: -90,
-			clientAddr:     -10000,
-		},
-	}
+	rm := models.NewRssiMap()
+	rm.Set(testAddr, testServerAddr, -90)
+	rm.Set(testAddr, clientAddr, -10000)
 	s := getDummyForwarder(t, testAddr, rm)
 	s.forwarder.Run()
 	time.Sleep(client.ScanInterval + (client.ScanInterval / 2))
-	assert.DeepEqual(t, *s.forwarder.rssiMap, rm)
+	assert.DeepEqual(t, s.forwarder.rssiMap.GetAll(), rm.GetAll())
 	readChars, _ := getChars(s.forwarder)
 	char := readChars[1]
 	data, err := char.HandleRead(testAddr2, context.Background())
 	assert.NilError(t, err)
 	actualRM, err := models.GetRssiMapFromBytes(data)
 	assert.NilError(t, err)
-	assert.DeepEqual(t, rm, *actualRM)
+	assert.DeepEqual(t, rm.GetAll(), actualRM.GetAll())
 }
 
 func prepare2ForwarderState(t *testing.T) (*testStructs, *testStructs) {
-	expectedRssiMap := RssiMap{
-		testAddr: map[string]int{
-			testServerAddr: -90,
-			testAddr2:      -30,
-		},
-		testAddr2: map[string]int{
-			testAddr:       -5,
-			testServerAddr: -10,
-		},
-	}
+	expectedRssiMap := models.NewRssiMap()
+	expectedRssiMap.Set(testAddr, testServerAddr, -90)
+	expectedRssiMap.Set(testAddr, testAddr2, -30)
+	expectedRssiMap.Set(testAddr2, testServerAddr, -10)
 	s1 := getDummyForwarder(t, testAddr, expectedRssiMap)
 	s2 := getDummyForwarder(t, testAddr2, expectedRssiMap)
 	f1, mockedReadValue1, _ := s1.forwarder, s1.mockedReadValue, s1.mockedWriteBuffer
@@ -222,6 +205,7 @@ func TestStartEndReadChars(t *testing.T) {
 	writeChar1 := writeChars1[1]
 	writeChar1.HandleWrite(clientAddr, data, nil)
 	buffer1 := *mockedWriteBuffer1
+	assert.Check(t, !f1.isConnectedToServer(), "F1 should not be connected to server")
 	assert.Equal(t, len(buffer1), 1)
 	assert.DeepEqual(t, buffer1[0].Bytes(), data)
 
@@ -230,6 +214,7 @@ func TestStartEndReadChars(t *testing.T) {
 	writeChar2 := writeChars2[1]
 	writeChar2.HandleWrite(testAddr, data, nil)
 	buffer2 := *mockedWriteBuffer2
+	assert.Check(t, f2.isConnectedToServer(), "F2 should be connected to server")
 	assert.Equal(t, len(buffer2), 0)
 
 	// mimic client read from forwarder (end read request)

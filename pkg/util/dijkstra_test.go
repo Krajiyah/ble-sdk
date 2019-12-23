@@ -3,7 +3,6 @@ package util
 import (
 	"testing"
 
-	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"gotest.tools/assert"
 )
 
@@ -11,7 +10,7 @@ func TestShortestPathCase1(t *testing.T) {
 	src := "A"
 	dst := "B"
 	middle := "C"
-	rssiMap := models.RssiMap{
+	rssiMap := map[string]map[string]int{
 		src: map[string]int{
 			dst:    3,
 			middle: 2,
@@ -29,7 +28,7 @@ func TestShortestPathCase2(t *testing.T) {
 	src := "A"
 	dst := "B"
 	middle := "C"
-	rssiMap := models.RssiMap{
+	rssiMap := map[string]map[string]int{
 		src: map[string]int{
 			dst:    70,
 			middle: 2,
@@ -50,7 +49,7 @@ func TestShortestPathCase3(t *testing.T) {
 	d := "D"
 	e := "E"
 	f := "F"
-	rssiMap := models.RssiMap{
+	rssiMap := map[string]map[string]int{
 		a: map[string]int{
 			c: 1,
 			d: 2,

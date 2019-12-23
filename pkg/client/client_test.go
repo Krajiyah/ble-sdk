@@ -26,29 +26,19 @@ var (
 	attempts     = 0
 	rssi         = 0
 	serviceUUIDs = []string{util.ClientStateUUID, util.TimeSyncUUID, util.ClientLogUUID}
-	testRssiMap  = &RssiMap{
-		testAddr: map[string]int{
-			testServerAddr: testRSSI,
-		},
-	}
+	testRssiMap  = NewRssiMap()
 )
 
 func setServerConnection() {
 	serviceUUIDs = []string{util.ClientStateUUID, util.TimeSyncUUID, util.ClientLogUUID}
-	testRssiMap = &RssiMap{
-		testAddr: map[string]int{
-			testServerAddr: testRSSI,
-		},
-	}
+	testRssiMap = NewRssiMap()
+	testRssiMap.Set(testAddr, testServerAddr, testRSSI)
 }
 
 func setForwarderConnection() {
 	serviceUUIDs = []string{util.WriteForwardCharUUID, util.StartReadForwardCharUUID, util.EndReadForwardCharUUID}
-	testRssiMap = &RssiMap{
-		testAddr: map[string]int{
-			testForwarderAddr: testRSSI,
-		},
-	}
+	testRssiMap = NewRssiMap()
+	testRssiMap.Set(testAddr, testForwarderAddr, testRSSI)
 }
 
 type dummyCoreClient struct {
@@ -114,7 +104,7 @@ type testBleConnector struct {
 }
 
 func (bc testBleConnector) filter(fn func(addr string, rssi int)) {
-	for k, v := range (*bc.rssiMap)[bc.addr] {
+	for k, v := range bc.rssiMap.GetAll()[bc.addr] {
 		fn(k, v)
 	}
 }
@@ -146,7 +136,7 @@ func dummyOnDisconnected() {}
 
 func getTestClient() *BLEClient {
 	client := newBLEClient(testAddr, testSecret, testServerAddr, true, dummyOnConnected, dummyOnDisconnected)
-	client.bleConnector = testBleConnector{testAddr, testRssiMap}
+	client.bleConnector = testBleConnector{testAddr, &testRssiMap}
 	return client
 }
 
@@ -176,11 +166,14 @@ func mockUnixTS(t *testing.T, buffer *bytes.Buffer) int64 {
 	assert.NilError(t, err)
 	guid, err := pa.AddData(encData)
 	assert.NilError(t, err)
-	var isLastPacket bool
-	data, isLastPacket, err := pa.PopPacketDataFromStream(guid)
-	buffer.Write(data)
-	assert.NilError(t, err)
-	assert.Assert(t, isLastPacket)
+	isLastPacket := false
+	for !isLastPacket {
+		var err error
+		var data []byte
+		data, isLastPacket, err = pa.PopPacketDataFromStream(guid)
+		assert.NilError(t, err)
+		buffer.Write(data)
+	}
 	return expected
 }
 
@@ -217,7 +210,9 @@ func TestUnixTS(t *testing.T) {
 	// test timesync
 	x := util.NewTimeSync(ts)
 	client.timeSync = &x
-	assert.Equal(t, client.UnixTS(), ts)
+	actual, err := client.UnixTS()
+	assert.NilError(t, err)
+	assert.Equal(t, actual, ts)
 }
 
 func TestLog(t *testing.T) {
@@ -250,19 +245,20 @@ func TestScanLoop(t *testing.T) {
 	client := getTestClient()
 	go client.scan()
 	time.Sleep(ScanInterval + (ScanInterval / 2))
-	assert.DeepEqual(t, client.rssiMap, testRssiMap)
+	assert.DeepEqual(t, client.rssiMap.GetAll(), testRssiMap.GetAll())
 }
 
 func TestRun(t *testing.T) {
 	setServerConnection()
 	client := getTestClient()
 	client.Run()
-	duration := PingInterval + (PingInterval / 4)
-	time.Sleep(duration)
+	time.Sleep(afterConnectionDelay)
 	c := (*(client.cln)).(dummyCoreClient)
 	ts := mockUnixTS(t, c.mockedReadCharData)
-	time.Sleep(duration)
-	assert.Assert(t, client.UnixTS() > ts, "UnixTS must be after mocked TS")
+	time.Sleep(PingInterval + (PingInterval / 4))
+	actual, err := client.UnixTS()
+	assert.NilError(t, err)
+	assert.Assert(t, actual > ts, "UnixTS must be after mocked TS")
 }
 
 func TestForwardedWrite(t *testing.T) {

@@ -2,6 +2,7 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -18,7 +19,8 @@ const (
 	// PingInterval is the rate at which ble clients will let ble server know of its state
 	PingInterval = time.Second * 1
 	// ForwardedReadDelay is the delay between start and end read requests
-	ForwardedReadDelay = time.Millisecond * 500
+	ForwardedReadDelay   = time.Millisecond * 500
+	afterConnectionDelay = time.Millisecond * 250
 )
 
 type bleConnector interface {
@@ -67,8 +69,9 @@ type BLEClient struct {
 }
 
 func newBLEClient(addr string, secret string, serverAddr string, doForwarding bool, onConnected func(int, int), onDisconnected func()) *BLEClient {
+	rm := NewRssiMap()
 	return &BLEClient{
-		addr, secret, Disconnected, 0, doForwarding, nil, serverAddr, "", &RssiMap{}, util.MakeINFContext(), nil,
+		addr, secret, Disconnected, 0, doForwarding, nil, serverAddr, "", &rm, util.MakeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
 		stdBleConnector{},
 	}
@@ -92,13 +95,17 @@ func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, ser
 // Run is a method that runs the connection from client to service
 func (client *BLEClient) Run() {
 	client.connectLoop()
+	time.Sleep(afterConnectionDelay)
 	go client.scan()
 	go client.pingLoop()
 }
 
 // UnixTS returns the current time synced timestamp from the ble service
-func (client *BLEClient) UnixTS() int64 {
-	return client.timeSync.TS()
+func (client *BLEClient) UnixTS() (int64, error) {
+	if client.timeSync == nil {
+		return 0, errors.New("Time not syncronized yet")
+	}
+	return client.timeSync.TS(), nil
 }
 
 func (client *BLEClient) getUnixTS() (int64, error) {
@@ -120,7 +127,7 @@ func (client *BLEClient) Log(log ClientLogRequest) error {
 }
 
 func (client *BLEClient) isConnectedToForwarder() bool {
-	return client.doForwarding && client.connectedAddr != "" && client.connectedAddr != client.serverAddr
+	return client.doForwarding && client.connectedAddr != "" && !util.AddrEqualAddr(client.serverAddr, client.connectedAddr)
 }
 
 // ReadValue will read packeted data from ble server from given uuid
@@ -153,6 +160,9 @@ func (client *BLEClient) readValue(uuid string) ([]byte, error) {
 			return nil, err
 		}
 		guid, err = client.packetAggregator.AddPacketFromPacketBytes(packetData)
+		if err != nil {
+			return nil, err
+		}
 	}
 	encData, err := client.packetAggregator.PopAllDataFromPackets(guid)
 	if err != nil {
@@ -204,10 +214,10 @@ func (client *BLEClient) writeValue(uuid string, data []byte) error {
 
 func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error) {
 	var data []byte
-	var err error
-	err = util.Optimize(func() error {
-		data, err = (*client.cln).ReadCharacteristic(c)
-		return err
+	err := util.Optimize(func() error {
+		dat, e := (*client.cln).ReadCharacteristic(c)
+		data = dat
+		return e
 	})
 	return data, err
 }
@@ -256,9 +266,8 @@ func (client *BLEClient) scan() {
 }
 
 func (client *BLEClient) connectLoop() {
-	client.status = Connected
+	client.status = Disconnected
 	if client.connectionAttempts > 0 {
-		client.status = Disconnected
 		client.onDisconnected()
 	}
 	err := errors.New("")
@@ -267,14 +276,15 @@ func (client *BLEClient) connectLoop() {
 		err = client.connect()
 	}
 	client.status = Connected
-	rssi := (*client.rssiMap)[client.addr][client.connectedAddr]
+	rssi, _ := client.rssiMap.Get(client.addr, client.connectedAddr)
 	client.onConnected(client.connectionAttempts, rssi)
 }
 
 func (client *BLEClient) pingLoop() {
 	for {
 		time.Sleep(PingInterval)
-		req := &ClientStateRequest{*client.rssiMap}
+		m := client.rssiMap.GetAll()
+		req := &ClientStateRequest{m}
 		b, _ := req.Data()
 		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {
@@ -322,9 +332,16 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 
 // RawConnect exposes underlying ble connection functionality
 func (client *BLEClient) RawConnect(filter ble.AdvFilter) error {
-	return util.Optimize(func() error {
-		return client.rawConnect(filter)
-	})
+	var err error
+	util.TryCatchBlock{
+		Try: func() {
+			err = client.rawConnect(filter)
+		},
+		Catch: func(e error) {
+			err = e
+		},
+	}.Do()
+	return err
 }
 
 func (client *BLEClient) connect() error {
@@ -335,5 +352,5 @@ func (client *BLEClient) getCharacteristic(uuid string) (*ble.Characteristic, er
 	if c, ok := client.characteristics[uuid]; ok {
 		return c, nil
 	}
-	return nil, errors.New("No such uuid in characteristics advertised from server")
+	return nil, fmt.Errorf("No such uuid (%s) in characteristics (%v) advertised from server.", uuid, client.characteristics)
 }

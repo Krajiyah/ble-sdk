@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/gob"
 	"errors"
+	"sync"
 
 	"github.com/bradfitz/slice"
 	mapset "github.com/deckarep/golang-set"
@@ -33,6 +34,7 @@ type BLEPacket struct {
 // PacketAggregator is a struct with function to get constructed & validated data
 type PacketAggregator struct {
 	store map[string][]BLEPacket
+	mutex sync.RWMutex
 }
 
 // Data will serialize BLEPacket to []byte
@@ -48,14 +50,14 @@ func (p *BLEPacket) Data() ([]byte, error) {
 
 // NewPacketAggregator makes new struct for packet aggregation
 func NewPacketAggregator() PacketAggregator {
-	return PacketAggregator{map[string][]BLEPacket{}}
+	return PacketAggregator{map[string][]BLEPacket{}, sync.RWMutex{}}
 }
 
 func getPacketsFromData(data []byte) []BLEPacket {
 	l := []BLEPacket{}
 	guid := getUUID()
 	checksum := getChecksum(data)
-	chunks := splitBytes(data, MTU)
+	chunks := splitBytes(data, MTU/4)
 	total := len(chunks)
 	for i := 0; i < total; i++ {
 		p := BLEPacket{}
@@ -75,7 +77,7 @@ func (pa *PacketAggregator) PopAllDataFromPackets(guid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	pa.store[guid] = []BLEPacket{}
+	pa.initStore(guid)
 	return ret, nil
 }
 
@@ -89,9 +91,9 @@ func (pa *PacketAggregator) AddPacketFromPacketBytes(packetBytes []byte) (string
 		return "", err
 	}
 	pa.initStore(packet.Guid)
-	tmp := pa.store[packet.Guid]
+	tmp, _ := pa.get(packet.Guid)
 	tmp = append(tmp, packet)
-	pa.store[packet.Guid] = tmp
+	pa.set(packet.Guid, tmp)
 	return packet.Guid, nil
 }
 
@@ -121,30 +123,44 @@ func (pa *PacketAggregator) HasDataFromPacketStream(guid string) bool {
 // PopPacketDataFromStream returns next packet in (index) order in the given guid stream
 func (pa *PacketAggregator) PopPacketDataFromStream(guid string) ([]byte, bool, error) {
 	pa.initStore(guid)
-	if len(pa.store[guid]) == 0 {
+	packets, _ := pa.get(guid)
+	if len(packets) == 0 {
 		return nil, false, errors.New(errNoPacketDataInStream)
 	}
-	packet := pa.store[guid][0]
+	packet := packets[0]
 	data, err := packet.Data()
 	if err != nil {
 		return nil, false, err
 	}
-	tmp := pa.store[guid]
+	tmp := packets
 	tmp = tmp[1:]
-	pa.store[guid] = tmp
+	pa.set(guid, tmp)
 	isLastPacket := packet.Index+1 == packet.Total
 	return data, isLastPacket, nil
 }
 
+func (pa *PacketAggregator) get(guid string) ([]BLEPacket, bool) {
+	pa.mutex.RLock()
+	data, ok := pa.store[guid]
+	pa.mutex.RUnlock()
+	return data, ok
+}
+
+func (pa *PacketAggregator) set(guid string, packets []BLEPacket) {
+	pa.mutex.Lock()
+	pa.store[guid] = packets
+	pa.mutex.Unlock()
+}
+
 func (pa *PacketAggregator) initStore(guid string) {
-	if _, ok := pa.store[guid]; !ok {
-		pa.store[guid] = []BLEPacket{}
+	if _, ok := pa.get(guid); !ok {
+		pa.set(guid, []BLEPacket{})
 	}
 }
 
 func (pa *PacketAggregator) getAllDataFromPackets(guid string) ([]byte, error) {
 	pa.initStore(guid)
-	packets := pa.store[guid]
+	packets, _ := pa.get(guid)
 	slice.Sort(packets, func(i, j int) bool {
 		return packets[i].Index < packets[j].Index
 	})
