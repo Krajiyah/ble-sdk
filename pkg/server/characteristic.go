@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -77,6 +78,10 @@ func generateReadHandler(server *BLEServer, uuid string, load func(string, conte
 			data, err := load(addr, ctx)
 			if err != nil {
 				server.listener.OnReadOrWriteError(err)
+				return
+			}
+			if data == nil || len(data) == 0 {
+				server.listener.OnReadOrWriteError(errors.New("empty data returned from read char loader"))
 				return
 			}
 			encryptedData, err := util.Encrypt(data, server.secret)

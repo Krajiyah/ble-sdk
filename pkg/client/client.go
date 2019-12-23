@@ -185,6 +185,9 @@ func (client *BLEClient) WriteValue(uuid string, data []byte) error {
 }
 
 func (client *BLEClient) writeValue(uuid string, data []byte) error {
+	if data == nil || len(data) == 0 {
+		return errors.New("Empty data provided. Will skip writing.")
+	}
 	c, err := client.getCharacteristic(uuid)
 	if err != nil {
 		return err
