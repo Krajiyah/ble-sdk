@@ -63,12 +63,12 @@ type BLEClient struct {
 	cln                *ble.Client
 	characteristics    map[string]*ble.Characteristic
 	packetAggregator   util.PacketAggregator
-	onConnected        func(int, int)
+	onConnected        func(string, int, int)
 	onDisconnected     func()
 	bleConnector       bleConnector
 }
 
-func newBLEClient(addr string, secret string, serverAddr string, doForwarding bool, onConnected func(int, int), onDisconnected func()) *BLEClient {
+func newBLEClient(addr string, secret string, serverAddr string, doForwarding bool, onConnected func(string, int, int), onDisconnected func()) *BLEClient {
 	rm := NewRssiMap()
 	return &BLEClient{
 		addr, secret, Disconnected, 0, doForwarding, nil, serverAddr, "", &rm, util.MakeINFContext(), nil,
@@ -78,7 +78,7 @@ func newBLEClient(addr string, secret string, serverAddr string, doForwarding bo
 }
 
 // NewBLEClient is a function that creates a new ble client
-func NewBLEClient(addr string, secret string, serverAddr string, onConnected func(int, int), onDisconnected func()) (*BLEClient, error) {
+func NewBLEClient(addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
 	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func NewBLEClient(addr string, secret string, serverAddr string, onConnected fun
 }
 
 // NewBLEClientSharedDevice is a function that creates a new ble client
-func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, serverAddr string, doForwarding bool, onConnected func(int, int), onDisconnected func()) (*BLEClient, error) {
+func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, serverAddr string, doForwarding bool, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
 	ble.SetDefaultDevice(device)
 	return newBLEClient(addr, secret, serverAddr, doForwarding, onConnected, onDisconnected), nil
 }
@@ -280,7 +280,7 @@ func (client *BLEClient) connectLoop() {
 	}
 	client.status = Connected
 	rssi, _ := client.rssiMap.Get(client.addr, client.connectedAddr)
-	client.onConnected(client.connectionAttempts, rssi)
+	client.onConnected(client.connectedAddr, client.connectionAttempts, rssi)
 }
 
 func (client *BLEClient) pingLoop() {

@@ -25,8 +25,8 @@ const (
 // BLEForwarder is a struct used to handle mesh network behaviors for forwarder
 type BLEForwarder struct {
 	addr              string
-	forwardingServer  server.BLEServerInt
-	forwardingClient  client.BLEClientInt
+	ForwardingServer  server.BLEServerInt
+	ForwardingClient  client.BLEClientInt
 	serverAddr        string
 	connectedAddr     string
 	toConnectAddr     string
@@ -56,38 +56,49 @@ func getChars(f *BLEForwarder) ([]*server.BLEReadCharacteristic, []*server.BLEWr
 		}
 }
 
+type forwarderServerListener struct {
+	listener models.BLEForwarderListener
+}
+
+func (l *forwarderServerListener) OnClientStateMapChanged(map[string]models.BLEClientState) {}
+func (l *forwarderServerListener) OnClientLog(models.ClientLogRequest)                      {}
+func (l *forwarderServerListener) OnReadOrWriteError(err error)                             { l.listener.OnReadOrWriteError(err) }
+func (l *forwarderServerListener) OnServerStatusChanged(s models.BLEServerStatus, err error) {
+	l.listener.OnServerStatusChanged(s, err)
+}
+
 // NewBLEForwarder is a function that creates a new ble forwarder
-func NewBLEForwarder(name string, addr string, secret string, serverAddr string, serverListener models.BLEServerStatusListener, listener models.BLEForwarderListener) (*BLEForwarder, error) {
+func NewBLEForwarder(name string, addr string, secret string, serverAddr string, listener models.BLEForwarderListener) (*BLEForwarder, error) {
 	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
 	}
 	f := newBLEForwarder(addr, serverAddr, listener)
 	readChars, writeChars := getChars(f)
-	serv, err := server.NewBLEServerSharedDevice(d, name, secret, serverListener, readChars, writeChars)
+	serv, err := server.NewBLEServerSharedDevice(d, name, secret, &forwarderServerListener{listener: listener}, readChars, writeChars)
 	if err != nil {
 		return nil, err
 	}
-	clien, err := client.NewBLEClientSharedDevice(d, addr, secret, serverAddr, false, func(attempts int, rssi int) {}, noop)
+	clien, err := client.NewBLEClientSharedDevice(d, addr, secret, serverAddr, false, listener.OnClientConnected, f.listener.OnClientDisconnected)
 	if err != nil {
 		return nil, err
 	}
-	f.forwardingServer = serv
-	f.forwardingClient = clien
+	f.ForwardingServer = serv
+	f.ForwardingClient = clien
 	return f, nil
 }
 
 // Run is a method that runs the forwarder forever
 func (forwarder *BLEForwarder) Run() error {
 	go forwarder.scanLoop()
-	return forwarder.forwardingServer.Run()
+	return forwarder.ForwardingServer.Run()
 }
 
 func (forwarder *BLEForwarder) scanLoop() {
 	mutex := &sync.Mutex{}
 	for {
 		time.Sleep(client.ScanInterval)
-		forwarder.forwardingClient.RawScan(func(a ble.Advertisement) {
+		forwarder.ForwardingClient.RawScan(func(a ble.Advertisement) {
 			mutex.Lock()
 			err := forwarder.onScanned(a)
 			if err != nil {
@@ -131,7 +142,7 @@ func (forwarder *BLEForwarder) updateRssiMap(addr string) error {
 	if err != nil {
 		return err
 	}
-	data, err := forwarder.forwardingClient.ReadValue(util.ReadRssiMapCharUUID)
+	data, err := forwarder.ForwardingClient.ReadValue(util.ReadRssiMapCharUUID)
 	if err != nil {
 		return err
 	}
@@ -178,7 +189,7 @@ func (forwarder *BLEForwarder) keepTryConnect(addr string) error {
 
 func (forwarder *BLEForwarder) connect(addr string) error {
 	forwarder.connectedAddr = ""
-	err := forwarder.forwardingClient.RawConnect(func(a ble.Advertisement) bool {
+	err := forwarder.ForwardingClient.RawConnect(func(a ble.Advertisement) bool {
 		return util.AddrEqualAddr(a.Address().String(), addr)
 	})
 	if err != nil {
@@ -215,7 +226,7 @@ func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic
 			return
 		}
 		if !forwarder.isConnectedToServer() {
-			err := forwarder.forwardingClient.WriteValue(util.WriteForwardCharUUID, data)
+			err := forwarder.ForwardingClient.WriteValue(util.WriteForwardCharUUID, data)
 			if err != nil {
 				forwarder.listener.OnReadOrWriteError(err)
 				return
@@ -230,7 +241,7 @@ func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic
 				forwarder.listener.OnError(errors.New(errInvalidForwardReq))
 				return
 			}
-			err = forwarder.forwardingClient.WriteValue(r.CharUUID, r.Payload)
+			err = forwarder.ForwardingClient.WriteValue(r.CharUUID, r.Payload)
 			if err != nil {
 				forwarder.listener.OnReadOrWriteError(err)
 				return
@@ -250,7 +261,7 @@ func newStartReadForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteri
 			return
 		}
 		if !forwarder.isConnectedToServer() {
-			err := forwarder.forwardingClient.WriteValue(util.StartReadForwardCharUUID, data)
+			err := forwarder.ForwardingClient.WriteValue(util.StartReadForwardCharUUID, data)
 			if err != nil {
 				forwarder.listener.OnReadOrWriteError(err)
 				return
@@ -277,9 +288,9 @@ func newEndReadForwardChar(forwarder *BLEForwarder) *server.BLEReadCharacteristi
 			return nil, errors.New(errNotConnected)
 		}
 		if !forwarder.isConnectedToServer() {
-			return forwarder.forwardingClient.ReadValue(util.EndReadForwardCharUUID)
+			return forwarder.ForwardingClient.ReadValue(util.EndReadForwardCharUUID)
 		}
-		data, err := forwarder.forwardingClient.ReadValue(forwarder.readCharUUID)
+		data, err := forwarder.ForwardingClient.ReadValue(forwarder.readCharUUID)
 		forwarder.readCharUUIDMutex.Unlock()
 		return data, err
 	}, DoInBackground: noop}

@@ -29,9 +29,10 @@ func (l myServerListener) OnReadOrWriteError(err error)                         
 
 type myListener struct{}
 
-func (l myListener) OnConnectionError(err error)  {}
-func (l myListener) OnReadOrWriteError(err error) {}
-func (l myListener) OnError(err error)            {}
+func (l myListener) OnConnectionError(err error)                           {}
+func (l myListener) OnReadOrWriteError(err error)                          {}
+func (l myListener) OnError(err error)                                     {}
+func (l myListener) OnClientConnected(addr string, attempts int, rssi int) {}
 
 func main() {
 	if BLESecret == "" || BLEForwarderAddr == "" || BLEServerAddr == "" {
