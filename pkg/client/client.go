@@ -1,8 +1,8 @@
 package client
 
 import (
-	"errors"
 	"fmt"
+	"github.com/pkg/errors"
 	"strconv"
 	"time"
 
@@ -54,7 +54,6 @@ type BLEClient struct {
 	secret             string
 	status             BLEClientStatus
 	connectionAttempts int
-	doForwarding       bool
 	timeSync           *util.TimeSync
 	serverAddr         string
 	connectedAddr      string
@@ -68,10 +67,10 @@ type BLEClient struct {
 	bleConnector       bleConnector
 }
 
-func newBLEClient(addr string, secret string, serverAddr string, doForwarding bool, onConnected func(string, int, int), onDisconnected func()) *BLEClient {
+func newBLEClient(addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) *BLEClient {
 	rm := NewRssiMap()
 	return &BLEClient{
-		addr, secret, Disconnected, 0, doForwarding, nil, serverAddr, "", &rm, util.MakeINFContext(), nil,
+		addr, secret, Disconnected, 0, nil, serverAddr, "", rm, util.MakeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
 		stdBleConnector{},
 	}
@@ -83,13 +82,13 @@ func NewBLEClient(addr string, secret string, serverAddr string, onConnected fun
 	if err != nil {
 		return nil, err
 	}
-	return NewBLEClientSharedDevice(d, addr, secret, serverAddr, true, onConnected, onDisconnected)
+	return NewBLEClientSharedDevice(d, addr, secret, serverAddr, onConnected, onDisconnected)
 }
 
 // NewBLEClientSharedDevice is a function that creates a new ble client
-func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, serverAddr string, doForwarding bool, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
+func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
 	ble.SetDefaultDevice(device)
-	return newBLEClient(addr, secret, serverAddr, doForwarding, onConnected, onDisconnected), nil
+	return newBLEClient(addr, secret, serverAddr, onConnected, onDisconnected), nil
 }
 
 // Run is a method that runs the connection from client to service
@@ -127,7 +126,7 @@ func (client *BLEClient) Log(log ClientLogRequest) error {
 }
 
 func (client *BLEClient) isConnectedToForwarder() bool {
-	return client.doForwarding && client.connectedAddr != "" && !util.AddrEqualAddr(client.serverAddr, client.connectedAddr)
+	return client.connectedAddr != "" && !util.AddrEqualAddr(client.serverAddr, client.connectedAddr)
 }
 
 // ReadValue will read packeted data from ble server from given uuid
@@ -171,9 +170,18 @@ func (client *BLEClient) readValue(uuid string) ([]byte, error) {
 	return util.Decrypt(encData, client.secret)
 }
 
+func isDataForwarderRequest(data []byte) bool {
+	_, err := GetForwarderRequestFromBytes(data)
+	return err == nil
+}
+
+func isForwardedWrite(uuid string, data []byte) bool {
+	return isDataForwarderRequest(data) && util.AddrEqualAddr(uuid, util.WriteForwardCharUUID)
+}
+
 // WriteValue will write data (which is parsed to packets) to ble server to given uuid
 func (client *BLEClient) WriteValue(uuid string, data []byte) error {
-	if !client.isConnectedToForwarder() {
+	if !client.isConnectedToForwarder() || isForwardedWrite(uuid, data) {
 		return client.writeValue(uuid, data)
 	}
 	req := ForwarderRequest{uuid, data, false, true}
@@ -241,15 +249,21 @@ func IsForwarder(a ble.Advertisement) bool {
 	return false
 }
 
-func (client *BLEClient) filter(a ble.Advertisement) bool {
-	addr := a.Address().String()
-	rssi := a.RSSI()
-	client.rssiMap.Set(client.addr, addr, rssi)
-	b := util.AddrEqualAddr(addr, client.serverAddr) || (client.doForwarding && IsForwarder(a))
-	if b {
-		client.connectedAddr = addr
+func (client *BLEClient) wrapFilter(fn func(ble.Advertisement) bool) func(ble.Advertisement) bool {
+	return func(a ble.Advertisement) bool {
+		addr := a.Address().String()
+		rssi := a.RSSI()
+		client.rssiMap.Set(client.addr, addr, rssi)
+		b := fn(a)
+		if b {
+			client.connectedAddr = addr
+		}
+		return b
 	}
-	return b
+}
+
+func (client *BLEClient) serverFilter(a ble.Advertisement) bool {
+	return util.AddrEqualAddr(a.Address().String(), client.serverAddr)
 }
 
 // RawScan exposes underlying BLE scanner
@@ -348,7 +362,13 @@ func (client *BLEClient) RawConnect(filter ble.AdvFilter) error {
 }
 
 func (client *BLEClient) connect() error {
-	return client.RawConnect(client.filter)
+	serverFilter := client.wrapFilter(client.serverFilter)
+	forwarderFilter := client.wrapFilter(IsForwarder)
+	err := client.RawConnect(serverFilter)
+	if err != nil {
+		err = errors.Wrap(client.RawConnect(forwarderFilter), err.Error())
+	}
+	return err
 }
 
 func (client *BLEClient) getCharacteristic(uuid string) (*ble.Characteristic, error) {

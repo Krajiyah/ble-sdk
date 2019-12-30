@@ -27,8 +27,8 @@ func main() {
 		return
 	}
 	var clien *client.BLEClient
-	clien, err := client.NewBLEClient(BLEClientAddr, BLESecret, BLEServerAddr, func(attempts int, rssi int) {
-		fmt.Printf("Client connected to server after %d attempts with rssi %d", attempts, rssi)
+	clien, err := client.NewBLEClient(BLEClientAddr, BLESecret, BLEServerAddr, func(addr string, attempts int, rssi int) {
+		fmt.Printf("Client connected to server (%s) after %d attempts with rssi %d", addr, attempts, rssi)
 		for {
 			time.Sleep(time.Second * 1)
 			fmt.Println("Attempting to write to extra write char...")

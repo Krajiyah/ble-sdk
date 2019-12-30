@@ -20,26 +20,23 @@ var (
 	BLEServerAddr string
 )
 
-type myServerListener struct{}
-
-func (l myServerListener) OnServerStatusChanged(s models.BLEServerStatus, err error)  {}
-func (l myServerListener) OnClientStateMapChanged(m map[string]models.BLEClientState) {}
-func (l myServerListener) OnClientLog(r models.ClientLogRequest)                      {}
-func (l myServerListener) OnReadOrWriteError(err error)                               {}
-
 type myListener struct{}
 
-func (l myListener) OnConnectionError(err error)                           {}
-func (l myListener) OnReadOrWriteError(err error)                          {}
-func (l myListener) OnError(err error)                                     {}
-func (l myListener) OnClientConnected(addr string, attempts int, rssi int) {}
+func (l myListener) OnServerStatusChanged(s models.BLEServerStatus, err error)  {}
+func (l myListener) OnClientStateMapChanged(m map[string]models.BLEClientState) {}
+func (l myListener) OnClientLog(r models.ClientLogRequest)                      {}
+func (l myListener) OnConnectionError(err error)                                {}
+func (l myListener) OnReadOrWriteError(err error)                               {}
+func (l myListener) OnError(err error)                                          {}
+func (l myListener) OnClientConnected(addr string, attempts int, rssi int)      {}
+func (l myListener) OnClientDisconnected()                                      {}
 
 func main() {
 	if BLESecret == "" || BLEForwarderAddr == "" || BLEServerAddr == "" {
 		fmt.Println("please compile this with BLESecret, BLEForwarderAddr, and BLEServerAddr as ldflag")
 		return
 	}
-	forward, err := forwarder.NewBLEForwarder(serviceName, BLEForwarderAddr, BLESecret, BLEServerAddr, myServerListener{}, myListener{})
+	forward, err := forwarder.NewBLEForwarder(serviceName, BLEForwarderAddr, BLESecret, BLEServerAddr, myListener{})
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble client: " + err.Error())
 	}

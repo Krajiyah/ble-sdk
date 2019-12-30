@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -29,13 +28,16 @@ const (
 
 type dummyListener struct{}
 
-func (l dummyListener) OnConnectionError(err error)  {}
-func (l dummyListener) OnReadOrWriteError(err error) {}
-func (l dummyListener) OnError(err error)            {}
+func (l dummyListener) OnServerStatusChanged(models.BLEServerStatus, error) {}
+func (l dummyListener) OnConnectionError(error)                             {}
+func (l dummyListener) OnReadOrWriteError(error)                            {}
+func (l dummyListener) OnError(error)                                       {}
+func (l dummyListener) OnClientConnected(string, int, int)                  {}
+func (l dummyListener) OnClientDisconnected()                               {}
 
 type dummyClient struct {
 	addr              string
-	dummyRssiMap      RssiMap
+	dummyRssiMap      *RssiMap
 	mockedReadValue   *bytes.Buffer
 	mockedWriteBuffer *[]*bytes.Buffer
 }
@@ -69,7 +71,7 @@ type testStructs struct {
 	mockedWriteBuffer *[]*bytes.Buffer
 }
 
-func getDummyForwarder(t *testing.T, addr string, rssiMap RssiMap) *testStructs {
+func getDummyForwarder(t *testing.T, addr string, rssiMap *RssiMap) *testStructs {
 	mockedReadValue := bytes.NewBuffer([]byte{})
 	mockedWriteBuffer := &[]*bytes.Buffer{}
 	f := newBLEForwarder(addr, testServerAddr, dummyListener{})
@@ -79,13 +81,12 @@ func getDummyForwarder(t *testing.T, addr string, rssiMap RssiMap) *testStructs 
 }
 
 func TestSingleForwarder(t *testing.T) {
-	mutex := &sync.Mutex{}
 	expectedRssiMap := models.NewRssiMap()
 	expectedRssiMap.Set(testAddr, testServerAddr, -90)
 	expectedRssiMap.Set(testAddr, clientAddr, -10000)
 	s := getDummyForwarder(t, testAddr, expectedRssiMap)
 	forwarder := s.forwarder
-	scan(forwarder, mutex, expectedRssiMap, testAddr)
+	scan(forwarder, expectedRssiMap, testAddr)
 	assert.DeepEqual(t, forwarder.rssiMap.GetAll(), expectedRssiMap.GetAll())
 	assert.Equal(t, forwarder.toConnectAddr, forwarder.serverAddr)
 	assert.Equal(t, forwarder.connectedAddr, forwarder.serverAddr)
@@ -97,16 +98,14 @@ func mockReadBuffer(t *testing.T, rssiMap *RssiMap, buffer *bytes.Buffer) {
 	buffer.Write(p)
 }
 
-func scan(f *BLEForwarder, mutex *sync.Mutex, rssiMap RssiMap, addr string) {
+func scan(f *BLEForwarder, rssiMap *RssiMap, addr string) {
 	for k, v := range rssiMap.GetAll()[addr] {
 		f.onScanned(DummyAdv{DummyAddr{k}, v})
 	}
 }
 
 func TestDoubleForwarder(t *testing.T) {
-	mutex := &sync.Mutex{}
 	expectedRssiMap := models.NewRssiMap()
-	expectedRssiMap.Set(testAddr, testServerAddr, -90)
 	expectedRssiMap.Set(testAddr, testAddr2, -30)
 	expectedRssiMap.Set(testAddr2, testAddr, -5)
 	expectedRssiMap.Set(testAddr2, testServerAddr, -10)
@@ -114,12 +113,12 @@ func TestDoubleForwarder(t *testing.T) {
 	s2 := getDummyForwarder(t, testAddr2, expectedRssiMap)
 	f1, mockedReadValue1 := s1.forwarder, s1.mockedReadValue
 	f2, mockedReadValue2 := s2.forwarder, s2.mockedReadValue
-	scan(f1, mutex, expectedRssiMap, testAddr)
-	scan(f2, mutex, expectedRssiMap, testAddr2)
+	scan(f1, expectedRssiMap, testAddr)
+	scan(f2, expectedRssiMap, testAddr2)
 	mockReadBuffer(t, f1.rssiMap, mockedReadValue2)
 	mockReadBuffer(t, f2.rssiMap, mockedReadValue1)
-	scan(f1, mutex, expectedRssiMap, testAddr)
-	scan(f2, mutex, expectedRssiMap, testAddr2)
+	scan(f1, expectedRssiMap, testAddr)
+	scan(f2, expectedRssiMap, testAddr2)
 	assert.DeepEqual(t, f1.rssiMap.GetAll(), expectedRssiMap.GetAll())
 	assert.DeepEqual(t, f2.rssiMap.GetAll(), expectedRssiMap.GetAll())
 	assert.Equal(t, f1.toConnectAddr, testAddr2)
@@ -154,8 +153,8 @@ func prepare2ForwarderState(t *testing.T) (*testStructs, *testStructs) {
 	s2 := getDummyForwarder(t, testAddr2, expectedRssiMap)
 	f1, mockedReadValue1, _ := s1.forwarder, s1.mockedReadValue, s1.mockedWriteBuffer
 	f2, mockedReadValue2, _ := s2.forwarder, s2.mockedReadValue, s2.mockedWriteBuffer
-	mockReadBuffer(t, &expectedRssiMap, mockedReadValue2)
-	mockReadBuffer(t, &expectedRssiMap, mockedReadValue1)
+	mockReadBuffer(t, expectedRssiMap, mockedReadValue2)
+	mockReadBuffer(t, expectedRssiMap, mockedReadValue1)
 	f1.Run()
 	f2.Run()
 	time.Sleep(client.ScanInterval * 2)

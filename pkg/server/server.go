@@ -82,7 +82,7 @@ func (server *BLEServer) GetRssiMap() *RssiMap {
 			}
 		}
 	}
-	return &ret
+	return ret
 }
 
 func (server *BLEServer) setStatus(status BLEServerStatus, err error) {
