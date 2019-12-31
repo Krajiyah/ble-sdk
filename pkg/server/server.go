@@ -67,7 +67,7 @@ func (server *BLEServer) Run() error {
 	err := ble.AdvertiseNameAndServices(ctx, server.name, ble.MustParse(util.MainServiceUUID))
 	server.setStatus(Crashed, err)
 	for addr := range server.clientStateMap {
-		server.setClientState(addr, BLEClientState{Status: Disconnected, RssiMap: map[string]map[string]int{}})
+		server.setClientState(addr, BLEClientState{Status: Disconnected, ConnectedAddr: "", RssiMap: map[string]map[string]int{}})
 	}
 	return err
 }
@@ -132,7 +132,7 @@ func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 			server.listener.OnReadOrWriteError(err)
 			return
 		}
-		state := BLEClientState{Status: Connected, RssiMap: r.RssiMap}
+		state := BLEClientState{Status: Connected, ConnectedAddr: r.ConnectedAddr, RssiMap: r.RssiMap}
 		server.setClientState(addr, state)
 	}, func() {
 		for {
@@ -140,7 +140,7 @@ func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 			diff := util.UnixTS() - int64(PollingInterval.Seconds()*1000)
 			for addr := range lastHeard {
 				if diff > lastHeard[addr] {
-					state := BLEClientState{Status: Disconnected, RssiMap: map[string]map[string]int{}}
+					state := BLEClientState{Status: Disconnected, ConnectedAddr: "", RssiMap: map[string]map[string]int{}}
 					server.setClientState(addr, state)
 				}
 			}
