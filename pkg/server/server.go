@@ -121,19 +121,19 @@ func getService(server *BLEServer, moreReadChars []*BLEReadCharacteristic, moreW
 
 func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 	lastHeard := map[string]int64{}
-	return &BLEWriteCharacteristic{util.ClientStateUUID, func(addr string, data []byte, err error) {
+	return &BLEWriteCharacteristic{util.ClientStateUUID, func(a string, data []byte, err error) {
 		if err != nil {
 			server.listener.OnReadOrWriteError(err)
 			return
 		}
-		lastHeard[addr] = util.UnixTS()
 		r, err := GetClientStateRequestFromBytes(data)
+		lastHeard[r.Addr] = util.UnixTS()
 		if err != nil {
 			server.listener.OnReadOrWriteError(err)
 			return
 		}
 		state := BLEClientState{Status: Connected, ConnectedAddr: r.ConnectedAddr, RssiMap: r.RssiMap}
-		server.setClientState(addr, state)
+		server.setClientState(r.Addr, state)
 	}, func() {
 		for {
 			time.Sleep(PollingInterval)

@@ -104,9 +104,10 @@ func TestClientStatusChar(t *testing.T) {
 	server := getTestServer()
 	char := newClientStatusChar(server)
 	addr := "some addr"
+	other := "some other addr"
 	m := NewRssiMap()
-	m.Set(addr, "some other addr", -80)
-	req := ClientStateRequest{ConnectedAddr: addr, RssiMap: m.GetAll()}
+	m.Set(addr, other, -80)
+	req := ClientStateRequest{Addr: addr, ConnectedAddr: other, RssiMap: m.GetAll()}
 	b, err := req.Data()
 	assert.NilError(t, err)
 	go char.DoInBackground()

@@ -301,7 +301,7 @@ func (client *BLEClient) pingLoop() {
 	for {
 		time.Sleep(PingInterval)
 		m := client.rssiMap.GetAll()
-		req := &ClientStateRequest{ConnectedAddr: client.connectedAddr, RssiMap: m}
+		req := &ClientStateRequest{Addr: client.addr, ConnectedAddr: client.connectedAddr, RssiMap: m}
 		b, _ := req.Data()
 		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {
