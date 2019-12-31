@@ -155,7 +155,7 @@ func newTimeSyncChar(server *BLEServer) *BLEReadCharacteristic {
 }
 
 func newClientLogChar(server *BLEServer) *BLEWriteCharacteristic {
-	return &BLEWriteCharacteristic{util.ClientLogUUID, func(addr string, data []byte, err error) {
+	return &BLEWriteCharacteristic{util.ClientLogUUID, func(_ string, data []byte, err error) {
 		if err != nil {
 			server.listener.OnReadOrWriteError(err)
 			return
