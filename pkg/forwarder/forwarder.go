@@ -89,6 +89,16 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 	return f, nil
 }
 
+// GetRssiMap returns underlying data for rssi map
+func (forwarder *BLEForwarder) GetRssiMap() map[string]map[string]int {
+	return forwarder.rssiMap.GetAll()
+}
+
+// GetConnectionGraph returns underlying data for connection graph
+func (forwarder *BLEForwarder) GetConnectionGraph() map[string]string {
+	return forwarder.connectionGraph.GetAll()
+}
+
 // GetClient returns the client abstraction for the forwarder
 func (forwarder *BLEForwarder) GetClient() *client.BLEClient {
 	return forwarder.forwardingClient.(*client.BLEClient)
