@@ -13,13 +13,13 @@ type RssiMap struct {
 }
 
 // NewRssiMap will return newly init struct
-func NewRssiMap() RssiMap {
-	return RssiMap{data: map[string]map[string]int{}, mutex: sync.RWMutex{}}
+func NewRssiMap() *RssiMap {
+	return &RssiMap{data: map[string]map[string]int{}, mutex: sync.RWMutex{}}
 }
 
 // NewRssiMapFromRaw will return newly init struct
-func NewRssiMapFromRaw(raw map[string]map[string]int) RssiMap {
-	return RssiMap{data: raw, mutex: sync.RWMutex{}}
+func NewRssiMapFromRaw(raw map[string]map[string]int) *RssiMap {
+	return &RssiMap{data: raw, mutex: sync.RWMutex{}}
 }
 
 // Data will return serialized form of struct as bytes
@@ -72,7 +72,5 @@ func GetRssiMapFromBytes(data []byte) (*RssiMap, error) {
 	if err != nil {
 		return nil, err
 	}
-	rm := NewRssiMap()
-	rm.data = m
-	return &rm, nil
+	return NewRssiMapFromRaw(m), nil
 }

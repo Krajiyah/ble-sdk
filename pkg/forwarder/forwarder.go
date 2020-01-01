@@ -31,16 +31,17 @@ type BLEForwarder struct {
 	connectedAddr     string
 	toConnectAddr     string
 	rssiMap           *models.RssiMap
+	connectionGraph   *models.ConnectionGraph
 	readCharUUIDMutex *sync.Mutex
 	readCharUUID      string
 	listener          models.BLEForwarderListener
 }
 
 func newBLEForwarder(addr, serverAddr string, listener models.BLEForwarderListener) *BLEForwarder {
-	rm := models.NewRssiMap()
 	return &BLEForwarder{
 		addr, nil, nil,
-		serverAddr, "", "", &rm,
+		serverAddr, "", "",
+		models.NewRssiMap(), models.NewConnectionGraph(),
 		&sync.Mutex{}, "",
 		listener,
 	}
@@ -56,25 +57,56 @@ func getChars(f *BLEForwarder) ([]*server.BLEReadCharacteristic, []*server.BLEWr
 		}
 }
 
+type forwarderServerListener struct {
+	listener models.BLEForwarderListener
+}
+
+func (l *forwarderServerListener) OnClientStateMapChanged(map[string]models.BLEClientState) {}
+func (l *forwarderServerListener) OnClientLog(models.ClientLogRequest)                      {}
+func (l *forwarderServerListener) OnReadOrWriteError(err error)                             { l.listener.OnReadOrWriteError(err) }
+func (l *forwarderServerListener) OnServerStatusChanged(s models.BLEServerStatus, err error) {
+	l.listener.OnServerStatusChanged(s, err)
+}
+
 // NewBLEForwarder is a function that creates a new ble forwarder
-func NewBLEForwarder(name string, addr string, secret string, serverAddr string, serverListener models.BLEServerStatusListener, listener models.BLEForwarderListener) (*BLEForwarder, error) {
+func NewBLEForwarder(name string, addr string, secret string, serverAddr string, listener models.BLEForwarderListener) (*BLEForwarder, error) {
 	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
 	}
 	f := newBLEForwarder(addr, serverAddr, listener)
 	readChars, writeChars := getChars(f)
-	serv, err := server.NewBLEServerSharedDevice(d, name, secret, serverListener, readChars, writeChars)
+	serv, err := server.NewBLEServerSharedDevice(d, name, secret, &forwarderServerListener{listener: listener}, readChars, writeChars)
 	if err != nil {
 		return nil, err
 	}
-	clien, err := client.NewBLEClientSharedDevice(d, addr, secret, serverAddr, false, func(attempts int, rssi int) {}, noop)
+	clien, err := client.NewBLEClientSharedDevice(d, addr, secret, serverAddr, listener.OnClientConnected, f.listener.OnClientDisconnected)
 	if err != nil {
 		return nil, err
 	}
 	f.forwardingServer = serv
 	f.forwardingClient = clien
 	return f, nil
+}
+
+// GetRssiMap returns underlying data for rssi map
+func (forwarder *BLEForwarder) GetRssiMap() map[string]map[string]int {
+	return forwarder.rssiMap.GetAll()
+}
+
+// GetConnectionGraph returns underlying data for connection graph
+func (forwarder *BLEForwarder) GetConnectionGraph() map[string]string {
+	return forwarder.connectionGraph.GetAll()
+}
+
+// GetClient returns the client abstraction for the forwarder
+func (forwarder *BLEForwarder) GetClient() *client.BLEClient {
+	return forwarder.forwardingClient.(*client.BLEClient)
+}
+
+// GetServer returns the server abstraction for the forwarder
+func (forwarder *BLEForwarder) GetServer() *server.BLEServer {
+	return forwarder.forwardingServer.(*server.BLEServer)
 }
 
 // Run is a method that runs the forwarder forever
@@ -115,7 +147,7 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	isF := client.IsForwarder(a)
 	var err error
 	if addr != forwarder.serverAddr && isF {
-		err = forwarder.updateRssiMap(addr)
+		err = forwarder.updateNetworkState(addr)
 		e := forwarder.reconnect()
 		err = wrapError(err, e)
 	}
@@ -126,7 +158,7 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	return err
 }
 
-func (forwarder *BLEForwarder) updateRssiMap(addr string) error {
+func (forwarder *BLEForwarder) updateNetworkState(addr string) error {
 	err := forwarder.keepTryConnect(addr)
 	if err != nil {
 		return err
@@ -140,6 +172,15 @@ func (forwarder *BLEForwarder) updateRssiMap(addr string) error {
 		return err
 	}
 	forwarder.rssiMap.Merge(rssiMap)
+	data, err = forwarder.forwardingClient.ReadValue(util.ReadConnectionGraphUUID)
+	if err != nil {
+		return err
+	}
+	connectionGraph, err := models.GetConnectionGraphFromBytes(data)
+	if err != nil {
+		return err
+	}
+	forwarder.connectionGraph.Merge(connectionGraph)
 	return nil
 }
 
@@ -185,6 +226,7 @@ func (forwarder *BLEForwarder) connect(addr string) error {
 		return err
 	}
 	forwarder.connectedAddr = addr
+	forwarder.connectionGraph.Set(forwarder.addr, addr)
 	return nil
 }
 
@@ -201,6 +243,12 @@ func noop() {}
 func newReadRssiMapChar(forwarder *BLEForwarder) *server.BLEReadCharacteristic {
 	return &server.BLEReadCharacteristic{Uuid: util.ReadRssiMapCharUUID, HandleRead: func(addr string, ctx context.Context) ([]byte, error) {
 		return forwarder.rssiMap.Data()
+	}, DoInBackground: noop}
+}
+
+func newReadConnectionGraphChar(forwarder *BLEForwarder) *server.BLEReadCharacteristic {
+	return &server.BLEReadCharacteristic{Uuid: util.ReadConnectionGraphUUID, HandleRead: func(addr string, ctx context.Context) ([]byte, error) {
+		return forwarder.connectionGraph.Data()
 	}, DoInBackground: noop}
 }
 

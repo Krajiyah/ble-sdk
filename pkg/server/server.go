@@ -67,7 +67,7 @@ func (server *BLEServer) Run() error {
 	err := ble.AdvertiseNameAndServices(ctx, server.name, ble.MustParse(util.MainServiceUUID))
 	server.setStatus(Crashed, err)
 	for addr := range server.clientStateMap {
-		server.setClientState(addr, BLEClientState{Status: Disconnected, RssiMap: map[string]map[string]int{}})
+		server.setClientState(addr, BLEClientState{Status: Disconnected, ConnectedAddr: "", RssiMap: map[string]map[string]int{}})
 	}
 	return err
 }
@@ -82,7 +82,7 @@ func (server *BLEServer) GetRssiMap() *RssiMap {
 			}
 		}
 	}
-	return &ret
+	return ret
 }
 
 func (server *BLEServer) setStatus(status BLEServerStatus, err error) {
@@ -121,26 +121,26 @@ func getService(server *BLEServer, moreReadChars []*BLEReadCharacteristic, moreW
 
 func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 	lastHeard := map[string]int64{}
-	return &BLEWriteCharacteristic{util.ClientStateUUID, func(addr string, data []byte, err error) {
+	return &BLEWriteCharacteristic{util.ClientStateUUID, func(a string, data []byte, err error) {
 		if err != nil {
 			server.listener.OnReadOrWriteError(err)
 			return
 		}
-		lastHeard[addr] = util.UnixTS()
 		r, err := GetClientStateRequestFromBytes(data)
+		lastHeard[r.Addr] = util.UnixTS()
 		if err != nil {
 			server.listener.OnReadOrWriteError(err)
 			return
 		}
-		state := BLEClientState{Status: Connected, RssiMap: r.RssiMap}
-		server.setClientState(addr, state)
+		state := BLEClientState{Status: Connected, ConnectedAddr: r.ConnectedAddr, RssiMap: r.RssiMap}
+		server.setClientState(r.Addr, state)
 	}, func() {
 		for {
 			time.Sleep(PollingInterval)
 			diff := util.UnixTS() - int64(PollingInterval.Seconds()*1000)
 			for addr := range lastHeard {
 				if diff > lastHeard[addr] {
-					state := BLEClientState{Status: Disconnected, RssiMap: map[string]map[string]int{}}
+					state := BLEClientState{Status: Disconnected, ConnectedAddr: "", RssiMap: map[string]map[string]int{}}
 					server.setClientState(addr, state)
 				}
 			}
@@ -155,7 +155,7 @@ func newTimeSyncChar(server *BLEServer) *BLEReadCharacteristic {
 }
 
 func newClientLogChar(server *BLEServer) *BLEWriteCharacteristic {
-	return &BLEWriteCharacteristic{util.ClientLogUUID, func(addr string, data []byte, err error) {
+	return &BLEWriteCharacteristic{util.ClientLogUUID, func(_ string, data []byte, err error) {
 		if err != nil {
 			server.listener.OnReadOrWriteError(err)
 			return

@@ -48,55 +48,55 @@ type dummyCoreClient struct {
 }
 
 func newDummyCoreClient(addr string) ble.Client {
-	return dummyCoreClient{addr, bytes.NewBuffer([]byte{}), &[]*bytes.Buffer{}}
+	return &dummyCoreClient{addr, bytes.NewBuffer([]byte{}), &[]*bytes.Buffer{}}
 }
 
-func (c dummyCoreClient) ReadCharacteristic(char *ble.Characteristic) ([]byte, error) {
+func (c *dummyCoreClient) ReadCharacteristic(char *ble.Characteristic) ([]byte, error) {
 	return c.mockedReadCharData.Bytes(), nil
 }
-func (c dummyCoreClient) WriteCharacteristic(char *ble.Characteristic, value []byte, noRsp bool) error {
+func (c *dummyCoreClient) WriteCharacteristic(char *ble.Characteristic, value []byte, noRsp bool) error {
 	buf := bytes.NewBuffer(value)
 	*c.mockedWriteCharData = append(*c.mockedWriteCharData, buf)
 	return nil
 }
-func (c dummyCoreClient) Address() ble.Addr { return ble.NewAddr(c.testAddr) }
-func (c dummyCoreClient) Name() string      { return "some name" }
-func (c dummyCoreClient) Profile() *ble.Profile {
+func (c *dummyCoreClient) Address() ble.Addr { return ble.NewAddr(c.testAddr) }
+func (c *dummyCoreClient) Name() string      { return "some name" }
+func (c *dummyCoreClient) Profile() *ble.Profile {
 	return &ble.Profile{
 		Services: GetTestServices(serviceUUIDs),
 	}
 }
-func (c dummyCoreClient) DiscoverProfile(force bool) (*ble.Profile, error) {
+func (c *dummyCoreClient) DiscoverProfile(force bool) (*ble.Profile, error) {
 	return &ble.Profile{
 		Services: GetTestServices(serviceUUIDs),
 	}, nil
 }
-func (c dummyCoreClient) DiscoverServices(filter []ble.UUID) ([]*ble.Service, error) {
+func (c *dummyCoreClient) DiscoverServices(filter []ble.UUID) ([]*ble.Service, error) {
 	return GetTestServices(serviceUUIDs), nil
 }
-func (c dummyCoreClient) DiscoverIncludedServices(filter []ble.UUID, s *ble.Service) ([]*ble.Service, error) {
+func (c *dummyCoreClient) DiscoverIncludedServices(filter []ble.UUID, s *ble.Service) ([]*ble.Service, error) {
 	return GetTestServices(serviceUUIDs), nil
 }
-func (c dummyCoreClient) DiscoverCharacteristics(filter []ble.UUID, s *ble.Service) ([]*ble.Characteristic, error) {
+func (c *dummyCoreClient) DiscoverCharacteristics(filter []ble.UUID, s *ble.Service) ([]*ble.Characteristic, error) {
 	return nil, nil
 }
-func (c dummyCoreClient) DiscoverDescriptors(filter []ble.UUID, char *ble.Characteristic) ([]*ble.Descriptor, error) {
+func (c *dummyCoreClient) DiscoverDescriptors(filter []ble.UUID, char *ble.Characteristic) ([]*ble.Descriptor, error) {
 	return nil, nil
 }
-func (c dummyCoreClient) ReadLongCharacteristic(char *ble.Characteristic) ([]byte, error) {
+func (c *dummyCoreClient) ReadLongCharacteristic(char *ble.Characteristic) ([]byte, error) {
 	return nil, nil
 }
-func (c dummyCoreClient) ReadDescriptor(d *ble.Descriptor) ([]byte, error)  { return nil, nil }
-func (c dummyCoreClient) WriteDescriptor(d *ble.Descriptor, v []byte) error { return nil }
-func (c dummyCoreClient) ReadRSSI() int                                     { return testRSSI }
-func (c dummyCoreClient) ExchangeMTU(rxMTU int) (txMTU int, err error)      { return util.MTU, nil }
-func (c dummyCoreClient) Subscribe(char *ble.Characteristic, ind bool, h ble.NotificationHandler) error {
+func (c *dummyCoreClient) ReadDescriptor(d *ble.Descriptor) ([]byte, error)  { return nil, nil }
+func (c *dummyCoreClient) WriteDescriptor(d *ble.Descriptor, v []byte) error { return nil }
+func (c *dummyCoreClient) ReadRSSI() int                                     { return testRSSI }
+func (c *dummyCoreClient) ExchangeMTU(rxMTU int) (txMTU int, err error)      { return util.MTU, nil }
+func (c *dummyCoreClient) Subscribe(char *ble.Characteristic, ind bool, h ble.NotificationHandler) error {
 	return nil
 }
-func (c dummyCoreClient) Unsubscribe(char *ble.Characteristic, ind bool) error { return nil }
-func (c dummyCoreClient) ClearSubscriptions() error                            { return nil }
-func (c dummyCoreClient) CancelConnection() error                              { return nil }
-func (c dummyCoreClient) Disconnected() <-chan struct{}                        { return nil }
+func (c *dummyCoreClient) Unsubscribe(char *ble.Characteristic, ind bool) error { return nil }
+func (c *dummyCoreClient) ClearSubscriptions() error                            { return nil }
+func (c *dummyCoreClient) CancelConnection() error                              { return nil }
+func (c *dummyCoreClient) Disconnected() <-chan struct{}                        { return nil }
 
 type testBleConnector struct {
 	addr    string
@@ -127,7 +127,7 @@ func setCharacteristic(client *BLEClient, uuid string) {
 	client.characteristics[uuid] = ble.NewCharacteristic(u)
 }
 
-func dummyOnConnected(a int, r int) {
+func dummyOnConnected(_ string, a int, r int) {
 	attempts = a
 	rssi = r
 }
@@ -135,8 +135,8 @@ func dummyOnConnected(a int, r int) {
 func dummyOnDisconnected() {}
 
 func getTestClient() *BLEClient {
-	client := newBLEClient(testAddr, testSecret, testServerAddr, true, dummyOnConnected, dummyOnDisconnected)
-	client.bleConnector = testBleConnector{testAddr, &testRssiMap}
+	client := newBLEClient(testAddr, testSecret, testServerAddr, dummyOnConnected, dummyOnDisconnected)
+	client.bleConnector = testBleConnector{testAddr, testRssiMap}
 	return client
 }
 
@@ -151,8 +151,8 @@ func getDummyClient(connectedAddr string) (*BLEClient, *dummyCoreClient) {
 	for _, uuid := range serviceUUIDs {
 		client.characteristics[uuid] = nil
 	}
-	dc := cc.(dummyCoreClient)
-	return client, &dc
+	dc := cc.(*dummyCoreClient)
+	return client, dc
 }
 
 func TestIsForwarder(t *testing.T) {
@@ -253,7 +253,7 @@ func TestRun(t *testing.T) {
 	client := getTestClient()
 	client.Run()
 	time.Sleep(afterConnectionDelay)
-	c := (*(client.cln)).(dummyCoreClient)
+	c := (*(client.cln)).(*dummyCoreClient)
 	ts := mockUnixTS(t, c.mockedReadCharData)
 	time.Sleep(PingInterval + (PingInterval / 4))
 	actual, err := client.UnixTS()
@@ -263,6 +263,8 @@ func TestRun(t *testing.T) {
 
 func TestForwardedWrite(t *testing.T) {
 	setForwarderConnection()
+
+	// 1st forward request
 	client, dummyCoreClient := getDummyClient(testForwarderAddr)
 	req := ClientLogRequest{testAddr, Info, "Hello World!"}
 	expectedData, err := req.Data()
@@ -273,6 +275,15 @@ func TestForwardedWrite(t *testing.T) {
 	r, err := GetForwarderRequestFromBytes(data)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, r.Payload, expectedData)
+
+	// 2nd forwarder request
+	dummyCoreClient.mockedWriteCharData = &[]*bytes.Buffer{}
+	err = client.WriteValue(util.WriteForwardCharUUID, data)
+	assert.NilError(t, err)
+	data = getWriteBufferData(t, client.secret, dummyCoreClient.mockedWriteCharData)
+	r2, err := GetForwarderRequestFromBytes(data)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, r, r2)
 }
 
 func TestForwardedRead(t *testing.T) {

@@ -26,6 +26,6 @@ func TestMerge(t *testing.T) {
 	z.Set(a, b, 2)
 	z.Set(b, a, 1)
 	z.Set(b, b, 2)
-	x.Merge(&y)
+	x.Merge(y)
 	assert.DeepEqual(t, x.data, z.data)
 }

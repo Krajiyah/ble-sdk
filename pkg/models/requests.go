@@ -21,7 +21,9 @@ func (l LogLevel) String() string {
 
 // ClientStateRequest is the payload for the equivalent write characteristic
 type ClientStateRequest struct {
-	RssiMap map[string]map[string]int
+	Addr          string
+	ConnectedAddr string
+	RssiMap       map[string]map[string]int
 }
 
 // ClientLogRequest is the payload for the equivalent write characteristic
