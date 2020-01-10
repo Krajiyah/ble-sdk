@@ -146,15 +146,12 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
 	isF := client.IsForwarder(a)
 	var err error
-	fmt.Printf("Found adv: %s  isF: %t\n", addr, isF)
 	if !util.AddrEqualAddr(addr, forwarder.serverAddr) && isF {
-		fmt.Println("Updating network state...")
 		err = forwarder.updateNetworkState(addr)
 		e := forwarder.reconnect()
 		err = wrapError(err, e)
 	}
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) || isF {
-		fmt.Println("Refresh shortest path...")
 		e := forwarder.refreshShortestPath()
 		err = wrapError(err, e)
 	}
@@ -195,19 +192,14 @@ func (forwarder *BLEForwarder) reconnect() error {
 }
 
 func (forwarder *BLEForwarder) refreshShortestPath() error {
-	fmt.Println("RSSI MAP: ")
-	fmt.Println(forwarder.rssiMap.GetAll())
 	path, err := util.ShortestPath(forwarder.rssiMap.GetAll(), forwarder.addr, forwarder.serverAddr)
 	if err != nil {
 		return errors.Wrap(err, "Could not calc shortest path.")
 	}
-	fmt.Println("Finished shortest path")
 	if len(path) < 2 {
 		return fmt.Errorf("Invalid path to server: %s", path)
 	}
-	fmt.Println("good path length")
 	nextHop := path[1]
-	fmt.Println("NEXT HOP: " + nextHop)
 	if !util.AddrEqualAddr(forwarder.toConnectAddr, nextHop) {
 		forwarder.toConnectAddr = nextHop
 		err = forwarder.keepTryConnect(nextHop)
