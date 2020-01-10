@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	scanDuration         = time.Second * 2
 	maxConnectAttempts   = 5
 	errNotConnected      = "Forwarder is not connected"
 	errInvalidForwardReq = "Invalid forwarding request"
@@ -115,18 +116,35 @@ func (forwarder *BLEForwarder) Run() error {
 	return forwarder.forwardingServer.Run()
 }
 
+func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, error) {
+	ret := []ble.Advertisement{}
+	mutex := sync.Mutex{}
+	err := forwarder.forwardingClient.RawScanWithDuration(scanDuration, func(a ble.Advertisement) {
+		mutex.Lock()
+		ret = append(ret, a)
+		mutex.Unlock()
+	})
+	if err != nil && err.Error() == "context deadline exceeded" {
+		err = nil
+	}
+	return ret, err
+}
+
 func (forwarder *BLEForwarder) scanLoop() {
-	mutex := &sync.Mutex{}
 	for {
 		time.Sleep(client.ScanInterval)
-		forwarder.forwardingClient.RawScan(func(a ble.Advertisement) {
-			mutex.Lock()
+		advs, err := forwarder.collectAdvirtisements()
+		if err != nil {
+			e := errors.Wrap(err, "collectAdvirtisements error")
+			forwarder.listener.OnConnectionError(e)
+		}
+		for _, a := range advs {
 			err := forwarder.onScanned(a)
 			if err != nil {
-				forwarder.listener.OnError(err)
+				e := errors.Wrap(err, "onScanned error")
+				forwarder.listener.OnError(e)
 			}
-			mutex.Unlock()
-		})
+		}
 	}
 }
 
@@ -146,12 +164,12 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
 	isF := client.IsForwarder(a)
 	var err error
-	if addr != forwarder.serverAddr && isF {
+	if !util.AddrEqualAddr(addr, forwarder.serverAddr) && isF {
 		err = forwarder.updateNetworkState(addr)
 		e := forwarder.reconnect()
 		err = wrapError(err, e)
 	}
-	if addr == forwarder.serverAddr || isF {
+	if util.AddrEqualAddr(addr, forwarder.serverAddr) || isF {
 		e := forwarder.refreshShortestPath()
 		err = wrapError(err, e)
 	}
@@ -194,13 +212,13 @@ func (forwarder *BLEForwarder) reconnect() error {
 func (forwarder *BLEForwarder) refreshShortestPath() error {
 	path, err := util.ShortestPath(forwarder.rssiMap.GetAll(), forwarder.addr, forwarder.serverAddr)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Could not calc shortest path.")
 	}
 	if len(path) < 2 {
 		return fmt.Errorf("Invalid path to server: %s", path)
 	}
 	nextHop := path[1]
-	if forwarder.toConnectAddr != nextHop {
+	if !util.AddrEqualAddr(forwarder.toConnectAddr, nextHop) {
 		forwarder.toConnectAddr = nextHop
 		err = forwarder.keepTryConnect(nextHop)
 	}
@@ -210,24 +228,35 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 func (forwarder *BLEForwarder) keepTryConnect(addr string) error {
 	err := errors.New("")
 	attempts := 0
+	rssi := 0
 	for err != nil && attempts < maxConnectAttempts {
-		err = forwarder.connect(addr)
+		rssi, err = forwarder.connect(addr)
+		if err != nil {
+			e := errors.Wrap(err, "keepTryConnect single connection error")
+			forwarder.listener.OnConnectionError(e)
+		}
 		attempts++
 	}
-	return err
+	forwarder.listener.OnClientConnected(addr, attempts, rssi)
+	return nil
 }
 
-func (forwarder *BLEForwarder) connect(addr string) error {
+func (forwarder *BLEForwarder) connect(addr string) (int, error) {
 	forwarder.connectedAddr = ""
+	rssi := 0
 	err := forwarder.forwardingClient.RawConnect(func(a ble.Advertisement) bool {
-		return util.AddrEqualAddr(a.Address().String(), addr)
+		b := util.AddrEqualAddr(a.Address().String(), addr)
+		if b {
+			rssi = a.RSSI()
+		}
+		return b
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	forwarder.connectedAddr = addr
 	forwarder.connectionGraph.Set(forwarder.addr, addr)
-	return nil
+	return rssi, nil
 }
 
 func (forwarder *BLEForwarder) isConnected() bool {
@@ -235,7 +264,7 @@ func (forwarder *BLEForwarder) isConnected() bool {
 }
 
 func (forwarder *BLEForwarder) isConnectedToServer() bool {
-	return forwarder.connectedAddr == forwarder.serverAddr
+	return util.AddrEqualAddr(forwarder.connectedAddr, forwarder.serverAddr)
 }
 
 func noop() {}

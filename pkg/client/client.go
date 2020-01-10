@@ -42,6 +42,7 @@ func (bc stdBleConnector) Scan(ctx context.Context, b bool, h ble.AdvHandler, f 
 
 // BLEClientInt is a interface used to abstract BLEClient
 type BLEClientInt interface {
+	RawScanWithDuration(time.Duration, func(ble.Advertisement)) error
 	RawScan(func(ble.Advertisement)) error
 	ReadValue(string) ([]byte, error)
 	RawConnect(ble.AdvFilter) error
@@ -268,7 +269,17 @@ func (client *BLEClient) serverFilter(a ble.Advertisement) bool {
 
 // RawScan exposes underlying BLE scanner
 func (client *BLEClient) RawScan(handle func(ble.Advertisement)) error {
-	return client.bleConnector.Scan(client.ctx, true, handle, nil)
+	return client.scanWithCtx(client.ctx, handle)
+}
+
+// RawScanWithDuration exposes underlying BLE scanner (with timeout)
+func (client *BLEClient) RawScanWithDuration(duration time.Duration, handle func(ble.Advertisement)) error {
+	ctx, _ := context.WithTimeout(context.Background(), duration)
+	return client.scanWithCtx(ctx, handle)
+}
+
+func (client *BLEClient) scanWithCtx(ctx context.Context, handle func(ble.Advertisement)) error {
+	return client.bleConnector.Scan(ctx, true, handle, nil)
 }
 
 func (client *BLEClient) scan() {

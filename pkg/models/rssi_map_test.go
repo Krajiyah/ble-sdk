@@ -8,13 +8,13 @@ import (
 
 func TestSetter(t *testing.T) {
 	x := NewRssiMap()
-	x.Set("a", "b", 1)
-	assert.DeepEqual(t, x.data, map[string]map[string]int{"a": map[string]int{"b": 1}})
+	x.Set("A", "B", 1)
+	assert.DeepEqual(t, x.data, map[string]map[string]int{"A": map[string]int{"B": 1}})
 }
 
 func TestMerge(t *testing.T) {
-	a := "a"
-	b := "b"
+	a := "A"
+	b := "B"
 	x := NewRssiMap()
 	y := NewRssiMap()
 	z := NewRssiMap()
