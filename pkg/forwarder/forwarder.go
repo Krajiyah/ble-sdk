@@ -144,6 +144,7 @@ func (forwarder *BLEForwarder) scanLoop() {
 				e := errors.Wrap(err, "onScanned error")
 				forwarder.listener.OnError(e)
 			}
+			fmt.Println("Finished onScanned for %s: " + a.Address().String())
 		}
 	}
 }
@@ -236,6 +237,7 @@ func (forwarder *BLEForwarder) keepTryConnect(addr string) error {
 		}
 		attempts++
 	}
+	fmt.Println("finished keepTryConnect")
 	return err
 }
 
@@ -250,6 +252,7 @@ func (forwarder *BLEForwarder) connect(addr string) error {
 	}
 	forwarder.connectedAddr = addr
 	forwarder.connectionGraph.Set(forwarder.addr, addr)
+	fmt.Println("Connected! Updated CG")
 	return nil
 }
 
