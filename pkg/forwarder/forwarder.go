@@ -220,6 +220,10 @@ func (forwarder *BLEForwarder) keepTryConnect(addr string) error {
 	attempts := 0
 	for err != nil && attempts < maxConnectAttempts {
 		err = forwarder.connect(addr)
+		if err != nil {
+			e := errors.Wrap(err, "keepTryConnect single connection error")
+			forwarder.listener.OnConnectionError(e)
+		}
 		attempts++
 	}
 	return err
