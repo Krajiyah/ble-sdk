@@ -199,7 +199,7 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 	fmt.Println(forwarder.rssiMap.GetAll())
 	path, err := util.ShortestPath(forwarder.rssiMap.GetAll(), forwarder.addr, forwarder.serverAddr)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Could not calc shortest path.")
 	}
 	if len(path) < 2 {
 		return fmt.Errorf("Invalid path to server: %s", path)
