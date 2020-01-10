@@ -49,6 +49,10 @@ func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
 	return nil
 }
 
+func (c dummyClient) RawScanWithDuration(_ time.Duration, f func(ble.Advertisement)) error {
+	return c.RawScan(f)
+}
+
 func (c dummyClient) ReadValue(uuid string) ([]byte, error) {
 	return c.mockedReadValue.Bytes(), nil
 }

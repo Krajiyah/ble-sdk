@@ -42,6 +42,7 @@ func (bc stdBleConnector) Scan(ctx context.Context, b bool, h ble.AdvHandler, f 
 
 // BLEClientInt is a interface used to abstract BLEClient
 type BLEClientInt interface {
+	RawScanWithDuration(time.Duration, func(ble.Advertisement)) error
 	RawScan(func(ble.Advertisement)) error
 	ReadValue(string) ([]byte, error)
 	RawConnect(ble.AdvFilter) error
