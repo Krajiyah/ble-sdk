@@ -124,7 +124,7 @@ func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, err
 		ret = append(ret, a)
 		mutex.Unlock()
 	})
-	if err.Error() == "context deadline exceeded" {
+	if err != nil && err.Error() == "context deadline exceeded" {
 		err = nil
 	}
 	return ret, err
@@ -144,7 +144,6 @@ func (forwarder *BLEForwarder) scanLoop() {
 				e := errors.Wrap(err, "onScanned error")
 				forwarder.listener.OnError(e)
 			}
-			fmt.Println("Finished onScanned for %s: " + a.Address().String())
 		}
 	}
 }
@@ -229,31 +228,35 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 func (forwarder *BLEForwarder) keepTryConnect(addr string) error {
 	err := errors.New("")
 	attempts := 0
+	rssi := 0
 	for err != nil && attempts < maxConnectAttempts {
-		err = forwarder.connect(addr)
+		rssi, err = forwarder.connect(addr)
 		if err != nil {
 			e := errors.Wrap(err, "keepTryConnect single connection error")
 			forwarder.listener.OnConnectionError(e)
 		}
 		attempts++
 	}
-	fmt.Println("finished keepTryConnect")
-	return err
+	forwarder.listener.OnClientConnected(addr, attempts, rssi)
+	return nil
 }
 
-func (forwarder *BLEForwarder) connect(addr string) error {
+func (forwarder *BLEForwarder) connect(addr string) (int, error) {
 	forwarder.connectedAddr = ""
-	fmt.Println("Raw connecting....")
+	rssi := 0
 	err := forwarder.forwardingClient.RawConnect(func(a ble.Advertisement) bool {
-		return util.AddrEqualAddr(a.Address().String(), addr)
+		b := util.AddrEqualAddr(a.Address().String(), addr)
+		if b {
+			rssi = a.RSSI()
+		}
+		return b
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	forwarder.connectedAddr = addr
 	forwarder.connectionGraph.Set(forwarder.addr, addr)
-	fmt.Println("Connected! Updated CG")
-	return nil
+	return rssi, nil
 }
 
 func (forwarder *BLEForwarder) isConnected() bool {
