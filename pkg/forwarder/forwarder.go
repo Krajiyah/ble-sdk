@@ -119,14 +119,21 @@ func (forwarder *BLEForwarder) scanLoop() {
 	mutex := &sync.Mutex{}
 	for {
 		time.Sleep(client.ScanInterval)
-		forwarder.forwardingClient.RawScan(func(a ble.Advertisement) {
+		// TODO: fix bug: can't do connection within (at same time) scans
+		// TODO: stop scanning then try connections, then go back to scanning
+		err := forwarder.forwardingClient.RawScan(func(a ble.Advertisement) {
 			mutex.Lock()
 			err := forwarder.onScanned(a)
 			if err != nil {
-				forwarder.listener.OnError(err)
+				e := errors.Wrap(err, "onScanned error")
+				forwarder.listener.OnError(e)
 			}
 			mutex.Unlock()
 		})
+		if err != nil {
+			e := errors.Wrap(err, "RawScan error")
+			forwarder.listener.OnConnectionError(e)
+		}
 	}
 }
 
