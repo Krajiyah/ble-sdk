@@ -60,7 +60,7 @@ func TestStatusSetters(t *testing.T) {
 	assert.Equal(t, len(errs), 1)
 	assert.DeepEqual(t, errs[0].Error(), expected.Error())
 	addr := "someaddr"
-	expectedRM := map[string]map[string]int{"a": map[string]int{"b": -90}}
+	expectedRM := map[string]map[string]int{"A": map[string]int{"B": -90}}
 	s := BLEClientState{Status: Connected, RssiMap: expectedRM, ConnectedAddr: addr}
 	server.setClientState(addr, s)
 	expectedState := map[string]BLEClientState{}

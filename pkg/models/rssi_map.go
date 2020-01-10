@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"encoding/gob"
+	"strings"
 	"sync"
 )
 
@@ -29,6 +30,8 @@ func (rm *RssiMap) Data() ([]byte, error) {
 
 // Set will update the map
 func (rm *RssiMap) Set(src, dst string, new int) {
+	src = strings.ToUpper(src)
+	dst = strings.ToUpper(dst)
 	rm.mutex.Lock()
 	if _, ok := rm.data[src]; !ok {
 		rm.data[src] = map[string]int{}
@@ -44,6 +47,8 @@ func (rm *RssiMap) GetAll() map[string]map[string]int {
 
 // Get will get from map
 func (rm *RssiMap) Get(src, dst string) (int, bool) {
+	src = strings.ToUpper(src)
+	dst = strings.ToUpper(dst)
 	rm.mutex.RLock()
 	if tmp, ok := rm.data[src]; ok {
 		ret, oke := tmp[dst]

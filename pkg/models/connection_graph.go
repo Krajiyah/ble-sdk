@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"encoding/gob"
+	"strings"
 	"sync"
 )
 
@@ -29,6 +30,8 @@ func (cg *ConnectionGraph) Data() ([]byte, error) {
 
 // Set will update the map
 func (cg *ConnectionGraph) Set(src, new string) {
+	src = strings.ToUpper(src)
+	new = strings.ToUpper(new)
 	cg.mutex.Lock()
 	cg.data[src] = new
 	cg.mutex.Unlock()
@@ -41,6 +44,7 @@ func (cg *ConnectionGraph) GetAll() map[string]string {
 
 // Get will get from map
 func (cg *ConnectionGraph) Get(src string) (string, bool) {
+	src = strings.ToUpper(src)
 	cg.mutex.RLock()
 	ret, ok := cg.data[src]
 	cg.mutex.RUnlock()
