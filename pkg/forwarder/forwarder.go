@@ -201,9 +201,11 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 	if err != nil {
 		return errors.Wrap(err, "Could not calc shortest path.")
 	}
+	fmt.Println("Finished shortest path")
 	if len(path) < 2 {
 		return fmt.Errorf("Invalid path to server: %s", path)
 	}
+	fmt.Println("good path length")
 	nextHop := path[1]
 	if forwarder.toConnectAddr != nextHop {
 		forwarder.toConnectAddr = nextHop
