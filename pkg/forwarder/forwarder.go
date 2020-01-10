@@ -118,8 +118,11 @@ func (forwarder *BLEForwarder) Run() error {
 
 func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, error) {
 	ret := []ble.Advertisement{}
+	mutex := sync.Mutex{}
 	err := forwarder.forwardingClient.RawScanWithDuration(scanDuration, func(a ble.Advertisement) {
+		mutex.Lock()
 		ret = append(ret, a)
+		mutex.Unlock()
 	})
 	return ret, err
 }
