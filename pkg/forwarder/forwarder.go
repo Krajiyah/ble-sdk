@@ -124,6 +124,9 @@ func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, err
 		ret = append(ret, a)
 		mutex.Unlock()
 	})
+	if err.Error() == "context deadline exceeded" {
+		err = nil
+	}
 	return ret, err
 }
 
