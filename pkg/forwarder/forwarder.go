@@ -147,13 +147,13 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	isF := client.IsForwarder(a)
 	var err error
 	fmt.Printf("Found adv: %s  isF: %t\n", addr, isF)
-	if addr != forwarder.serverAddr && isF {
+	if !util.AddrEqualAddr(addr, forwarder.serverAddr) && isF {
 		fmt.Println("Updating network state...")
 		err = forwarder.updateNetworkState(addr)
 		e := forwarder.reconnect()
 		err = wrapError(err, e)
 	}
-	if addr == forwarder.serverAddr || isF {
+	if util.AddrEqualAddr(addr, forwarder.serverAddr) || isF {
 		fmt.Println("Refresh shortest path...")
 		e := forwarder.refreshShortestPath()
 		err = wrapError(err, e)
@@ -206,9 +206,9 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 		return fmt.Errorf("Invalid path to server: %s", path)
 	}
 	fmt.Println("good path length")
-	fmt.Println(path)
 	nextHop := path[1]
-	if forwarder.toConnectAddr != nextHop {
+	fmt.Println("NEXT HOP: " + nextHop)
+	if !util.AddrEqualAddr(forwarder.toConnectAddr, nextHop) {
 		forwarder.toConnectAddr = nextHop
 		err = forwarder.keepTryConnect(nextHop)
 	}
@@ -227,6 +227,7 @@ func (forwarder *BLEForwarder) keepTryConnect(addr string) error {
 
 func (forwarder *BLEForwarder) connect(addr string) error {
 	forwarder.connectedAddr = ""
+	fmt.Println("Raw connecting....")
 	err := forwarder.forwardingClient.RawConnect(func(a ble.Advertisement) bool {
 		return util.AddrEqualAddr(a.Address().String(), addr)
 	})
@@ -243,7 +244,7 @@ func (forwarder *BLEForwarder) isConnected() bool {
 }
 
 func (forwarder *BLEForwarder) isConnectedToServer() bool {
-	return forwarder.connectedAddr == forwarder.serverAddr
+	return util.AddrEqualAddr(forwarder.connectedAddr, forwarder.serverAddr)
 }
 
 func noop() {}
