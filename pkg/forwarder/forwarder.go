@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	scanDuration         = time.Second * 2
 	maxConnectAttempts   = 5
 	errNotConnected      = "Forwarder is not connected"
 	errInvalidForwardReq = "Invalid forwarding request"
@@ -115,24 +116,28 @@ func (forwarder *BLEForwarder) Run() error {
 	return forwarder.forwardingServer.Run()
 }
 
+func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, error) {
+	ret := []ble.Advertisement{}
+	err := forwarder.forwardingClient.RawScanWithDuration(scanDuration, func(a ble.Advertisement) {
+		ret = append(ret, a)
+	})
+	return ret, err
+}
+
 func (forwarder *BLEForwarder) scanLoop() {
-	mutex := &sync.Mutex{}
 	for {
 		time.Sleep(client.ScanInterval)
-		// TODO: fix bug: can't do connection within (at same time) scans
-		// TODO: stop scanning then try connections, then go back to scanning
-		err := forwarder.forwardingClient.RawScan(func(a ble.Advertisement) {
-			mutex.Lock()
+		advs, err := forwarder.collectAdvirtisements()
+		if err != nil {
+			e := errors.Wrap(err, "collectAdvirtisements error")
+			forwarder.listener.OnConnectionError(e)
+		}
+		for _, a := range advs {
 			err := forwarder.onScanned(a)
 			if err != nil {
 				e := errors.Wrap(err, "onScanned error")
 				forwarder.listener.OnError(e)
 			}
-			mutex.Unlock()
-		})
-		if err != nil {
-			e := errors.Wrap(err, "RawScan error")
-			forwarder.listener.OnConnectionError(e)
 		}
 	}
 }

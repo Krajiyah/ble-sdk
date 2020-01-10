@@ -268,7 +268,17 @@ func (client *BLEClient) serverFilter(a ble.Advertisement) bool {
 
 // RawScan exposes underlying BLE scanner
 func (client *BLEClient) RawScan(handle func(ble.Advertisement)) error {
-	return client.bleConnector.Scan(client.ctx, true, handle, nil)
+	return client.scanWithCtx(client.ctx, handle)
+}
+
+// RawScanWithDuration exposes underlying BLE scanner (with timeout)
+func (client *BLEClient) RawScanWithDuration(duration time.Duration, handle func(ble.Advertisement)) error {
+	ctx, _ := context.WithTimeout(context.Background(), duration)
+	return client.scanWithCtx(ctx, handle)
+}
+
+func (client *BLEClient) scanWithCtx(ctx context.Context, handle func(ble.Advertisement)) error {
+	return client.bleConnector.Scan(ctx, true, handle, nil)
 }
 
 func (client *BLEClient) scan() {
