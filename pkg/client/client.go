@@ -22,7 +22,7 @@ const (
 	// ForwardedReadDelay is the delay between start and end read requests
 	ForwardedReadDelay   = time.Millisecond * 500
 	afterConnectionDelay = time.Millisecond * 250
-	maxRetryAttempts     = 10
+	maxRetryAttempts     = 5
 )
 
 type bleConnector interface {
@@ -227,32 +227,23 @@ func (client *BLEClient) writeValue(uuid string, data []byte) error {
 	return nil
 }
 
-func (client *BLEClient) retry(fn func() error) error {
-	err := util.Optimize(fn)
-	attempts := 0
-	for err != nil && attempts < maxRetryAttempts {
-		fmt.Println("RETRYING...")
-		fmt.Println(err)
-		client.connectLoop()
-		err = util.Optimize(fn)
-		attempts += 1
-	}
-	return err
-}
-
 func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error) {
 	var data []byte
-	err := client.retry(func() error {
-		dat, e := (*client.cln).ReadCharacteristic(c)
-		data = dat
-		return e
+	err := retry(func() error {
+		return util.Optimize(func() error {
+			dat, e := (*client.cln).ReadCharacteristic(c)
+			data = dat
+			return e
+		})
 	})
 	return data, err
 }
 
 func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) error {
-	return client.retry(func() error {
-		return (*client.cln).WriteCharacteristic(c, data, true)
+	return retry(func() error {
+		return util.Optimize(func() error {
+			return (*client.cln).WriteCharacteristic(c, data, true)
+		})
 	})
 }
 
@@ -389,14 +380,34 @@ func (client *BLEClient) RawConnect(filter ble.AdvFilter) error {
 	return err
 }
 
+func retry(fn func() error) error {
+	err := errors.New("not error")
+	attempts := 0
+	for err != nil && attempts < maxRetryAttempts {
+		if attempts > 0 {
+			fmt.Printf("Error: %s\n Retrying...\n", err.Error())
+		}
+		err = fn()
+		attempts += 1
+	}
+	return err
+}
+
 func (client *BLEClient) connect() error {
 	serverFilter := client.wrapFilter(client.serverFilter)
 	forwarderFilter := client.wrapFilter(IsForwarder)
-	err := client.RawConnect(serverFilter)
+
+	err := retry(func() error {
+		return client.RawConnect(serverFilter)
+	})
+
 	if err != nil {
-		fmt.Printf("Could not connect to server: %s\nSo now trying to connect to a forwarder.", err.Error())
-		err = errors.Wrap(client.RawConnect(forwarderFilter), err.Error())
+		fmt.Printf("Could not connect to server: %s\nSo now trying to connect to a forwarder.\n", err.Error())
+		err = retry(func() error {
+			return client.RawConnect(forwarderFilter)
+		})
 	}
+
 	return err
 }
 
