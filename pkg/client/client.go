@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"strconv"
+	"sync"
 	"time"
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
@@ -21,6 +22,7 @@ const (
 	// ForwardedReadDelay is the delay between start and end read requests
 	ForwardedReadDelay   = time.Millisecond * 500
 	afterConnectionDelay = time.Millisecond * 250
+	maxRetryAttempts     = 10
 )
 
 type bleConnector interface {
@@ -55,6 +57,7 @@ type BLEClient struct {
 	secret             string
 	status             BLEClientStatus
 	connectionAttempts int
+	connectionMutex    *sync.Mutex
 	timeSync           *util.TimeSync
 	serverAddr         string
 	connectedAddr      string
@@ -71,7 +74,7 @@ type BLEClient struct {
 func newBLEClient(addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) *BLEClient {
 	rm := NewRssiMap()
 	return &BLEClient{
-		addr, secret, Disconnected, 0, nil, serverAddr, "", rm, util.MakeINFContext(), nil,
+		addr, secret, Disconnected, 0, &sync.Mutex{}, nil, serverAddr, "", rm, util.MakeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
 		stdBleConnector{},
 	}
@@ -224,9 +227,22 @@ func (client *BLEClient) writeValue(uuid string, data []byte) error {
 	return nil
 }
 
+func (client *BLEClient) retry(fn func() error) error {
+	err := util.Optimize(fn)
+	attempts := 0
+	for err != nil && attempts < maxRetryAttempts {
+		fmt.Println("RETRYING...")
+		fmt.Println(err)
+		client.connectLoop()
+		err = util.Optimize(fn)
+		attempts += 1
+	}
+	return err
+}
+
 func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error) {
 	var data []byte
-	err := util.Optimize(func() error {
+	err := client.retry(func() error {
 		dat, e := (*client.cln).ReadCharacteristic(c)
 		data = dat
 		return e
@@ -235,7 +251,7 @@ func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error
 }
 
 func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) error {
-	return util.Optimize(func() error {
+	return client.retry(func() error {
 		return (*client.cln).WriteCharacteristic(c, data, true)
 	})
 }
@@ -294,10 +310,12 @@ func (client *BLEClient) scan() {
 }
 
 func (client *BLEClient) connectLoop() {
+	client.connectionMutex.Lock()
 	client.status = Disconnected
 	if client.connectionAttempts > 0 {
 		client.onDisconnected()
 	}
+	client.connectionAttempts = 0
 	err := errors.New("")
 	for err != nil {
 		client.connectionAttempts++
@@ -306,6 +324,7 @@ func (client *BLEClient) connectLoop() {
 	client.status = Connected
 	rssi, _ := client.rssiMap.Get(client.addr, client.connectedAddr)
 	client.onConnected(client.connectedAddr, client.connectionAttempts, rssi)
+	client.connectionMutex.Unlock()
 }
 
 func (client *BLEClient) pingLoop() {
@@ -316,12 +335,10 @@ func (client *BLEClient) pingLoop() {
 		b, _ := req.Data()
 		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {
-			client.connectLoop()
 			continue
 		}
 		initTS, err := client.getUnixTS()
 		if err != nil {
-			client.connectLoop()
 			continue
 		}
 		timeSync := util.NewTimeSync(initTS)
