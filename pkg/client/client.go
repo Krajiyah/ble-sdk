@@ -394,6 +394,7 @@ func (client *BLEClient) connect() error {
 	forwarderFilter := client.wrapFilter(IsForwarder)
 	err := client.RawConnect(serverFilter)
 	if err != nil {
+		fmt.Printf("Could not connect to server: %s\nSo now trying to connect to a forwarder.", err.Error())
 		err = errors.Wrap(client.RawConnect(forwarderFilter), err.Error())
 	}
 	return err
