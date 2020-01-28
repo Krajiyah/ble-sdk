@@ -227,9 +227,20 @@ func (client *BLEClient) writeValue(uuid string, data []byte) error {
 	return nil
 }
 
+func (client *BLEClient) retryReadWrite(logic func() error) error {
+	err := logic()
+	if err != nil {
+		err = retry(func() error {
+			client.connectLoop()
+			return logic()
+		})
+	}
+	return err
+}
+
 func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error) {
 	var data []byte
-	err := retry(func() error {
+	err := client.retryReadWrite(func() error {
 		return util.Optimize(func() error {
 			dat, e := (*client.cln).ReadCharacteristic(c)
 			data = dat
@@ -240,7 +251,7 @@ func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error
 }
 
 func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) error {
-	return retry(func() error {
+	return client.retryReadWrite(func() error {
 		return util.Optimize(func() error {
 			return (*client.cln).WriteCharacteristic(c, data, true)
 		})
