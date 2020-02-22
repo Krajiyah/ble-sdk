@@ -91,7 +91,11 @@ func (server *BLEServer) setStatus(status BLEServerStatus, err error) {
 
 func (server *BLEServer) setClientState(addr string, state BLEClientState) {
 	server.clientStateMap[addr] = state
-	server.connectionGraph.Set(addr, server.addr)
+	if state.Status == Connected {
+		server.connectionGraph.Set(addr, server.addr)
+	} else {
+		server.connectionGraph.Set(addr, "")
+	}
 	server.rssiMap.Merge(NewRssiMapFromRaw(state.RssiMap))
 	server.listener.OnClientStateMapChanged(server.connectionGraph, server.rssiMap, server.clientStateMap)
 }
