@@ -11,6 +11,7 @@ import (
 
 const (
 	serviceName          = "My BLE Server"
+	bluetoothAddress     = "11:11:11:11:11:11"
 	exampleReadCharUUID  = "10010000-0001-1000-8000-00805F9B34FB"
 	exampleWriteCharUUID = "10010000-0001-1000-8000-00805F9B34FB"
 )
@@ -23,8 +24,8 @@ type myServerListener struct{}
 func (l myServerListener) OnServerStatusChanged(s models.BLEServerStatus, err error) {
 	fmt.Println(fmt.Sprintf("Server status changed: %s, Error: %s", s, err))
 }
-func (l myServerListener) OnClientStateMapChanged(m map[string]models.BLEClientState) {
-	fmt.Println(fmt.Sprintf("Client status changed: %+v", m))
+func (l myServerListener) OnClientStateMapChanged(c *models.ConnectionGraph, r *models.RssiMap, m map[string]models.BLEClientState) {
+	fmt.Println(fmt.Sprintf("Client status changed: %+v, %+v, %+v", c, r, m))
 }
 func (l myServerListener) OnClientLog(r models.ClientLogRequest) {
 	fmt.Println(fmt.Sprintf("Client pushed log entry: %+v", r))
@@ -63,7 +64,7 @@ func main() {
 		}},
 	}
 	fmt.Println("Starting BLE server...")
-	serv, err := server.NewBLEServer(serviceName, BLESecret, myServerListener{}, moreReadChars, moreWriteChars)
+	serv, err := server.NewBLEServer(serviceName, BLESecret, bluetoothAddress, myServerListener{}, moreReadChars, moreWriteChars)
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble server: " + err.Error())
 	}

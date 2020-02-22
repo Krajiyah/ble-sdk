@@ -129,6 +129,14 @@ func (client *BLEClient) Log(log ClientLogRequest) error {
 	return client.WriteValue(util.ClientLogUUID, b)
 }
 
+func (client *BLEClient) GetRssiMap() *RssiMap {
+	return client.rssiMap
+}
+
+func (client *BLEClient) GetConnectionGraph() *ConnectionGraph {
+	return NewConnectionGraphFromRaw(map[string]string{client.addr: client.connectedAddr})
+}
+
 func (client *BLEClient) isConnectedToForwarder() bool {
 	return client.connectedAddr != "" && !util.AddrEqualAddr(client.serverAddr, client.connectedAddr)
 }

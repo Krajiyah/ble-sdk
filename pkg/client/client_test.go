@@ -238,6 +238,7 @@ func TestConnectLoop(t *testing.T) {
 	client.connectLoop()
 	assert.Equal(t, attempts, 1)
 	assert.Equal(t, rssi, testRSSI)
+	assert.DeepEqual(t, client.GetConnectionGraph().GetAll(), NewConnectionGraphFromRaw(map[string]string{client.addr: client.serverAddr}).GetAll())
 }
 
 func TestScanLoop(t *testing.T) {
@@ -245,7 +246,7 @@ func TestScanLoop(t *testing.T) {
 	client := getTestClient()
 	go client.scan()
 	time.Sleep(ScanInterval + (ScanInterval / 2))
-	assert.DeepEqual(t, client.rssiMap.GetAll(), testRssiMap.GetAll())
+	assert.DeepEqual(t, client.GetRssiMap().GetAll(), testRssiMap.GetAll())
 }
 
 func TestRun(t *testing.T) {
