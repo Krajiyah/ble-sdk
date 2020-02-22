@@ -39,7 +39,7 @@ type dummyClient struct {
 	addr              string
 	dummyRssiMap      *RssiMap
 	mockedReadValue   *bytes.Buffer
-	mockedWriteBuffer *[]*bytes.Buffer
+	mockedWriteBuffer map[string]*bytes.Buffer
 }
 
 func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
@@ -61,7 +61,7 @@ func (c dummyClient) RawConnect(ble.AdvFilter) error { return nil }
 
 func (c dummyClient) WriteValue(char string, data []byte) error {
 	buf := bytes.NewBuffer(data)
-	*c.mockedWriteBuffer = append(*c.mockedWriteBuffer, buf)
+	c.mockedWriteBuffer[char] = buf
 	return nil
 }
 
@@ -72,12 +72,12 @@ func (s dummyServer) Run() error { return nil }
 type testStructs struct {
 	forwarder         *BLEForwarder
 	mockedReadValue   *bytes.Buffer
-	mockedWriteBuffer *[]*bytes.Buffer
+	mockedWriteBuffer map[string]*bytes.Buffer
 }
 
 func getDummyForwarder(t *testing.T, addr string, rssiMap *RssiMap) *testStructs {
 	mockedReadValue := bytes.NewBuffer([]byte{})
-	mockedWriteBuffer := &[]*bytes.Buffer{}
+	mockedWriteBuffer := map[string]*bytes.Buffer{}
 	f := newBLEForwarder(addr, testServerAddr, dummyListener{})
 	f.forwardingClient = dummyClient{addr, rssiMap, mockedReadValue, mockedWriteBuffer}
 	f.forwardingServer = dummyServer{}
@@ -180,16 +180,14 @@ func TestWriteChar(t *testing.T) {
 	_, writeChars1 := getChars(f1)
 	char1 := writeChars1[0]
 	char1.HandleWrite(clientAddr, data, nil)
-	buffers1 := *mockedWriteBuffer1
-	bufferData1 := buffers1[1].Bytes()
+	bufferData1 := mockedWriteBuffer1[util.WriteForwardCharUUID].Bytes()
 	assert.DeepEqual(t, bufferData1, data)
 
 	// mimic 2nd forwarder passing on data to server and unpacking forwarder request
 	_, writeChars2 := getChars(f2)
 	char2 := writeChars2[0]
 	char2.HandleWrite(testAddr, data, nil)
-	buffers2 := *mockedWriteBuffer2
-	bufferData2 := buffers2[2].Bytes()
+	bufferData2 := mockedWriteBuffer2[util.ClientLogUUID].Bytes()
 	assert.DeepEqual(t, bufferData2, logData)
 }
 
@@ -205,9 +203,9 @@ func TestStartEndReadChars(t *testing.T) {
 	readChars1, writeChars1 := getChars(f1)
 	writeChar1 := writeChars1[1]
 	writeChar1.HandleWrite(clientAddr, data, nil)
-	buffer1 := *mockedWriteBuffer1
+	bufferData1 := mockedWriteBuffer1[util.StartReadForwardCharUUID].Bytes()
 	assert.Check(t, !f1.isConnectedToServer(), "F1 should not be connected to server")
-	assert.DeepEqual(t, buffer1[1].Bytes(), data)
+	assert.DeepEqual(t, bufferData1, data)
 
 	// mimic 2nd forwarder preparing for end read request
 	readChars2, writeChars2 := getChars(f2)
