@@ -181,8 +181,7 @@ func TestWriteChar(t *testing.T) {
 	char1 := writeChars1[0]
 	char1.HandleWrite(clientAddr, data, nil)
 	buffers1 := *mockedWriteBuffer1
-	assert.Equal(t, len(buffers1), 1)
-	bufferData1 := buffers1[0].Bytes()
+	bufferData1 := buffers1[1].Bytes()
 	assert.DeepEqual(t, bufferData1, data)
 
 	// mimic 2nd forwarder passing on data to server and unpacking forwarder request
@@ -190,15 +189,14 @@ func TestWriteChar(t *testing.T) {
 	char2 := writeChars2[0]
 	char2.HandleWrite(testAddr, data, nil)
 	buffers2 := *mockedWriteBuffer2
-	assert.Equal(t, len(buffers2), 1)
-	bufferData2 := buffers2[0].Bytes()
+	bufferData2 := buffers2[2].Bytes()
 	assert.DeepEqual(t, bufferData2, logData)
 }
 
 func TestStartEndReadChars(t *testing.T) {
 	s1, s2 := prepare2ForwarderState(t)
 	f1, mockedReadValue1, mockedWriteBuffer1 := s1.forwarder, s1.mockedReadValue, s1.mockedWriteBuffer
-	f2, mockedReadValue2, mockedWriteBuffer2 := s2.forwarder, s2.mockedReadValue, s2.mockedWriteBuffer
+	f2, mockedReadValue2, _ := s2.forwarder, s2.mockedReadValue, s2.mockedWriteBuffer
 
 	// mimic client write to forwarder (start read request)
 	req := models.ForwarderRequest{util.TimeSyncUUID, nil, true, false}
@@ -209,16 +207,13 @@ func TestStartEndReadChars(t *testing.T) {
 	writeChar1.HandleWrite(clientAddr, data, nil)
 	buffer1 := *mockedWriteBuffer1
 	assert.Check(t, !f1.isConnectedToServer(), "F1 should not be connected to server")
-	assert.Equal(t, len(buffer1), 1)
-	assert.DeepEqual(t, buffer1[0].Bytes(), data)
+	assert.DeepEqual(t, buffer1[1].Bytes(), data)
 
 	// mimic 2nd forwarder preparing for end read request
 	readChars2, writeChars2 := getChars(f2)
 	writeChar2 := writeChars2[1]
 	writeChar2.HandleWrite(testAddr, data, nil)
-	buffer2 := *mockedWriteBuffer2
 	assert.Check(t, f2.isConnectedToServer(), "F2 should be connected to server")
-	assert.Equal(t, len(buffer2), 0)
 
 	// mimic client read from forwarder (end read request)
 	ts := []byte(strconv.FormatInt(util.UnixTS(), 10))
