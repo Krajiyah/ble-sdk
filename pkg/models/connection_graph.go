@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
 	"strings"
 	"sync"
 )
@@ -20,7 +21,11 @@ func NewConnectionGraph() *ConnectionGraph {
 
 // NewConnectionGraphFromRaw will return newly init struct
 func NewConnectionGraphFromRaw(raw map[string]string) *ConnectionGraph {
-	return &ConnectionGraph{data: raw, mutex: sync.RWMutex{}}
+	cg := NewConnectionGraph()
+	for src, dst := range raw {
+		cg.Set(src, dst)
+	}
+	return cg
 }
 
 // Data will return serialized form of struct as bytes
@@ -57,6 +62,12 @@ func (cg *ConnectionGraph) Merge(o *ConnectionGraph) {
 		val, _ := o.Get(addr)
 		cg.Set(addr, val)
 	}
+}
+
+// String returns json string of data
+func (cg *ConnectionGraph) String() string {
+	b, _ := json.Marshal(cg.GetAll())
+	return string(b)
 }
 
 // GetConnectionGraphFromBytes constructs the map from bytes
