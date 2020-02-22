@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Krajiyah/ble-sdk/pkg/models"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/currantlabs/ble"
@@ -25,34 +24,38 @@ type BLEServerInt interface {
 // BLEServer is the struct used for instantiating a ble server
 type BLEServer struct {
 	name             string
+	addr             string
 	secret           string
 	status           BLEServerStatus
+	connectionGraph  *ConnectionGraph
+	rssiMap          *RssiMap
 	clientStateMap   map[string]BLEClientState
 	packetAggregator util.PacketAggregator
 	listener         BLEServerStatusListener
 }
 
 // NewBLEServer creates a new BLEService
-func NewBLEServer(name string, secret string, listener BLEServerStatusListener,
+func NewBLEServer(name string, addr string, secret string, listener BLEServerStatusListener,
 	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, error) {
 	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
 	}
-	return NewBLEServerSharedDevice(d, name, secret, listener, moreReadChars, moreWriteChars)
+	return NewBLEServerSharedDevice(d, name, addr, secret, listener, moreReadChars, moreWriteChars)
 }
 
-func newBLEServer(name string, secret string, listener BLEServerStatusListener) *BLEServer {
+func newBLEServer(name string, addr string, secret string, listener BLEServerStatusListener) *BLEServer {
 	return &BLEServer{
-		name, secret, Running,
+		name, addr, secret, Running,
+		NewConnectionGraph(), NewRssiMap(),
 		map[string]BLEClientState{}, util.NewPacketAggregator(), listener,
 	}
 }
 
 // NewBLEServerSharedDevice creates a new BLEService using shared ble device
-func NewBLEServerSharedDevice(device ble.Device, name string, secret string, listener BLEServerStatusListener,
+func NewBLEServerSharedDevice(device ble.Device, name string, addr string, secret string, listener BLEServerStatusListener,
 	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, error) {
-	server := newBLEServer(name, secret, listener)
+	server := newBLEServer(name, addr, secret, listener)
 	ble.SetDefaultDevice(device)
 	err := ble.AddService(getService(server, moreReadChars, moreWriteChars))
 	if err != nil {
@@ -74,15 +77,11 @@ func (server *BLEServer) Run() error {
 
 // GetRssiMap returns the current state of the network from server perspective
 func (server *BLEServer) GetRssiMap() *RssiMap {
-	ret := models.NewRssiMap()
-	for addr := range server.clientStateMap {
-		for a := range server.clientStateMap[addr].RssiMap {
-			for b := range server.clientStateMap[addr].RssiMap[a] {
-				ret.Set(a, b, server.clientStateMap[addr].RssiMap[a][b])
-			}
-		}
-	}
-	return ret
+	return server.rssiMap
+}
+
+func (server *BLEServer) GetConnectionGraph() *ConnectionGraph {
+	return server.connectionGraph
 }
 
 func (server *BLEServer) setStatus(status BLEServerStatus, err error) {
@@ -92,7 +91,13 @@ func (server *BLEServer) setStatus(status BLEServerStatus, err error) {
 
 func (server *BLEServer) setClientState(addr string, state BLEClientState) {
 	server.clientStateMap[addr] = state
-	server.listener.OnClientStateMapChanged(server.clientStateMap)
+	if state.Status == Connected {
+		server.connectionGraph.Set(addr, server.addr)
+	} else {
+		server.connectionGraph.Set(addr, "")
+	}
+	server.rssiMap.Merge(NewRssiMapFromRaw(state.RssiMap))
+	server.listener.OnClientStateMapChanged(server.connectionGraph, server.rssiMap, server.clientStateMap)
 }
 
 func getService(server *BLEServer, moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) *ble.Service {

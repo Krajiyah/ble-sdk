@@ -62,9 +62,10 @@ type forwarderServerListener struct {
 	listener models.BLEForwarderListener
 }
 
-func (l *forwarderServerListener) OnClientStateMapChanged(map[string]models.BLEClientState) {}
-func (l *forwarderServerListener) OnClientLog(models.ClientLogRequest)                      {}
-func (l *forwarderServerListener) OnReadOrWriteError(err error)                             { l.listener.OnReadOrWriteError(err) }
+func (l *forwarderServerListener) OnClientStateMapChanged(*models.ConnectionGraph, *models.RssiMap, map[string]models.BLEClientState) {
+}
+func (l *forwarderServerListener) OnClientLog(models.ClientLogRequest) {}
+func (l *forwarderServerListener) OnReadOrWriteError(err error)        { l.listener.OnReadOrWriteError(err) }
 func (l *forwarderServerListener) OnServerStatusChanged(s models.BLEServerStatus, err error) {
 	l.listener.OnServerStatusChanged(s, err)
 }
@@ -77,7 +78,7 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 	}
 	f := newBLEForwarder(addr, serverAddr, listener)
 	readChars, writeChars := getChars(f)
-	serv, err := server.NewBLEServerSharedDevice(d, name, secret, &forwarderServerListener{listener: listener}, readChars, writeChars)
+	serv, err := server.NewBLEServerSharedDevice(d, name, addr, secret, &forwarderServerListener{listener: listener}, readChars, writeChars)
 	if err != nil {
 		return nil, err
 	}

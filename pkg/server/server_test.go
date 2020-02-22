@@ -21,9 +21,11 @@ type testBLEServerStatusListener struct{}
 func (l testBLEServerStatusListener) OnServerStatusChanged(s BLEServerStatus, err error) {
 	errs = append(errs, err)
 }
-func (l testBLEServerStatusListener) OnClientStateMapChanged(m map[string]BLEClientState) { state = m }
-func (l testBLEServerStatusListener) OnClientLog(r ClientLogRequest)                      { logs = append(logs, r) }
-func (l testBLEServerStatusListener) OnReadOrWriteError(err error)                        { errs = append(errs, err) }
+func (l testBLEServerStatusListener) OnClientStateMapChanged(c *ConnectionGraph, r *RssiMap, m map[string]BLEClientState) {
+	state = m
+}
+func (l testBLEServerStatusListener) OnClientLog(r ClientLogRequest) { logs = append(logs, r) }
+func (l testBLEServerStatusListener) OnReadOrWriteError(err error)   { errs = append(errs, err) }
 
 func assertSimilar(t *testing.T, x int64, y int64) {
 	diff := x - y
@@ -34,7 +36,7 @@ func assertSimilar(t *testing.T, x int64, y int64) {
 }
 
 func getTestServer() *BLEServer {
-	return newBLEServer("SomeName", "passwd123", testBLEServerStatusListener{})
+	return newBLEServer("SomeName", "someAddr", "passwd123", testBLEServerStatusListener{})
 }
 
 func dummyReadChar() *BLEReadCharacteristic {
@@ -115,6 +117,8 @@ func TestClientStatusChar(t *testing.T) {
 	assert.Equal(t, server.clientStateMap[addr].Status, Connected)
 	stateMap := server.clientStateMap[addr].RssiMap
 	assert.DeepEqual(t, stateMap, m.GetAll())
+	assert.DeepEqual(t, server.GetRssiMap().GetAll(), m.GetAll())
+	assert.DeepEqual(t, server.GetConnectionGraph().GetAll(), NewConnectionGraphFromRaw(map[string]string{addr: server.addr}).GetAll())
 	time.Sleep(PollingInterval * 3)
 	stateMap = server.clientStateMap[addr].RssiMap
 	assert.Equal(t, server.clientStateMap[addr].Status, Disconnected)
