@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
 	"strings"
 	"sync"
 )
@@ -20,7 +21,13 @@ func NewRssiMap() *RssiMap {
 
 // NewRssiMapFromRaw will return newly init struct
 func NewRssiMapFromRaw(raw map[string]map[string]int) *RssiMap {
-	return &RssiMap{data: raw, mutex: sync.RWMutex{}}
+	rm := NewRssiMap()
+	for src, f := range raw {
+		for dst, rssi := range f {
+			rm.Set(src, dst, rssi)
+		}
+	}
+	return rm
 }
 
 // Data will return serialized form of struct as bytes
@@ -66,6 +73,12 @@ func (rm *RssiMap) Merge(o *RssiMap) {
 			rm.Set(addr, nestedAddr, val)
 		}
 	}
+}
+
+// String returns json string of data
+func (rm *RssiMap) String() string {
+	b, _ := json.Marshal(rm.GetAll())
+	return string(b)
 }
 
 // GetRssiMapFromBytes constructs client state request from characteristic write payload
