@@ -171,17 +171,28 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 		err = wrapError(err, e)
 	}
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
-		r := models.ClientStateRequest{Addr: forwarder.addr, ConnectedAddr: addr, RssiMap: forwarder.rssiMap.GetAll()}
-		data, e := r.Data()
+		err = forwarder.updateClientState()
+		e := forwarder.reconnect()
 		err = wrapError(err, e)
-		er := forwarder.forwardingClient.WriteValue(util.ClientStateUUID, data)
-		err = wrapError(err, er)
 	}
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) || isF {
 		e := forwarder.refreshShortestPath()
 		err = wrapError(err, e)
 	}
 	return err
+}
+
+func (forwarder *BLEForwarder) updateClientState() error {
+	err := forwarder.keepTryConnect(forwarder.serverAddr)
+	if err != nil {
+		return err
+	}
+	r := models.ClientStateRequest{Addr: forwarder.addr, ConnectedAddr: forwarder.serverAddr, RssiMap: forwarder.rssiMap.GetAll()}
+	data, err := r.Data()
+	if err != nil {
+		return err
+	}
+	return forwarder.forwardingClient.WriteValue(util.ClientStateUUID, data)
 }
 
 func (forwarder *BLEForwarder) updateNetworkState(addr string) error {
