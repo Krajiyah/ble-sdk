@@ -375,10 +375,12 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 	}
 	for _, s := range p.Services {
 		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
+			fmt.Println("Found main service!")
 			for _, c := range s.Characteristics {
 				uuid := util.UuidToStr(c.UUID)
 				client.characteristics[uuid] = c
 			}
+			fmt.Printf("Got chars: %v\n", client.characteristics)
 			break
 		}
 	}
