@@ -435,7 +435,6 @@ func (client *BLEClient) connect() error {
 
 func (client *BLEClient) getCharacteristic(uuid string) (*ble.Characteristic, error) {
 	if c, ok := client.characteristics[uuid]; ok {
-		fmt.Printf("Found char: %s in %v\n", uuid, client.characteristics)
 		return c, nil
 	}
 	return nil, fmt.Errorf("No such uuid (%s) in characteristics (%v) advertised from server.", uuid, client.characteristics)
