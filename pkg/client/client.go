@@ -412,7 +412,11 @@ func retry(fn func() error) error {
 		err = fn()
 		attempts += 1
 	}
-	return err
+	if err != nil {
+		fmt.Println("Exceeded connection attempts, and could not connect :(")
+		return err
+	}
+	return nil
 }
 
 func (client *BLEClient) connect() error {
