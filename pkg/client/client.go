@@ -197,6 +197,7 @@ func (client *BLEClient) WriteValue(uuid string, data []byte) error {
 	if !client.isConnectedToForwarder() || isForwardedWrite(uuid, data) {
 		return client.writeValue(uuid, data)
 	}
+	fmt.Println("Forwarding...")
 	req := ForwarderRequest{uuid, data, false, true}
 	payload, err := req.Data()
 	if err != nil {
