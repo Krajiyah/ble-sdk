@@ -169,9 +169,7 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if err != nil {
 		return err
 	}
-	if forwarder.toConnectAddr != "" && !util.AddrEqualAddr(forwarder.toConnectAddr, addr) {
-		err = forwarder.keepTryConnect(forwarder.toConnectAddr)
-	}
+	err = forwarder.keepTryConnect(forwarder.toConnectAddr)
 	if err != nil {
 		return err
 	}
@@ -219,15 +217,16 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 		return fmt.Errorf("Invalid path to server: %s", path)
 	}
 	nextHop := path[1]
-	if !util.AddrEqualAddr(forwarder.toConnectAddr, nextHop) {
-		forwarder.toConnectAddr = nextHop
-		err = forwarder.keepTryConnect(nextHop)
-	}
+	forwarder.toConnectAddr = nextHop
+	err = forwarder.keepTryConnect(nextHop)
 	return err
 }
 
 func (forwarder *BLEForwarder) keepTryConnect(addr string) error {
-	fmt.Println("Connecting to " + addr)
+	if addr == "" || util.AddrEqualAddr(addr, forwarder.connectedAddr) {
+		return nil
+	}
+	fmt.Println("Connecting...")
 	err := errors.New("")
 	attempts := 0
 	rssi := 0
