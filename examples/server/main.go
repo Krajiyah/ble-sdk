@@ -10,11 +10,13 @@ import (
 )
 
 const (
-	serviceName          = "My BLE Server"
 	bluetoothAddress     = "11:11:11:11:11:11"
 	exampleReadCharUUID  = "10010000-0001-1000-8000-00805F9B34FB"
 	exampleWriteCharUUID = "10010000-0001-1000-8000-00805F9B34FB"
 )
+
+// Name is a compile time var (ldflag)
+var Name string
 
 // BLESecret is a compile time var (ldflag)
 var BLESecret string
@@ -64,7 +66,7 @@ func main() {
 		}},
 	}
 	fmt.Println("Starting BLE server...")
-	serv, err := server.NewBLEServer(serviceName, BLESecret, bluetoothAddress, myServerListener{}, moreReadChars, moreWriteChars)
+	serv, err := server.NewBLEServer(Name, BLESecret, bluetoothAddress, myServerListener{}, moreReadChars, moreWriteChars)
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble server: " + err.Error())
 	}

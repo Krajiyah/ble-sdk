@@ -13,6 +13,8 @@ const (
 )
 
 var (
+	// Name is a compile time var (ldflag)
+	Name string
 	// BLESecret is a compile time var (ldflag)
 	BLESecret string
 	// BLEClientAddr is a compile time var (ldflag)
@@ -22,12 +24,12 @@ var (
 )
 
 func main() {
-	if BLESecret == "" || BLEClientAddr == "" || BLEServerAddr == "" {
+	if Name == "" || BLESecret == "" || BLEClientAddr == "" || BLEServerAddr == "" {
 		fmt.Println("please compile this with BLESecret, BLEClientAddr, and BLEServerAddr as ldflag")
 		return
 	}
 	var clien *client.BLEClient
-	clien, err := client.NewBLEClient(BLEClientAddr, BLESecret, BLEServerAddr, func(addr string, attempts int, rssi int) {
+	clien, err := client.NewBLEClient(Name, BLEClientAddr, BLESecret, BLEServerAddr, func(addr string, attempts int, rssi int) {
 		fmt.Printf("Client connected to server (%s) after %d attempts with rssi %d", addr, attempts, rssi)
 		for {
 			time.Sleep(time.Second * 1)
