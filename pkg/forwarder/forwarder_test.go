@@ -84,7 +84,7 @@ type testStructs struct {
 func getDummyForwarder(t *testing.T, addr string, rssiMap *RssiMap) *testStructs {
 	mockedReadValue := map[string]*bytes.Buffer{}
 	mockedWriteBuffer := map[string]*bytes.Buffer{}
-	f := newBLEForwarder(addr, testServerAddr, dummyListener{})
+	f := newBLEForwarder("some name", addr, testServerAddr, dummyListener{})
 	f.forwardingClient = dummyClient{addr, rssiMap, mockedReadValue, mockedWriteBuffer}
 	f.forwardingServer = dummyServer{}
 	return &testStructs{f, mockedReadValue, mockedWriteBuffer}

@@ -25,6 +25,7 @@ const (
 
 // BLEForwarder is a struct used to handle mesh network behaviors for forwarder
 type BLEForwarder struct {
+	name              string
 	addr              string
 	forwardingServer  server.BLEServerInt
 	forwardingClient  client.BLEClientInt
@@ -38,9 +39,9 @@ type BLEForwarder struct {
 	listener          models.BLEForwarderListener
 }
 
-func newBLEForwarder(addr, serverAddr string, listener models.BLEForwarderListener) *BLEForwarder {
+func newBLEForwarder(name, addr, serverAddr string, listener models.BLEForwarderListener) *BLEForwarder {
 	return &BLEForwarder{
-		addr, nil, nil,
+		name, addr, nil, nil,
 		serverAddr, "", "",
 		models.NewRssiMap(), models.NewConnectionGraph(),
 		&sync.Mutex{}, "",
@@ -76,7 +77,7 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 	if err != nil {
 		return nil, err
 	}
-	f := newBLEForwarder(addr, serverAddr, listener)
+	f := newBLEForwarder(name, addr, serverAddr, listener)
 	readChars, writeChars := getChars(f)
 	serv, err := server.NewBLEServerSharedDevice(d, name, addr, secret, &forwarderServerListener{listener: listener}, readChars, writeChars)
 	if err != nil {
@@ -176,7 +177,7 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 }
 
 func (forwarder *BLEForwarder) updateClientState() error {
-	r := models.ClientStateRequest{Addr: forwarder.addr, ConnectedAddr: forwarder.serverAddr, RssiMap: forwarder.rssiMap.GetAll()}
+	r := models.ClientStateRequest{Name: forwarder.name, Addr: forwarder.addr, ConnectedAddr: forwarder.serverAddr, RssiMap: forwarder.rssiMap.GetAll()}
 	data, err := r.Data()
 	if err != nil {
 		return err
