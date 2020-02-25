@@ -10,8 +10,9 @@ type BLEServerStatusListener interface {
 
 // BLEForwarderListener is an struct which can be used to implement custom state change listeners for forwarders
 type BLEForwarderListener interface {
-	OnClientConnected(string, int, int)
-	OnClientDisconnected()
+	OnConnected(string, int, int)
+	OnDisconnected()
+	OnTimeSync()
 	OnServerStatusChanged(BLEServerStatus, error)
 	OnConnectionError(error)
 	OnReadOrWriteError(error)
