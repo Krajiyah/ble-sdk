@@ -153,8 +153,7 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	rssi := a.RSSI()
 	addr := a.Address().String()
 	forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
-	isF := client.IsForwarder(a)
-	if !isF {
+	if !client.IsForwarder(a) {
 		return nil
 	}
 	err := forwarder.keepTryConnect(addr)
@@ -185,7 +184,7 @@ func (forwarder *BLEForwarder) updateClientState() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Writing to " + forwarder.serverAddr)
+	fmt.Println("Writing to " + forwarder.connectedAddr)
 	return forwarder.forwardingClient.WriteValue(util.ClientStateUUID, data)
 }
 
@@ -228,6 +227,7 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 }
 
 func (forwarder *BLEForwarder) keepTryConnect(addr string) error {
+	fmt.Println("Connecting to " + addr)
 	err := errors.New("")
 	attempts := 0
 	rssi := 0
