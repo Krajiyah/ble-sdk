@@ -341,6 +341,7 @@ func (client *BLEClient) connectLoop() {
 func (client *BLEClient) pingLoop() {
 	for {
 		time.Sleep(PingInterval)
+		fmt.Println("Calling ping...")
 		if client.status != Connected {
 			fmt.Println("Not connected skipping...")
 			continue
@@ -360,6 +361,7 @@ func (client *BLEClient) pingLoop() {
 		}
 		timeSync := util.NewTimeSync(initTS)
 		client.timeSync = &timeSync
+		fmt.Println("Finished ping..")
 	}
 }
 
