@@ -53,6 +53,7 @@ type BLEClientInt interface {
 
 // BLEClient is a struct used to handle client connection to BLEServer
 type BLEClient struct {
+	name               string
 	addr               string
 	secret             string
 	status             BLEClientStatus
@@ -71,28 +72,28 @@ type BLEClient struct {
 	bleConnector       bleConnector
 }
 
-func newBLEClient(addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) *BLEClient {
+func newBLEClient(name string, addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) *BLEClient {
 	rm := NewRssiMap()
 	return &BLEClient{
-		addr, secret, Disconnected, 0, &sync.Mutex{}, nil, serverAddr, "", rm, util.MakeINFContext(), nil,
+		name, addr, secret, Disconnected, 0, &sync.Mutex{}, nil, serverAddr, "", rm, util.MakeINFContext(), nil,
 		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
 		stdBleConnector{},
 	}
 }
 
 // NewBLEClient is a function that creates a new ble client
-func NewBLEClient(addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
+func NewBLEClient(name string, addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
 	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
 	}
-	return NewBLEClientSharedDevice(d, addr, secret, serverAddr, onConnected, onDisconnected)
+	return NewBLEClientSharedDevice(d, name, addr, secret, serverAddr, onConnected, onDisconnected)
 }
 
 // NewBLEClientSharedDevice is a function that creates a new ble client
-func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
+func NewBLEClientSharedDevice(device ble.Device, name string, addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
 	ble.SetDefaultDevice(device)
-	return newBLEClient(addr, secret, serverAddr, onConnected, onDisconnected), nil
+	return newBLEClient(name, addr, secret, serverAddr, onConnected, onDisconnected), nil
 }
 
 // Run is a method that runs the connection from client to service
@@ -344,7 +345,7 @@ func (client *BLEClient) pingLoop() {
 			continue
 		}
 		m := client.rssiMap.GetAll()
-		req := &ClientStateRequest{Addr: client.addr, ConnectedAddr: client.connectedAddr, RssiMap: m}
+		req := &ClientStateRequest{Name: client.name, Addr: client.addr, ConnectedAddr: client.connectedAddr, RssiMap: m}
 		b, _ := req.Data()
 		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {

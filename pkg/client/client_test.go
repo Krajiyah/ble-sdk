@@ -135,7 +135,7 @@ func dummyOnConnected(_ string, a int, r int) {
 func dummyOnDisconnected() {}
 
 func getTestClient() *BLEClient {
-	client := newBLEClient(testAddr, testSecret, testServerAddr, dummyOnConnected, dummyOnDisconnected)
+	client := newBLEClient("some name", testAddr, testSecret, testServerAddr, dummyOnConnected, dummyOnDisconnected)
 	client.bleConnector = testBleConnector{testAddr, testRssiMap}
 	return client
 }

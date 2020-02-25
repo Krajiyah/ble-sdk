@@ -82,7 +82,7 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 	if err != nil {
 		return nil, err
 	}
-	clien, err := client.NewBLEClientSharedDevice(d, addr, secret, serverAddr, listener.OnClientConnected, f.listener.OnClientDisconnected)
+	clien, err := client.NewBLEClientSharedDevice(d, name, addr, secret, serverAddr, listener.OnClientConnected, f.listener.OnClientDisconnected)
 	if err != nil {
 		return nil, err
 	}
