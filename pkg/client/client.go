@@ -197,7 +197,6 @@ func (client *BLEClient) WriteValue(uuid string, data []byte) error {
 	if !client.isConnectedToForwarder() || isForwardedWrite(uuid, data) {
 		return client.writeValue(uuid, data)
 	}
-	fmt.Println("Forwarding...")
 	req := ForwarderRequest{uuid, data, false, true}
 	payload, err := req.Data()
 	if err != nil {
@@ -343,6 +342,7 @@ func (client *BLEClient) pingLoop() {
 	for {
 		time.Sleep(PingInterval)
 		if client.status != Connected {
+			fmt.Println("Not connected skipping...")
 			continue
 		}
 		m := client.rssiMap.GetAll()
@@ -350,10 +350,12 @@ func (client *BLEClient) pingLoop() {
 		b, _ := req.Data()
 		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {
+			fmt.Println("Error write client state: " + err.Error())
 			continue
 		}
 		initTS, err := client.getUnixTS()
 		if err != nil {
+			fmt.Println("Error read unix TS: " + err.Error())
 			continue
 		}
 		timeSync := util.NewTimeSync(initTS)
