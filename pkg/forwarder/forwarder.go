@@ -185,11 +185,13 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 func (forwarder *BLEForwarder) updateClientState() error {
 	err := forwarder.keepTryConnect(forwarder.serverAddr)
 	if err != nil {
+		fmt.Println("Could not connect to server :(")
 		return err
 	}
 	r := models.ClientStateRequest{Addr: forwarder.addr, ConnectedAddr: forwarder.serverAddr, RssiMap: forwarder.rssiMap.GetAll()}
 	data, err := r.Data()
 	if err != nil {
+		fmt.Println("Could not encode req")
 		return err
 	}
 	return forwarder.forwardingClient.WriteValue(util.ClientStateUUID, data)
