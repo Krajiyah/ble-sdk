@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -128,7 +127,6 @@ func getService(server *BLEServer, moreReadChars []*BLEReadCharacteristic, moreW
 func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 	lastHeard := map[string]int64{}
 	return &BLEWriteCharacteristic{util.ClientStateUUID, func(a string, data []byte, err error) {
-		fmt.Println("Called by " + a)
 		if err != nil {
 			server.listener.OnReadOrWriteError(err)
 			return
