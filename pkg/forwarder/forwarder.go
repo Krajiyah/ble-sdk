@@ -149,16 +149,6 @@ func (forwarder *BLEForwarder) scanLoop() {
 	}
 }
 
-func wrapError(e1, e2 error) error {
-	if e1 == nil {
-		return e2
-	}
-	if e2 == nil {
-		return e1
-	}
-	return errors.Wrap(e1, e2.Error())
-}
-
 func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	rssi := a.RSSI()
 	addr := a.Address().String()
@@ -167,30 +157,23 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if !isF {
 		return nil
 	}
-	var err error
-	if !util.AddrEqualAddr(addr, forwarder.serverAddr) {
-		e := forwarder.updateNetworkState(addr)
-		err = wrapError(err, e)
-		e = forwarder.reconnect()
-		err = wrapError(err, e)
-	}
-	e := forwarder.refreshShortestPath()
-	err = wrapError(err, e)
-	if util.AddrEqualAddr(forwarder.connectedAddr, forwarder.serverAddr) {
-		fmt.Println("Updating client state")
-		e := forwarder.updateClientState()
-		err = wrapError(err, e)
-		e = forwarder.reconnect()
-		err = wrapError(err, e)
-	}
-	return err
-}
-
-func (forwarder *BLEForwarder) updateClientState() error {
-	err := forwarder.keepTryConnect(forwarder.serverAddr)
+	err := forwarder.keepTryConnect(addr)
 	if err != nil {
 		return err
 	}
+	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
+		fmt.Println("Updating client state")
+		err = forwarder.updateClientState()
+	} else {
+		err = forwarder.updateNetworkState(addr)
+	}
+	if err != nil {
+		return err
+	}
+	return forwarder.refreshShortestPath()
+}
+
+func (forwarder *BLEForwarder) updateClientState() error {
 	r := models.ClientStateRequest{Addr: forwarder.addr, ConnectedAddr: forwarder.serverAddr, RssiMap: forwarder.rssiMap.GetAll()}
 	data, err := r.Data()
 	if err != nil {
@@ -201,10 +184,6 @@ func (forwarder *BLEForwarder) updateClientState() error {
 }
 
 func (forwarder *BLEForwarder) updateNetworkState(addr string) error {
-	err := forwarder.keepTryConnect(addr)
-	if err != nil {
-		return err
-	}
 	data, err := forwarder.forwardingClient.ReadValue(util.ReadRssiMapCharUUID)
 	if err != nil {
 		return err
@@ -224,13 +203,6 @@ func (forwarder *BLEForwarder) updateNetworkState(addr string) error {
 	}
 	forwarder.connectionGraph.Merge(connectionGraph)
 	return nil
-}
-
-func (forwarder *BLEForwarder) reconnect() error {
-	if forwarder.toConnectAddr == "" {
-		return nil
-	}
-	return forwarder.keepTryConnect(forwarder.toConnectAddr)
 }
 
 func (forwarder *BLEForwarder) refreshShortestPath() error {
