@@ -377,6 +377,7 @@ func (client *BLEClient) syncTime() error {
 	}
 	timeSync := util.NewTimeSync(initTS)
 	client.timeSync = &timeSync
+	client.listener.OnTimeSync()
 	return nil
 }
 
