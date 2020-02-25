@@ -92,7 +92,7 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 }
 
 // GetRssiMap returns underlying data for rssi map
-func (forwarder *BLEForwarder) GetRssiMap() map[string]map[string]int {
+func (forwarder *BLEForwarder) GetRssiMap() models.RssiMapData {
 	return forwarder.rssiMap.GetAll()
 }
 

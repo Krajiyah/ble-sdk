@@ -11,7 +11,7 @@ func TestShortestPathCase1(t *testing.T) {
 	dst := "B"
 	middle := "C"
 	rssiMap := map[string]map[string]int{
-		src: map[string]int{
+		src: {
 			dst:    3,
 			middle: 2,
 		},

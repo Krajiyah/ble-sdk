@@ -24,7 +24,7 @@ type ClientStateRequest struct {
 	Name          string
 	Addr          string
 	ConnectedAddr string
-	RssiMap       map[string]map[string]int
+	RssiMap       RssiMapData
 }
 
 // ClientLogRequest is the payload for the equivalent write characteristic

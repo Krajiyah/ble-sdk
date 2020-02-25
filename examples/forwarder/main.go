@@ -26,8 +26,9 @@ func (l myListener) OnClientLog(r models.ClientLogRequest)                      
 func (l myListener) OnConnectionError(err error)                                {}
 func (l myListener) OnReadOrWriteError(err error)                               {}
 func (l myListener) OnError(err error)                                          {}
-func (l myListener) OnClientConnected(addr string, attempts int, rssi int)      {}
-func (l myListener) OnClientDisconnected()                                      {}
+func (l myListener) OnConnected(addr string, attempts int, rssi int)            {}
+func (l myListener) OnDisconnected()                                            {}
+func (l myListener) OnTimeSync()                                                {}
 
 func main() {
 	if Name == "" || BLESecret == "" || BLEForwarderAddr == "" || BLEServerAddr == "" {
