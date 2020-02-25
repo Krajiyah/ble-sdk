@@ -44,7 +44,7 @@ type dummyClient struct {
 
 func (c dummyClient) RawScan(f func(ble.Advertisement)) error {
 	for k, v := range c.dummyRssiMap.GetAll()[c.addr] {
-		f(DummyAdv{DummyAddr{k}, v})
+		f(DummyAdv{DummyAddr{k}, v, util.AddrEqualAddr(k, clientAddr)})
 	}
 	return nil
 }
@@ -104,7 +104,7 @@ func mockReadBuffer(t *testing.T, rssiMap *RssiMap, buffer *bytes.Buffer) {
 
 func scan(f *BLEForwarder, rssiMap *RssiMap, addr string) {
 	for k, v := range rssiMap.GetAll()[addr] {
-		f.onScanned(DummyAdv{DummyAddr{k}, v})
+		f.onScanned(DummyAdv{DummyAddr{k}, v, util.AddrEqualAddr(k, clientAddr)})
 	}
 }
 
@@ -117,6 +117,8 @@ func TestDoubleForwarder(t *testing.T) {
 	s2 := getDummyForwarder(t, testAddr2, expectedRssiMap)
 	f1, mockedReadValue1 := s1.forwarder, s1.mockedReadValue
 	f2, mockedReadValue2 := s2.forwarder, s2.mockedReadValue
+	mockReadBuffer(t, &RssiMap{}, mockedReadValue2)
+	mockReadBuffer(t, &RssiMap{}, mockedReadValue1)
 	scan(f1, expectedRssiMap, testAddr)
 	scan(f2, expectedRssiMap, testAddr2)
 	mockReadBuffer(t, f1.rssiMap, mockedReadValue2)

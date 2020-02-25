@@ -110,12 +110,12 @@ func (bc testBleConnector) filter(fn func(addr string, rssi int)) {
 }
 
 func (bc testBleConnector) Connect(_ context.Context, f ble.AdvFilter) (ble.Client, error) {
-	bc.filter(func(addr string, rssi int) { f(DummyAdv{DummyAddr{addr}, rssi}) })
+	bc.filter(func(addr string, rssi int) { f(DummyAdv{DummyAddr{addr}, rssi, false}) })
 	return newDummyCoreClient(testAddr), nil
 }
 
 func (bc testBleConnector) Scan(_ context.Context, _ bool, h ble.AdvHandler, _ ble.AdvFilter) error {
-	bc.filter(func(addr string, rssi int) { h(DummyAdv{DummyAddr{addr}, rssi}) })
+	bc.filter(func(addr string, rssi int) { h(DummyAdv{DummyAddr{addr}, rssi, false}) })
 	return nil
 }
 
@@ -156,7 +156,7 @@ func getDummyClient(connectedAddr string) (*BLEClient, *dummyCoreClient) {
 }
 
 func TestIsForwarder(t *testing.T) {
-	assert.Equal(t, IsForwarder(DummyAdv{DummyAddr{testServerAddr}, testRSSI}), true)
+	assert.Equal(t, IsForwarder(DummyAdv{DummyAddr{testServerAddr}, testRSSI, false}), true)
 }
 
 func mockUnixTS(t *testing.T, buffer *bytes.Buffer) int64 {

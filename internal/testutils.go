@@ -6,8 +6,9 @@ import (
 )
 
 type DummyAdv struct {
-	Addr ble.Addr
-	Rssi int
+	Addr       ble.Addr
+	Rssi       int
+	NonService bool
 }
 
 type DummyAddr struct {
@@ -20,6 +21,9 @@ func (a DummyAdv) LocalName() string              { return "" }
 func (a DummyAdv) ManufacturerData() []byte       { return nil }
 func (a DummyAdv) ServiceData() []ble.ServiceData { return nil }
 func (a DummyAdv) Services() []ble.UUID {
+	if a.NonService {
+		return nil
+	}
 	return GetTestServiceUUIDs()
 }
 func (a DummyAdv) OverflowService() []ble.UUID  { return nil }

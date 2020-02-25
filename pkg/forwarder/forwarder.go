@@ -170,6 +170,12 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if err != nil {
 		return err
 	}
+	if forwarder.toConnectAddr != "" && !util.AddrEqualAddr(forwarder.toConnectAddr, addr) {
+		err = forwarder.keepTryConnect(forwarder.toConnectAddr)
+	}
+	if err != nil {
+		return err
+	}
 	return forwarder.refreshShortestPath()
 }
 
