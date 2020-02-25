@@ -51,48 +51,55 @@ type BLEClientInt interface {
 	WriteValue(string, []byte) error
 }
 
-// BLEClient is a struct used to handle client connection to BLEServer
-type BLEClient struct {
-	addr               string
-	secret             string
-	status             BLEClientStatus
-	connectionAttempts int
-	connectionMutex    *sync.Mutex
-	timeSync           *util.TimeSync
-	serverAddr         string
-	connectedAddr      string
-	rssiMap            *RssiMap
-	ctx                context.Context
-	cln                *ble.Client
-	characteristics    map[string]*ble.Characteristic
-	packetAggregator   util.PacketAggregator
-	onConnected        func(string, int, int)
-	onDisconnected     func()
-	bleConnector       bleConnector
+type BLEClientListener interface {
+	OnConnected(string, int, int)
+	OnDisconnected()
+	OnTimeSync()
 }
 
-func newBLEClient(addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) *BLEClient {
+// BLEClient is a struct used to handle client connection to BLEServer
+type BLEClient struct {
+	name                string
+	addr                string
+	secret              string
+	status              BLEClientStatus
+	connectionAttempts  int
+	connectionLoopMutex *sync.Mutex
+	connectMutex        *sync.Mutex
+	timeSync            *util.TimeSync
+	serverAddr          string
+	connectedAddr       string
+	rssiMap             *RssiMap
+	ctx                 context.Context
+	cln                 *ble.Client
+	characteristics     map[string]*ble.Characteristic
+	packetAggregator    util.PacketAggregator
+	listener            BLEClientListener
+	bleConnector        bleConnector
+}
+
+func newBLEClient(name string, addr string, secret string, serverAddr string, listener BLEClientListener) *BLEClient {
 	rm := NewRssiMap()
 	return &BLEClient{
-		addr, secret, Disconnected, 0, &sync.Mutex{}, nil, serverAddr, "", rm, util.MakeINFContext(), nil,
-		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
+		name, addr, secret, Disconnected, 0, &sync.Mutex{}, &sync.Mutex{}, nil, serverAddr, "", rm, util.MakeINFContext(), nil,
+		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), listener,
 		stdBleConnector{},
 	}
 }
 
 // NewBLEClient is a function that creates a new ble client
-func NewBLEClient(addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
+func NewBLEClient(name string, addr string, secret string, serverAddr string, listener BLEClientListener) (*BLEClient, error) {
 	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
 	}
-	return NewBLEClientSharedDevice(d, addr, secret, serverAddr, onConnected, onDisconnected)
+	return NewBLEClientSharedDevice(d, name, addr, secret, serverAddr, listener)
 }
 
 // NewBLEClientSharedDevice is a function that creates a new ble client
-func NewBLEClientSharedDevice(device ble.Device, addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
+func NewBLEClientSharedDevice(device ble.Device, name string, addr string, secret string, serverAddr string, listener BLEClientListener) (*BLEClient, error) {
 	ble.SetDefaultDevice(device)
-	return newBLEClient(addr, secret, serverAddr, onConnected, onDisconnected), nil
+	return newBLEClient(name, addr, secret, serverAddr, listener), nil
 }
 
 // Run is a method that runs the connection from client to service
@@ -320,10 +327,10 @@ func (client *BLEClient) scan() {
 }
 
 func (client *BLEClient) connectLoop() {
-	client.connectionMutex.Lock()
+	client.connectionLoopMutex.Lock()
 	client.status = Disconnected
 	if client.connectionAttempts > 0 {
-		client.onDisconnected()
+		client.listener.OnDisconnected()
 	}
 	client.connectionAttempts = 0
 	err := errors.New("")
@@ -333,27 +340,38 @@ func (client *BLEClient) connectLoop() {
 	}
 	client.status = Connected
 	rssi, _ := client.rssiMap.Get(client.addr, client.connectedAddr)
-	client.onConnected(client.connectedAddr, client.connectionAttempts, rssi)
-	client.connectionMutex.Unlock()
+	client.listener.OnConnected(client.connectedAddr, client.connectionAttempts, rssi)
+	client.connectionLoopMutex.Unlock()
 }
 
 func (client *BLEClient) pingLoop() {
 	for {
 		time.Sleep(PingInterval)
+		if client.status != Connected {
+			continue
+		}
 		m := client.rssiMap.GetAll()
-		req := &ClientStateRequest{Addr: client.addr, ConnectedAddr: client.connectedAddr, RssiMap: m}
+		req := &ClientStateRequest{Name: client.name, Addr: client.addr, ConnectedAddr: client.connectedAddr, RssiMap: m}
 		b, _ := req.Data()
 		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {
 			continue
 		}
-		initTS, err := client.getUnixTS()
-		if err != nil {
-			continue
+		if client.timeSync == nil {
+			client.syncTime()
 		}
-		timeSync := util.NewTimeSync(initTS)
-		client.timeSync = &timeSync
 	}
+}
+
+func (client *BLEClient) syncTime() error {
+	initTS, err := client.getUnixTS()
+	if err != nil {
+		return err
+	}
+	timeSync := util.NewTimeSync(initTS)
+	client.timeSync = &timeSync
+	client.listener.OnTimeSync()
+	return nil
 }
 
 func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
@@ -387,6 +405,8 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 
 // RawConnect exposes underlying ble connection functionality
 func (client *BLEClient) RawConnect(filter ble.AdvFilter) error {
+	client.connectMutex.Lock()
+	defer client.connectMutex.Unlock()
 	var err error
 	util.TryCatchBlock{
 		Try: func() {
@@ -409,7 +429,11 @@ func retry(fn func() error) error {
 		err = fn()
 		attempts += 1
 	}
-	return err
+	if err != nil {
+		fmt.Println("Exceeded connection attempts, and could not connect :(")
+		return err
+	}
+	return nil
 }
 
 func (client *BLEClient) connect() error {

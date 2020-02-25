@@ -13,6 +13,8 @@ const (
 )
 
 var (
+	// Name is a compile time var (ldflag)
+	Name string
 	// BLESecret is a compile time var (ldflag)
 	BLESecret string
 	// BLEClientAddr is a compile time var (ldflag)
@@ -21,27 +23,39 @@ var (
 	BLEServerAddr string
 )
 
+type exampleListener struct {
+	c *client.BLEClient
+}
+
+func (l *exampleListener) OnConnected(addr string, attempts int, rssi int) {
+	fmt.Printf("Client connected to server (%s) after %d attempts with rssi %d", addr, attempts, rssi)
+	for {
+		time.Sleep(time.Second * 1)
+		fmt.Println("Attempting to write to extra write char...")
+		err := l.c.WriteValue(exampleWriteCharUUID, []byte("Hello Server! ~ from Client"))
+		if err != nil {
+			fmt.Println("Could not write to extra write char :( " + err.Error())
+		} else {
+			fmt.Println("Wrote to extra write char :)")
+		}
+	}
+}
+
+func (l *exampleListener) OnDisconnected() {
+	fmt.Println("Client has disconnected from server.")
+}
+
+func (l *exampleListener) OnTimeSync() {
+	fmt.Println("Client has syncronized time with server.")
+}
+
 func main() {
-	if BLESecret == "" || BLEClientAddr == "" || BLEServerAddr == "" {
+	if Name == "" || BLESecret == "" || BLEClientAddr == "" || BLEServerAddr == "" {
 		fmt.Println("please compile this with BLESecret, BLEClientAddr, and BLEServerAddr as ldflag")
 		return
 	}
 	var clien *client.BLEClient
-	clien, err := client.NewBLEClient(BLEClientAddr, BLESecret, BLEServerAddr, func(addr string, attempts int, rssi int) {
-		fmt.Printf("Client connected to server (%s) after %d attempts with rssi %d", addr, attempts, rssi)
-		for {
-			time.Sleep(time.Second * 1)
-			fmt.Println("Attempting to write to extra write char...")
-			err := clien.WriteValue(exampleWriteCharUUID, []byte("Hello Server! ~ from Client"))
-			if err != nil {
-				fmt.Println("Could not write to extra write char :( " + err.Error())
-			} else {
-				fmt.Println("Wrote to extra write char :)")
-			}
-		}
-	}, func() {
-		fmt.Println("Client has disconnected from server.")
-	})
+	clien, err := client.NewBLEClient(Name, BLEClientAddr, BLESecret, BLEServerAddr, &exampleListener{c: clien})
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble client: " + err.Error())
 	}
