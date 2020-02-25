@@ -8,21 +8,19 @@ import (
 	"sync"
 )
 
-type RssiMapData map[string]map[string]int
-
 // RssiMap is type alias for rssi map (routing tables)
 type RssiMap struct {
-	data  RssiMapData
+	data  map[string]map[string]int
 	mutex sync.RWMutex
 }
 
 // NewRssiMap will return newly init struct
 func NewRssiMap() *RssiMap {
-	return &RssiMap{data: RssiMapData{}, mutex: sync.RWMutex{}}
+	return &RssiMap{data: map[string]map[string]int{}, mutex: sync.RWMutex{}}
 }
 
 // NewRssiMapFromRaw will return newly init struct
-func NewRssiMapFromRaw(raw RssiMapData) *RssiMap {
+func NewRssiMapFromRaw(raw map[string]map[string]int) *RssiMap {
 	rm := NewRssiMap()
 	for src, f := range raw {
 		for dst, rssi := range f {
@@ -50,7 +48,7 @@ func (rm *RssiMap) Set(src, dst string, new int) {
 }
 
 // GetAll will get all data from map
-func (rm *RssiMap) GetAll() RssiMapData {
+func (rm *RssiMap) GetAll() map[string]map[string]int {
 	return rm.data
 }
 
@@ -87,7 +85,7 @@ func (rm *RssiMap) String() string {
 func GetRssiMapFromBytes(data []byte) (*RssiMap, error) {
 	buf := bytes.NewBuffer(data)
 	dec := gob.NewDecoder(buf)
-	var m RssiMapData
+	var m map[string]map[string]int
 	err := dec.Decode(&m)
 	if err != nil {
 		return nil, err

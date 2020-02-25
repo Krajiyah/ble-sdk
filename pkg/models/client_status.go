@@ -19,5 +19,5 @@ type BLEClientState struct {
 	Name          string
 	Status        BLEClientStatus
 	ConnectedAddr string
-	RssiMap       RssiMapData
+	RssiMap       map[string]map[string]int
 }
