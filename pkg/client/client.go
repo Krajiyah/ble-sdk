@@ -346,9 +346,7 @@ func (client *BLEClient) connectLoop() {
 func (client *BLEClient) pingLoop() {
 	for {
 		time.Sleep(PingInterval)
-		fmt.Println("Calling ping...")
 		if client.status != Connected {
-			fmt.Println("Not connected skipping...")
 			continue
 		}
 		m := client.rssiMap.GetAll()
@@ -356,17 +354,11 @@ func (client *BLEClient) pingLoop() {
 		b, _ := req.Data()
 		err := client.WriteValue(util.ClientStateUUID, b)
 		if err != nil {
-			fmt.Println("Error write client state: " + err.Error())
 			continue
 		}
 		if client.timeSync == nil {
-			fmt.Println("Syncing time")
-			err := client.syncTime()
-			if err != nil {
-				fmt.Println("Error sync time: " + err.Error())
-			}
+			client.syncTime()
 		}
-		fmt.Println("Finished ping..")
 	}
 }
 
