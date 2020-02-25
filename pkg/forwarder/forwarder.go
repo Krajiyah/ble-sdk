@@ -171,12 +171,10 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 		err = wrapError(err, e)
 	}
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
-		fmt.Println("Test1")
-		err = forwarder.updateClientState()
-		fmt.Println("Test2")
-		e := forwarder.reconnect()
-		fmt.Println("Test3")
-		err = wrapError(err, e)
+		fmt.Println("TODO: update client state")
+		// err = forwarder.updateClientState()
+		// e := forwarder.reconnect()
+		// err = wrapError(err, e)
 	}
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) || isF {
 		e := forwarder.refreshShortestPath()
