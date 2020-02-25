@@ -23,8 +23,6 @@ const (
 )
 
 var (
-	attempts     = 0
-	rssi         = 0
 	serviceUUIDs = []string{util.ClientStateUUID, util.TimeSyncUUID, util.ClientLogUUID}
 	testRssiMap  = NewRssiMap()
 )
@@ -127,21 +125,29 @@ func setCharacteristic(client *BLEClient, uuid string) {
 	client.characteristics[uuid] = ble.NewCharacteristic(u)
 }
 
-func dummyOnConnected(_ string, a int, r int) {
-	attempts = a
-	rssi = r
+type dummyListener struct {
+	attempts int
+	rssi     int
 }
 
-func dummyOnDisconnected() {}
+func (l *dummyListener) OnConnected(_ string, a int, r int) {
+	l.attempts = a
+	l.rssi = r
+}
 
-func getTestClient() *BLEClient {
-	client := newBLEClient("some name", testAddr, testSecret, testServerAddr, dummyOnConnected, dummyOnDisconnected)
+func (l *dummyListener) OnDisconnected() {}
+
+func (l *dummyListener) OnTimeSync() {}
+
+func getTestClient() (*BLEClient, *dummyListener) {
+	l := &dummyListener{}
+	client := newBLEClient("some name", testAddr, testSecret, testServerAddr, l)
 	client.bleConnector = testBleConnector{testAddr, testRssiMap}
-	return client
+	return client, l
 }
 
-func getDummyClient(connectedAddr string) (*BLEClient, *dummyCoreClient) {
-	client := getTestClient()
+func getDummyClient(connectedAddr string) (*BLEClient, *dummyCoreClient, *dummyListener) {
+	client, l := getTestClient()
 	cc := newDummyCoreClient(testAddr)
 	var c ble.Client
 	c = cc
@@ -152,7 +158,7 @@ func getDummyClient(connectedAddr string) (*BLEClient, *dummyCoreClient) {
 		client.characteristics[uuid] = nil
 	}
 	dc := cc.(*dummyCoreClient)
-	return client, dc
+	return client, dc, l
 }
 
 func TestIsForwarder(t *testing.T) {
@@ -196,7 +202,7 @@ func getWriteBufferData(t *testing.T, secret string, buffers *[]*bytes.Buffer) [
 
 func TestUnixTS(t *testing.T) {
 	setServerConnection()
-	client, dummyClient := getDummyClient(testServerAddr)
+	client, dummyClient, _ := getDummyClient(testServerAddr)
 
 	// mock server read
 	expected := mockUnixTS(t, dummyClient.mockedReadCharData)
@@ -217,7 +223,7 @@ func TestUnixTS(t *testing.T) {
 
 func TestLog(t *testing.T) {
 	setServerConnection()
-	client, dummyClient := getDummyClient(testServerAddr)
+	client, dummyClient, _ := getDummyClient(testServerAddr)
 
 	// test client write
 	setCharacteristic(client, util.ClientLogUUID)
@@ -234,16 +240,16 @@ func TestLog(t *testing.T) {
 
 func TestConnectLoop(t *testing.T) {
 	setServerConnection()
-	client := getTestClient()
+	client, listener := getTestClient()
 	client.connectLoop()
-	assert.Equal(t, attempts, 1)
-	assert.Equal(t, rssi, testRSSI)
+	assert.Equal(t, listener.attempts, 1)
+	assert.Equal(t, listener.rssi, testRSSI)
 	assert.DeepEqual(t, client.GetConnectionGraph().GetAll(), NewConnectionGraphFromRaw(map[string]string{client.addr: client.serverAddr}).GetAll())
 }
 
 func TestScanLoop(t *testing.T) {
 	setServerConnection()
-	client := getTestClient()
+	client, _ := getTestClient()
 	go client.scan()
 	time.Sleep(ScanInterval + (ScanInterval / 2))
 	assert.DeepEqual(t, client.GetRssiMap().GetAll(), testRssiMap.GetAll())
@@ -251,7 +257,7 @@ func TestScanLoop(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	setServerConnection()
-	client := getTestClient()
+	client, _ := getTestClient()
 	client.Run()
 	time.Sleep(afterConnectionDelay)
 	c := (*(client.cln)).(*dummyCoreClient)
@@ -266,7 +272,7 @@ func TestForwardedWrite(t *testing.T) {
 	setForwarderConnection()
 
 	// 1st forward request
-	client, dummyCoreClient := getDummyClient(testForwarderAddr)
+	client, dummyCoreClient, _ := getDummyClient(testForwarderAddr)
 	req := ClientLogRequest{testAddr, Info, "Hello World!"}
 	expectedData, err := req.Data()
 	assert.NilError(t, err)
@@ -289,7 +295,7 @@ func TestForwardedWrite(t *testing.T) {
 
 func TestForwardedRead(t *testing.T) {
 	setForwarderConnection()
-	client, dummyClient := getDummyClient(testForwarderAddr)
+	client, dummyClient, _ := getDummyClient(testForwarderAddr)
 
 	// mock forwarder read
 	expected := mockUnixTS(t, dummyClient.mockedReadCharData)

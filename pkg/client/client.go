@@ -51,6 +51,12 @@ type BLEClientInt interface {
 	WriteValue(string, []byte) error
 }
 
+type BLEClientListener interface {
+	OnConnected(string, int, int)
+	OnDisconnected()
+	OnTimeSync()
+}
+
 // BLEClient is a struct used to handle client connection to BLEServer
 type BLEClient struct {
 	name               string
@@ -67,33 +73,32 @@ type BLEClient struct {
 	cln                *ble.Client
 	characteristics    map[string]*ble.Characteristic
 	packetAggregator   util.PacketAggregator
-	onConnected        func(string, int, int)
-	onDisconnected     func()
+	listener           BLEClientListener
 	bleConnector       bleConnector
 }
 
-func newBLEClient(name string, addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) *BLEClient {
+func newBLEClient(name string, addr string, secret string, serverAddr string, listener BLEClientListener) *BLEClient {
 	rm := NewRssiMap()
 	return &BLEClient{
 		name, addr, secret, Disconnected, 0, &sync.Mutex{}, nil, serverAddr, "", rm, util.MakeINFContext(), nil,
-		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), onConnected, onDisconnected,
+		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), listener,
 		stdBleConnector{},
 	}
 }
 
 // NewBLEClient is a function that creates a new ble client
-func NewBLEClient(name string, addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
+func NewBLEClient(name string, addr string, secret string, serverAddr string, listener BLEClientListener) (*BLEClient, error) {
 	d, err := linux.NewDevice()
 	if err != nil {
 		return nil, err
 	}
-	return NewBLEClientSharedDevice(d, name, addr, secret, serverAddr, onConnected, onDisconnected)
+	return NewBLEClientSharedDevice(d, name, addr, secret, serverAddr, listener)
 }
 
 // NewBLEClientSharedDevice is a function that creates a new ble client
-func NewBLEClientSharedDevice(device ble.Device, name string, addr string, secret string, serverAddr string, onConnected func(string, int, int), onDisconnected func()) (*BLEClient, error) {
+func NewBLEClientSharedDevice(device ble.Device, name string, addr string, secret string, serverAddr string, listener BLEClientListener) (*BLEClient, error) {
 	ble.SetDefaultDevice(device)
-	return newBLEClient(name, addr, secret, serverAddr, onConnected, onDisconnected), nil
+	return newBLEClient(name, addr, secret, serverAddr, listener), nil
 }
 
 // Run is a method that runs the connection from client to service
@@ -324,7 +329,7 @@ func (client *BLEClient) connectLoop() {
 	client.connectionMutex.Lock()
 	client.status = Disconnected
 	if client.connectionAttempts > 0 {
-		client.onDisconnected()
+		client.listener.OnDisconnected()
 	}
 	client.connectionAttempts = 0
 	err := errors.New("")
@@ -334,7 +339,7 @@ func (client *BLEClient) connectLoop() {
 	}
 	client.status = Connected
 	rssi, _ := client.rssiMap.Get(client.addr, client.connectedAddr)
-	client.onConnected(client.connectedAddr, client.connectionAttempts, rssi)
+	client.listener.OnConnected(client.connectedAddr, client.connectionAttempts, rssi)
 	client.connectionMutex.Unlock()
 }
 
@@ -354,15 +359,25 @@ func (client *BLEClient) pingLoop() {
 			fmt.Println("Error write client state: " + err.Error())
 			continue
 		}
-		initTS, err := client.getUnixTS()
-		if err != nil {
-			fmt.Println("Error read unix TS: " + err.Error())
-			continue
+		if client.timeSync == nil {
+			fmt.Println("Syncing time")
+			err := client.syncTime()
+			if err != nil {
+				fmt.Println("Error sync time: " + err.Error())
+			}
 		}
-		timeSync := util.NewTimeSync(initTS)
-		client.timeSync = &timeSync
 		fmt.Println("Finished ping..")
 	}
+}
+
+func (client *BLEClient) syncTime() error {
+	initTS, err := client.getUnixTS()
+	if err != nil {
+		return err
+	}
+	timeSync := util.NewTimeSync(initTS)
+	client.timeSync = &timeSync
+	return nil
 }
 
 func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
