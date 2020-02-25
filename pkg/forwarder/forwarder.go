@@ -168,20 +168,21 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 		return nil
 	}
 	var err error
-	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
-		fmt.Println("Updating client state")
-		err = forwarder.updateClientState()
-		e := forwarder.reconnect()
+	if !util.AddrEqualAddr(addr, forwarder.serverAddr) {
+		e := forwarder.updateNetworkState(addr)
 		err = wrapError(err, e)
-	} else {
-		fmt.Println("Updating network state")
-		err = forwarder.updateNetworkState(addr)
-		e := forwarder.reconnect()
+		e = forwarder.reconnect()
 		err = wrapError(err, e)
 	}
-	fmt.Println("Refreshing shortest path...")
 	e := forwarder.refreshShortestPath()
 	err = wrapError(err, e)
+	if util.AddrEqualAddr(forwarder.connectedAddr, forwarder.serverAddr) {
+		fmt.Println("Updating client state")
+		e := forwarder.updateClientState()
+		err = wrapError(err, e)
+		e = forwarder.reconnect()
+		err = wrapError(err, e)
+	}
 	return err
 }
 
