@@ -164,29 +164,28 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	addr := a.Address().String()
 	forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
 	isF := client.IsForwarder(a)
+	if !isF {
+		return nil
+	}
 	var err error
-	if !util.AddrEqualAddr(addr, forwarder.serverAddr) && isF {
+	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
+		fmt.Println("Updating client state")
+		err = forwarder.updateClientState()
+		e := forwarder.reconnect()
+		err = wrapError(err, e)
+	} else {
+		fmt.Println("Updating network state")
 		err = forwarder.updateNetworkState(addr)
 		e := forwarder.reconnect()
 		err = wrapError(err, e)
 	}
-	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
-		err = forwarder.updateClientState()
-		if err != nil {
-			fmt.Println("Error writing state")
-		}
-		e := forwarder.reconnect()
-		err = wrapError(err, e)
-	}
-	if util.AddrEqualAddr(addr, forwarder.serverAddr) || isF {
-		e := forwarder.refreshShortestPath()
-		err = wrapError(err, e)
-	}
+	fmt.Println("Refreshing shortest path...")
+	e := forwarder.refreshShortestPath()
+	err = wrapError(err, e)
 	return err
 }
 
 func (forwarder *BLEForwarder) updateClientState() error {
-	fmt.Println("Called!")
 	err := forwarder.keepTryConnect(forwarder.serverAddr)
 	if err != nil {
 		return err
@@ -196,7 +195,7 @@ func (forwarder *BLEForwarder) updateClientState() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Writing!")
+	fmt.Println("Writing to " + forwarder.serverAddr)
 	return forwarder.forwardingClient.WriteValue(util.ClientStateUUID, data)
 }
 
