@@ -161,7 +161,6 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 		return err
 	}
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
-		fmt.Println("Updating client state")
 		err = forwarder.updateClientState()
 	} else {
 		err = forwarder.updateNetworkState(addr)
@@ -182,7 +181,6 @@ func (forwarder *BLEForwarder) updateClientState() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Writing to " + forwarder.connectedAddr)
 	return forwarder.forwardingClient.WriteValue(util.ClientStateUUID, data)
 }
 
@@ -226,7 +224,6 @@ func (forwarder *BLEForwarder) keepTryConnect(addr string) error {
 	if addr == "" || util.AddrEqualAddr(addr, forwarder.connectedAddr) {
 		return nil
 	}
-	fmt.Println("Connecting...")
 	err := errors.New("")
 	attempts := 0
 	rssi := 0
