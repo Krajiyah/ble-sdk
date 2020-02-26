@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"sort"
 	"sync"
 )
@@ -105,9 +104,7 @@ func decodeFromPacket(data []byte) (*header, []byte, error) {
 }
 
 func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
-	fmt.Println("Original Data: " + base64.StdEncoding.EncodeToString(payload))
 	data, err := Encrypt(payload, secret)
-	fmt.Println("Encrypted Data: " + base64.StdEncoding.EncodeToString(data))
 	if err != nil {
 		return nil, err
 	}
@@ -122,10 +119,6 @@ func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
 			Total:       uint32(total),
 			PayloadSize: uint32(len(chunk)),
 		}
-		fmt.Println("GUID")
-		fmt.Println(base64.StdEncoding.EncodeToString(h.Guid))
-		fmt.Println("Chunk")
-		fmt.Println(base64.StdEncoding.EncodeToString(chunk))
 		packet, err := encodeToPacket(chunk, h)
 		if err != nil {
 			return nil, err
@@ -147,13 +140,8 @@ func decodePacketsToData(packets []*packetSortable, secret string) ([]byte, erro
 	})
 	for _, packet := range packets {
 		chunk := packet.chunk.Bytes()
-		fmt.Println("GUID")
-		fmt.Println(base64.StdEncoding.EncodeToString(packet.header.Guid))
-		fmt.Println("Chunk")
-		fmt.Println(base64.StdEncoding.EncodeToString(chunk))
 		encData = append(encData, chunk...)
 	}
-	fmt.Println("Encrypted Data: " + base64.StdEncoding.EncodeToString(encData))
 	return Decrypt(encData, secret)
 }
 

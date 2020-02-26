@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
@@ -46,15 +45,12 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 		data := req.Data()
 		payload, err := server.buffer.Set(data)
 		if err != nil {
-			fmt.Printf("BAD!: %s\n", uuid)
 			onWrite(addr, nil, err)
 			return
 		}
 		if payload == nil {
 			return
 		}
-		fmt.Println("WORKS! " + uuid)
-		fmt.Println(payload)
 		onWrite(addr, payload, nil)
 	}
 }
