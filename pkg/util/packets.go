@@ -100,7 +100,11 @@ func decodeFromPacket(data []byte) (*header, []byte, error) {
 	return header, payload, nil
 }
 
-func EncodeDataAsPackets(data []byte) ([][]byte, error) {
+func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
+	data, err := Encrypt(payload, secret)
+	if err != nil {
+		return nil, err
+	}
 	guid := getRandBytes(guidSize)
 	dataLength := uint32(len(data))
 	chunks := split(data, MTU-headerSize)
@@ -127,7 +131,7 @@ type packetSortable struct {
 	data  []byte
 }
 
-func DecodePacketsToData(packets [][]byte) ([]byte, error) {
+func DecodePacketsToData(packets [][]byte, secret string) ([]byte, error) {
 	sortables := []packetSortable{}
 	for _, packet := range packets {
 		h, chunk, err := decodeFromPacket(packet)
@@ -139,11 +143,11 @@ func DecodePacketsToData(packets [][]byte) ([]byte, error) {
 	slice.Sort(sortables, func(i, j int) bool {
 		return sortables[i].index < sortables[j].index
 	})
-	data := []byte{}
+	encData := []byte{}
 	for _, b := range sortables {
-		data = append(data, b.data...)
+		encData = append(encData, b.data...)
 	}
-	return data, nil
+	return Decrypt(encData, secret)
 }
 
 func GetHeaderFromPacket(packet []byte) (*header, error) {

@@ -209,11 +209,7 @@ func (client *BLEClient) writeValue(uuid string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	encData, err := util.Encrypt(data, client.secret)
-	if err != nil {
-		return err
-	}
-	return client.optimizedWriteChar(c, encData)
+	return client.optimizedWriteChar(c, data)
 }
 
 func (client *BLEClient) retryReadWrite(logic func() error) error {
@@ -240,7 +236,7 @@ func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error
 }
 
 func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) error {
-	packets, err := util.EncodeDataAsPackets(data)
+	packets, err := util.EncodeDataAsPackets(data, client.secret)
 	for _, packet := range packets {
 		header, _ := util.GetHeaderFromPacket(packet)
 		fmt.Println("Guid: " + base64.StdEncoding.EncodeToString(header.Guid))

@@ -66,20 +66,16 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 			return
 		}
 		fmt.Println("Filled!")
-		encryptedData, err := util.DecodePacketsToData(arr)
+		payload, err := util.DecodePacketsToData(arr, server.secret)
 		server.buffer[guid64] = [][]byte{}
 		if err != nil {
-			onWrite(addr, nil, err)
-			return
-		}
-		data, err = util.Decrypt(encryptedData, server.secret)
-		if err != nil {
 			fmt.Println("Guid: " + guid64)
-			fmt.Printf("LEN: %d", len(encryptedData))
+			fmt.Printf("LEN: %d", len(payload))
+			fmt.Printf("Secret: %s", server.secret)
 			onWrite(addr, nil, err)
 			return
 		}
-		onWrite(addr, data, nil)
+		onWrite(addr, payload, nil)
 	}
 }
 

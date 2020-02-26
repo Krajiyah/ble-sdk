@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"context"
-	"math/rand"
 	"testing"
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
@@ -57,13 +56,6 @@ func (l testBlankListener) OnClientStateMapChanged(c *ConnectionGraph, r *RssiMa
 func (l testBlankListener) OnClientLog(r ClientLogRequest) {}
 func (l testBlankListener) OnReadOrWriteError(err error)   {}
 
-func getRandBytes(t *testing.T) []byte {
-	b := make([]byte, util.MTU*3)
-	_, err := rand.Read(b)
-	assert.NilError(t, err)
-	return b
-}
-
 func getDummyServer() *BLEServer {
 	return &BLEServer{"SomeName", "someAddr", "passwd123", Running, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, map[string][][]byte{}, testBlankListener{}}
 }
@@ -78,16 +70,14 @@ func getMockRsp(data []byte) *mockRspWriter {
 
 func TestWriteHandler(t *testing.T) {
 	server := getDummyServer()
-	expected := getRandBytes(t)
-	encData, err := util.Encrypt(expected, server.secret)
-	assert.NilError(t, err)
-	packets, err := util.EncodeDataAsPackets(encData)
+	expected := []byte("Hello World!")
+	packets, err := util.EncodeDataAsPackets(expected, server.secret)
 	assert.NilError(t, err)
 	callCount := 0
 	handler := generateWriteHandler(server, util.MainServiceUUID, func(addr string, actual []byte, err error) {
 		assert.Equal(t, addr, dummyAddr)
 		assert.NilError(t, err)
-		assert.DeepEqual(t, actual, expected)
+		assert.DeepEqual(t, expected, actual)
 		callCount++
 	})
 
@@ -101,7 +91,7 @@ func TestWriteHandler(t *testing.T) {
 
 func TestReadHandler(t *testing.T) {
 	server := getDummyServer()
-	expected := getRandBytes(t)
+	expected := []byte("Hello World!")
 	handler := generateReadHandler(server, util.MainServiceUUID, func(addr string, c context.Context) ([]byte, error) {
 		return expected, nil
 	})

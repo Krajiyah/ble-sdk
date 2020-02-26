@@ -190,9 +190,11 @@ func mockUnixTS(t *testing.T, buffer *bytes.Buffer) int64 {
 }
 
 func mockData(t *testing.T, data []byte, buffer *bytes.Buffer) {
-	encData, err := util.Encrypt(data, testSecret)
+	packets, err := util.EncodeDataAsPackets(data, testSecret)
 	assert.NilError(t, err)
-	buffer.Write(encData)
+	for _, packet := range packets {
+		buffer.Write(packet)
+	}
 }
 
 func getWriteBufferData(t *testing.T, buffers *[]*bytes.Buffer) []byte {
@@ -201,9 +203,7 @@ func getWriteBufferData(t *testing.T, buffers *[]*bytes.Buffer) []byte {
 		data := buffer.Bytes()
 		packets = append(packets, data)
 	}
-	encData, err := util.DecodePacketsToData(packets)
-	assert.NilError(t, err)
-	data, err := util.Decrypt(encData, testSecret)
+	data, err := util.DecodePacketsToData(packets, testSecret)
 	assert.NilError(t, err)
 	return data
 }
