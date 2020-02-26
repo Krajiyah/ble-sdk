@@ -121,8 +121,8 @@ func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
 			Total:       uint32(total),
 			PayloadSize: uint32(len(chunk)),
 		}
-		fmt.Println("Header")
-		fmt.Println(h)
+		fmt.Println("GUID")
+		fmt.Println(base64.StdEncoding.EncodeToString(h.Guid))
 		packet, err := encodeToPacket(chunk, h)
 		if err != nil {
 			return nil, err
@@ -173,8 +173,8 @@ func (buff *PacketBuffer) Set(packet []byte) ([]byte, error) {
 	buff.mutex.Lock()
 	defer buff.mutex.Unlock()
 	header, _, err := decodeFromPacket(packet)
-	fmt.Println("Header")
-	fmt.Println(header)
+	fmt.Println("GUID")
+	fmt.Println(base64.StdEncoding.EncodeToString(header.Guid))
 	fmt.Println("Packet")
 	fmt.Println(base64.StdEncoding.EncodeToString(packet))
 	if err != nil {
