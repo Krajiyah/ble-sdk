@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
@@ -66,6 +67,9 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 		}
 		data, err = util.Decrypt(encryptedData, server.secret)
 		if err != nil {
+			fmt.Println("Guid: " + guid64)
+			fmt.Printf("LEN: %d", len(encryptedData))
+			fmt.Println(string(encryptedData))
 			onWrite(addr, nil, err)
 			return
 		}
