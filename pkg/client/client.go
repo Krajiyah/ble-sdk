@@ -381,15 +381,17 @@ func (client *BLEClient) rawConnect(filter ble.AdvFilter) error {
 
 // RawConnect exposes underlying ble connection functionality
 func (client *BLEClient) RawConnect(filter ble.AdvFilter) error {
-	client.connectMutex.Lock()
-	defer client.connectMutex.Unlock()
 	var err error
 	util.TryCatchBlock{
 		Try: func() {
+			client.connectMutex.Lock()
 			err = client.rawConnect(filter)
 		},
 		Catch: func(e error) {
 			err = e
+		},
+		Finally: func() {
+			client.connectMutex.Unlock()
 		},
 	}.Do()
 	return err
