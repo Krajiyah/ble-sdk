@@ -355,8 +355,12 @@ func newEndReadForwardChar(forwarder *BLEForwarder) *server.BLEReadCharacteristi
 		if !forwarder.isConnectedToServer() {
 			return forwarder.forwardingClient.ReadValue(util.EndReadForwardCharUUID)
 		}
-		data, err := forwarder.forwardingClient.ReadValue(forwarder.readCharUUID)
-		forwarder.readCharUUIDMutex.Unlock()
-		return data, err
+		if forwarder.readCharUUID != "" {
+			data, err := forwarder.forwardingClient.ReadValue(forwarder.readCharUUID)
+			forwarder.readCharUUID = ""
+			forwarder.readCharUUIDMutex.Unlock()
+			return data, err
+		}
+		return nil, errors.New("StartReadChar not invoked, so can not EndReadChar")
 	}, DoInBackground: noop}
 }
