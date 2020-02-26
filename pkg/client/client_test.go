@@ -9,7 +9,7 @@ import (
 	. "github.com/Krajiyah/ble-sdk/internal"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
-	"github.com/currantlabs/ble"
+	"github.com/go-ble/ble"
 	"golang.org/x/net/context"
 	"gotest.tools/assert"
 )
@@ -57,8 +57,8 @@ func (c *dummyCoreClient) WriteCharacteristic(char *ble.Characteristic, value []
 	*c.mockedWriteCharData = append(*c.mockedWriteCharData, buf)
 	return nil
 }
-func (c *dummyCoreClient) Address() ble.Addr { return ble.NewAddr(c.testAddr) }
-func (c *dummyCoreClient) Name() string      { return "some name" }
+func (c *dummyCoreClient) Addr() ble.Addr { return ble.NewAddr(c.testAddr) }
+func (c *dummyCoreClient) Name() string   { return "some name" }
 func (c *dummyCoreClient) Profile() *ble.Profile {
 	return &ble.Profile{
 		Services: GetTestServices(serviceUUIDs),
@@ -95,6 +95,7 @@ func (c *dummyCoreClient) Unsubscribe(char *ble.Characteristic, ind bool) error 
 func (c *dummyCoreClient) ClearSubscriptions() error                            { return nil }
 func (c *dummyCoreClient) CancelConnection() error                              { return nil }
 func (c *dummyCoreClient) Disconnected() <-chan struct{}                        { return nil }
+func (c *dummyCoreClient) Conn() ble.Conn                                       { return nil }
 
 type testBleConnector struct {
 	addr    string

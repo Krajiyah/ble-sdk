@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
-	"github.com/currantlabs/ble"
+	"github.com/go-ble/ble"
 	"gotest.tools/assert"
 )
 

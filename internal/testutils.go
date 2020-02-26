@@ -2,20 +2,20 @@ package internal
 
 import (
 	"github.com/Krajiyah/ble-sdk/pkg/util"
-	"github.com/currantlabs/ble"
+	"github.com/go-ble/ble"
 )
 
 type DummyAdv struct {
-	Addr       ble.Addr
+	Address    ble.Addr
 	Rssi       int
 	NonService bool
 }
 
 type DummyAddr struct {
-	Addr string
+	Address string
 }
 
-func (addr DummyAddr) String() string { return addr.Addr }
+func (addr DummyAddr) String() string { return addr.Address }
 
 func (a DummyAdv) LocalName() string              { return "" }
 func (a DummyAdv) ManufacturerData() []byte       { return nil }
@@ -31,7 +31,7 @@ func (a DummyAdv) TxPowerLevel() int            { return 0 }
 func (a DummyAdv) Connectable() bool            { return true }
 func (a DummyAdv) SolicitedService() []ble.UUID { return nil }
 func (a DummyAdv) RSSI() int                    { return a.Rssi }
-func (a DummyAdv) Address() ble.Addr            { return a.Addr }
+func (a DummyAdv) Addr() ble.Addr               { return a.Address }
 
 func GetTestServiceUUIDs() []ble.UUID {
 	u, _ := ble.Parse(util.MainServiceUUID)
