@@ -73,7 +73,6 @@ type BLEClient struct {
 	ctx                 context.Context
 	cln                 *ble.Client
 	characteristics     map[string]*ble.Characteristic
-	packetAggregator    util.PacketAggregator
 	listener            BLEClientListener
 	bleConnector        bleConnector
 }
@@ -82,7 +81,7 @@ func newBLEClient(name string, addr string, secret string, serverAddr string, li
 	rm := NewRssiMap()
 	return &BLEClient{
 		name, addr, secret, Disconnected, 0, &sync.Mutex{}, &sync.Mutex{}, nil, serverAddr, "", rm, util.MakeINFContext(), nil,
-		map[string]*ble.Characteristic{}, util.NewPacketAggregator(), listener,
+		map[string]*ble.Characteristic{}, listener,
 		stdBleConnector{},
 	}
 }
@@ -171,18 +170,7 @@ func (client *BLEClient) readValue(uuid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	guid := ""
-	for !client.packetAggregator.HasDataFromPacketStream(guid) {
-		packetData, err := client.optimizedReadChar(c)
-		if err != nil {
-			return nil, err
-		}
-		guid, err = client.packetAggregator.AddPacketFromPacketBytes(packetData)
-		if err != nil {
-			return nil, err
-		}
-	}
-	encData, err := client.packetAggregator.PopAllDataFromPackets(guid)
+	encData, err := client.optimizedReadChar(c)
 	if err != nil {
 		return nil, err
 	}
@@ -223,23 +211,7 @@ func (client *BLEClient) writeValue(uuid string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	guid, err := client.packetAggregator.AddData(encData)
-	if err != nil {
-		return err
-	}
-	isLastPacket := false
-	for !isLastPacket {
-		var packetData []byte
-		packetData, isLastPacket, err = client.packetAggregator.PopPacketDataFromStream(guid)
-		if err != nil {
-			return err
-		}
-		err = client.optimizedWriteChar(c, packetData)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return client.optimizedWriteChar(c, encData)
 }
 
 func (client *BLEClient) retryReadWrite(logic func() error) error {
@@ -257,7 +229,7 @@ func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error
 	var data []byte
 	err := client.retryReadWrite(func() error {
 		return util.Optimize(func() error {
-			dat, e := (*client.cln).ReadCharacteristic(c)
+			dat, e := (*client.cln).ReadLongCharacteristic(c)
 			data = dat
 			return e
 		})
@@ -265,12 +237,34 @@ func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error
 	return data, err
 }
 
+func split(buf []byte, lim int) [][]byte {
+	var chunk []byte
+	chunks := make([][]byte, 0, len(buf)/lim+1)
+	for len(buf) >= lim {
+		chunk, buf = buf[:lim], buf[lim:]
+		chunks = append(chunks, chunk)
+	}
+	if len(buf) > 0 {
+		chunks = append(chunks, buf[:len(buf)])
+	}
+	return chunks
+}
+
 func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) error {
-	return client.retryReadWrite(func() error {
-		return util.Optimize(func() error {
-			return (*client.cln).WriteCharacteristic(c, data, true)
+	var err error
+	dataList := split(data, util.MTU)
+	dataList = append(dataList, []byte(util.WriteTerminator))
+	for _, data := range dataList {
+		e := client.retryReadWrite(func() error {
+			return util.Optimize(func() error {
+				return (*client.cln).WriteCharacteristic(c, data, false)
+			})
 		})
-	})
+		if e != nil {
+			err = e
+		}
+	}
+	return err
 }
 
 // IsForwarder is a filter which indicates if advertisement is from BLEForwarder

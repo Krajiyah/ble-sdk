@@ -82,7 +82,7 @@ func (c *dummyCoreClient) DiscoverDescriptors(filter []ble.UUID, char *ble.Chara
 	return nil, nil
 }
 func (c *dummyCoreClient) ReadLongCharacteristic(char *ble.Characteristic) ([]byte, error) {
-	return nil, nil
+	return c.ReadCharacteristic(char)
 }
 func (c *dummyCoreClient) ReadDescriptor(d *ble.Descriptor) ([]byte, error)  { return nil, nil }
 func (c *dummyCoreClient) WriteDescriptor(d *ble.Descriptor, v []byte) error { return nil }
@@ -167,36 +167,26 @@ func TestIsForwarder(t *testing.T) {
 }
 
 func mockUnixTS(t *testing.T, buffer *bytes.Buffer) int64 {
-	pa := util.NewPacketAggregator()
 	expected := util.UnixTS()
-	encData, err := util.Encrypt([]byte(strconv.Itoa(int(expected))), testSecret)
-	assert.NilError(t, err)
-	guid, err := pa.AddData(encData)
-	assert.NilError(t, err)
-	isLastPacket := false
-	for !isLastPacket {
-		var err error
-		var data []byte
-		data, isLastPacket, err = pa.PopPacketDataFromStream(guid)
-		assert.NilError(t, err)
-		buffer.Write(data)
-	}
+	mockData(t, []byte(strconv.Itoa(int(expected))), buffer)
 	return expected
 }
 
-func getWriteBufferData(t *testing.T, secret string, buffers *[]*bytes.Buffer) []byte {
-	pa := util.NewPacketAggregator()
-	var guid string
-	var err error
-	for _, buffer := range *buffers {
-		guid, err = pa.AddPacketFromPacketBytes(buffer.Bytes())
-		assert.NilError(t, err)
-	}
-	ok := pa.HasDataFromPacketStream(guid)
-	assert.Assert(t, ok)
-	encData, err := pa.PopAllDataFromPackets(guid)
+func mockData(t *testing.T, data []byte, buffer *bytes.Buffer) {
+	encData, err := util.Encrypt(data, testSecret)
 	assert.NilError(t, err)
-	data, err := util.Decrypt(encData, secret)
+	buffer.Write(encData)
+}
+
+func getWriteBufferData(t *testing.T, buffers *[]*bytes.Buffer) []byte {
+	encData := []byte{}
+	for _, buffer := range *buffers {
+		data := buffer.Bytes()
+		if string(data) != util.WriteTerminator {
+			encData = append(encData, data...)
+		}
+	}
+	data, err := util.Decrypt(encData, testSecret)
 	assert.NilError(t, err)
 	return data
 }
@@ -233,7 +223,7 @@ func TestLog(t *testing.T) {
 	assert.NilError(t, err)
 
 	// mock write to server
-	data := getWriteBufferData(t, client.secret, dummyClient.mockedWriteCharData)
+	data := getWriteBufferData(t, dummyClient.mockedWriteCharData)
 	actual, err := GetClientLogRequestFromBytes(data)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, *actual, expected)
@@ -279,7 +269,7 @@ func TestForwardedWrite(t *testing.T) {
 	assert.NilError(t, err)
 	err = client.Log(req)
 	assert.NilError(t, err)
-	data := getWriteBufferData(t, client.secret, dummyCoreClient.mockedWriteCharData)
+	data := getWriteBufferData(t, dummyCoreClient.mockedWriteCharData)
 	r, err := GetForwarderRequestFromBytes(data)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, r.Payload, expectedData)
@@ -288,7 +278,7 @@ func TestForwardedWrite(t *testing.T) {
 	dummyCoreClient.mockedWriteCharData = &[]*bytes.Buffer{}
 	err = client.WriteValue(util.WriteForwardCharUUID, data)
 	assert.NilError(t, err)
-	data = getWriteBufferData(t, client.secret, dummyCoreClient.mockedWriteCharData)
+	data = getWriteBufferData(t, dummyCoreClient.mockedWriteCharData)
 	r2, err := GetForwarderRequestFromBytes(data)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, r, r2)
@@ -306,7 +296,7 @@ func TestForwardedRead(t *testing.T) {
 	assert.Equal(t, ts, expected)
 
 	// check that it started read before doing the end read
-	data := getWriteBufferData(t, client.secret, dummyClient.mockedWriteCharData)
+	data := getWriteBufferData(t, dummyClient.mockedWriteCharData)
 	r, err := GetForwarderRequestFromBytes(data)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, *r, ForwarderRequest{util.TimeSyncUUID, nil, true, false})

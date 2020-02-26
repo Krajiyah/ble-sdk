@@ -16,11 +16,6 @@ const (
 	dummyAddr = "11:22:33:44:55:66"
 )
 
-var (
-	testReadHandlerBuffer       *bytes.Buffer
-	testReadHandlerPacketBuffer *bytes.Buffer
-)
-
 type mockConn struct {
 	ctx context.Context
 }
@@ -38,16 +33,21 @@ func (c *mockConn) Read(p []byte) (n int, err error)  { return 0, nil }
 func (c *mockConn) Write(p []byte) (n int, err error) { return 0, nil }
 func (c *mockConn) Close() error                      { return nil }
 
-type mockRspWriter struct{}
+type mockRspWriter struct {
+	buff *bytes.Buffer
+}
+
+func (rw *mockRspWriter) ReadAll() []byte {
+	return rw.buff.Bytes()
+}
 
 func (rw *mockRspWriter) Write(b []byte) (int, error) {
-	testReadHandlerPacketBuffer = bytes.NewBuffer(b)
-	return testReadHandlerBuffer.Write(b)
+	return rw.buff.Write(b)
 }
 func (rw *mockRspWriter) Status() ble.ATTError          { return ble.ErrSuccess }
 func (rw *mockRspWriter) SetStatus(status ble.ATTError) {}
-func (rw *mockRspWriter) Len() int                      { return testReadHandlerBuffer.Len() }
-func (rw *mockRspWriter) Cap() int                      { return testReadHandlerBuffer.Cap() }
+func (rw *mockRspWriter) Len() int                      { return rw.buff.Len() }
+func (rw *mockRspWriter) Cap() int                      { return rw.buff.Cap() }
 
 type testBlankListener struct{}
 
@@ -65,15 +65,15 @@ func getRandBytes(t *testing.T) []byte {
 }
 
 func getDummyServer() *BLEServer {
-	return &BLEServer{"SomeName", "someAddr", "passwd123", Running, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, util.NewPacketAggregator(), testBlankListener{}}
+	return &BLEServer{"SomeName", "someAddr", "passwd123", Running, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, map[string]*bytes.Buffer{}, testBlankListener{}}
 }
 
 func getMockReq(data []byte) ble.Request {
 	return ble.NewRequest(&mockConn{context.Background()}, data, 0)
 }
 
-func getMockRsp(data []byte) ble.ResponseWriter {
-	return &mockRspWriter{}
+func getMockRsp(data []byte) *mockRspWriter {
+	return &mockRspWriter{buff: bytes.NewBuffer(data)}
 }
 
 func TestWriteHandler(t *testing.T) {
@@ -81,58 +81,34 @@ func TestWriteHandler(t *testing.T) {
 	expected := getRandBytes(t)
 	encData, err := util.Encrypt(expected, server.secret)
 	assert.NilError(t, err)
-	pa := util.NewPacketAggregator()
-	guid, err := pa.AddData(encData)
-	assert.NilError(t, err)
-	shouldOnWriteNow := false
 	wasCalled := false
 	handler := generateWriteHandler(server, util.MainServiceUUID, func(addr string, actual []byte, err error) {
-		assert.Assert(t, shouldOnWriteNow)
 		assert.Equal(t, addr, dummyAddr)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, actual, expected)
 		wasCalled = true
 	})
 
-	for !wasCalled {
-
-		// mock client writing
-		packetData, isLastPacket, err := pa.PopPacketDataFromStream(guid)
-		assert.NilError(t, err)
-		shouldOnWriteNow = isLastPacket
-		req := getMockReq(packetData)
-		rsp := getMockRsp([]byte{})
-
-		// test write handler behavior
-		handler(req, rsp)
-	}
+	// test write handler behavior
+	handler(getMockReq(encData), getMockRsp([]byte{}))
+	handler(getMockReq([]byte(util.WriteTerminator)), getMockRsp([]byte{}))
+	assert.Check(t, wasCalled, "Handler should have been called")
 }
 
 func TestReadHandler(t *testing.T) {
-	testReadHandlerBuffer = bytes.NewBuffer([]byte{})
 	server := getDummyServer()
 	expected := getRandBytes(t)
-	pa := util.NewPacketAggregator()
 	handler := generateReadHandler(server, util.MainServiceUUID, func(addr string, c context.Context) ([]byte, error) {
 		return expected, nil
 	})
-	guid := ""
 
 	req := getMockReq([]byte{})
 	rsp := getMockRsp([]byte{})
-	for !pa.HasDataFromPacketStream(guid) {
-		// test read handler behavior
-		handler(req, rsp)
 
-		// mock client read
-		var err error
-		guid, err = pa.AddPacketFromPacketBytes(testReadHandlerPacketBuffer.Bytes())
-		assert.NilError(t, err)
-	}
+	// test read handler behavior
+	handler(req, rsp)
 
-	encData, err := pa.PopAllDataFromPackets(guid)
-	assert.NilError(t, err)
-	actual, err := util.Decrypt(encData, server.secret)
+	actual, err := util.Decrypt(rsp.ReadAll(), server.secret)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, actual, expected)
 }

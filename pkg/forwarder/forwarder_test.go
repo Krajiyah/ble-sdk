@@ -68,6 +68,7 @@ func (c dummyClient) RawConnect(ble.AdvFilter) error { return nil }
 func (c dummyClient) WriteValue(char string, data []byte) error {
 	buf := bytes.NewBuffer(data)
 	c.mockedWriteBuffer[char] = buf
+	time.Sleep(time.Millisecond * 250)
 	return nil
 }
 
@@ -157,7 +158,7 @@ func TestRssiMapChar(t *testing.T) {
 	rm.Set(testAddr, clientAddr, -10000)
 	s := getDummyForwarder(t, testAddr, rm)
 	s.forwarder.Run()
-	time.Sleep(client.ScanInterval + (client.ScanInterval / 2))
+	time.Sleep(2 * client.ScanInterval)
 	assert.DeepEqual(t, s.forwarder.rssiMap.GetAll(), rm.GetAll())
 	readChars, _ := getChars(s.forwarder)
 	char := readChars[1]
