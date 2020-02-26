@@ -7,9 +7,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
-
-	"github.com/bradfitz/slice"
 )
 
 const (
@@ -125,6 +124,7 @@ func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
 		}
 		fmt.Println("GUID")
 		fmt.Println(base64.StdEncoding.EncodeToString(h.Guid))
+		fmt.Printf("Chunk Length: %d\n", len(chunk))
 		packet, err := encodeToPacket(chunk, h)
 		if err != nil {
 			return nil, err
@@ -137,8 +137,8 @@ func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
 }
 
 type packetSortable struct {
-	index uint32
-	data  []byte
+	header *header
+	chunk  []byte
 }
 
 func decodePacketsToData(packets [][]byte, secret string) ([]byte, error) {
@@ -148,14 +148,19 @@ func decodePacketsToData(packets [][]byte, secret string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		sortables = append(sortables, packetSortable{index: h.Index, data: chunk})
+		fmt.Println("GUID (v2)")
+		fmt.Println(base64.StdEncoding.EncodeToString(h.Guid))
+		fmt.Printf("Chunk Length (v2): %d\n", len(chunk))
+		fmt.Println("Packet (v2)")
+		fmt.Println(base64.StdEncoding.EncodeToString(packet))
+		sortables = append(sortables, packetSortable{header: h, chunk: chunk})
 	}
-	slice.Sort(sortables, func(i, j int) bool {
-		return sortables[i].index < sortables[j].index
+	sort.Slice(sortables, func(i, j int) bool {
+		return sortables[i].header.Index < sortables[j].header.Index
 	})
 	encData := []byte{}
 	for _, b := range sortables {
-		encData = append(encData, b.data...)
+		encData = append(encData, b.chunk...)
 	}
 	fmt.Println("Encrypted Data: " + base64.StdEncoding.EncodeToString(encData))
 	return Decrypt(encData, secret)
@@ -174,10 +179,11 @@ func NewPacketBuffer(secret string) *PacketBuffer {
 func (buff *PacketBuffer) Set(packet []byte) ([]byte, error) {
 	buff.mutex.Lock()
 	defer buff.mutex.Unlock()
-	header, _, err := decodeFromPacket(packet)
-	fmt.Println("GUID")
+	header, chunk, err := decodeFromPacket(packet)
+	fmt.Println("GUID (v1)")
 	fmt.Println(base64.StdEncoding.EncodeToString(header.Guid))
-	fmt.Println("Packet")
+	fmt.Printf("Chunk Length (v1): %d\n", len(chunk))
+	fmt.Println("Packet (v1)")
 	fmt.Println(base64.StdEncoding.EncodeToString(packet))
 	if err != nil {
 		return nil, err
