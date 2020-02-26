@@ -46,6 +46,10 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 		addr := getAddrFromReq(req)
 		data := req.Data()
 		header, err := util.GetHeaderFromPacket(data)
+		fmt.Println("Guid: " + base64.StdEncoding.EncodeToString(header.Guid))
+		fmt.Printf("Total: %d\n", header.Total)
+		fmt.Printf("Index: %d\n", header.Index)
+		fmt.Printf("Size: %d\n", header.PayloadSize)
 		if err != nil {
 			onWrite(addr, nil, err)
 			return
@@ -69,7 +73,6 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 		if err != nil {
 			fmt.Println("Guid: " + guid64)
 			fmt.Printf("LEN: %d", len(encryptedData))
-			fmt.Println(string(encryptedData))
 			onWrite(addr, nil, err)
 			return
 		}
