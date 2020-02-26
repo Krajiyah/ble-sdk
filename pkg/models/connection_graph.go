@@ -1,9 +1,8 @@
 package models
 
 import (
-	"bytes"
-	"encoding/gob"
 	"encoding/json"
+	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"strings"
 	"sync"
 )
@@ -30,7 +29,7 @@ func NewConnectionGraphFromRaw(raw map[string]string) *ConnectionGraph {
 
 // Data will return serialized form of struct as bytes
 func (cg *ConnectionGraph) Data() ([]byte, error) {
-	return encode(cg.GetAll())
+	return util.Encode(cg.GetAll())
 }
 
 // Set will update the map
@@ -72,10 +71,8 @@ func (cg *ConnectionGraph) String() string {
 
 // GetConnectionGraphFromBytes constructs the map from bytes
 func GetConnectionGraphFromBytes(data []byte) (*ConnectionGraph, error) {
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
 	var m map[string]string
-	err := dec.Decode(&m)
+	err := util.Decode(data, &m)
 	if err != nil {
 		return nil, err
 	}

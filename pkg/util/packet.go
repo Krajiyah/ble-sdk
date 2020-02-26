@@ -1,10 +1,8 @@
 package util
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/gob"
 	"errors"
 	"sync"
 
@@ -39,13 +37,7 @@ type PacketAggregator struct {
 
 // Data will serialize BLEPacket to []byte
 func (p *BLEPacket) Data() ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(p)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return Encode(p)
 }
 
 // NewPacketAggregator makes new struct for packet aggregation
@@ -83,10 +75,8 @@ func (pa *PacketAggregator) PopAllDataFromPackets(guid string) ([]byte, error) {
 
 // AddPacketFromPacketBytes will take the input bytes, parse to packet struct, and add to store (returns guid)
 func (pa *PacketAggregator) AddPacketFromPacketBytes(packetBytes []byte) (string, error) {
-	buf := bytes.NewBuffer(packetBytes)
-	dec := gob.NewDecoder(buf)
 	var packet BLEPacket
-	err := dec.Decode(&packet)
+	err := Decode(packetBytes, &packet)
 	if err != nil {
 		return "", err
 	}

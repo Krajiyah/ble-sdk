@@ -1,8 +1,7 @@
 package models
 
 import (
-	"bytes"
-	"encoding/gob"
+	"github.com/Krajiyah/ble-sdk/pkg/util"
 )
 
 // LogLevel is the enum for client to server logging levels
@@ -42,56 +41,38 @@ type ForwarderRequest struct {
 	IsWrite  bool
 }
 
-func encode(x interface{}) ([]byte, error) {
-	buf := bytes.NewBuffer([]byte{})
-	enc := gob.NewEncoder(buf)
-	err := enc.Encode(x)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
 // Data will return serialized form of struct as bytes
 func (c *ClientStateRequest) Data() ([]byte, error) {
-	return encode(c)
+	return util.Encode(c)
 }
 
 // Data will return serialized form of struct as bytes
 func (c *ClientLogRequest) Data() ([]byte, error) {
-	return encode(c)
+	return util.Encode(c)
 }
 
 // Data will return serialized form of struct as bytes
 func (f *ForwarderRequest) Data() ([]byte, error) {
-	return encode(f)
-}
-
-func getDecoder(data []byte) *gob.Decoder {
-	buf := bytes.NewBuffer(data)
-	return gob.NewDecoder(buf)
+	return util.Encode(f)
 }
 
 // GetClientStateRequestFromBytes constructs client state request from characteristic write payload
 func GetClientStateRequestFromBytes(data []byte) (*ClientStateRequest, error) {
-	dec := getDecoder(data)
 	var ret ClientStateRequest
-	err := dec.Decode(&ret)
+	err := util.Decode(data, &ret)
 	return &ret, err
 }
 
 // GetClientLogRequestFromBytes constructs client log request from characteristic write payload
 func GetClientLogRequestFromBytes(data []byte) (*ClientLogRequest, error) {
-	dec := getDecoder(data)
 	var ret ClientLogRequest
-	err := dec.Decode(&ret)
+	err := util.Decode(data, &ret)
 	return &ret, err
 }
 
 // GetForwarderRequestFromBytes constructs forwarder request from characteristic write payload
 func GetForwarderRequestFromBytes(data []byte) (*ForwarderRequest, error) {
-	dec := getDecoder(data)
 	var ret ForwarderRequest
-	err := dec.Decode(&ret)
+	err := util.Decode(data, &ret)
 	return &ret, err
 }
