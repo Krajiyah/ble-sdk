@@ -46,8 +46,7 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 		data := req.Data()
 		payload, err := server.buffer.Set(data)
 		if err != nil {
-			fmt.Printf("CHAR: %s\n", uuid)
-			fmt.Printf("LEN: %d\n", len(data))
+			fmt.Printf("BAD!: %s\n", uuid)
 			onWrite(addr, nil, err)
 			return
 		}

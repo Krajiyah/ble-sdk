@@ -243,8 +243,6 @@ func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) 
 			})
 		})
 		if e != nil {
-			fmt.Println("Failed to write!")
-			fmt.Println(e.Error())
 			err = e
 		}
 	}

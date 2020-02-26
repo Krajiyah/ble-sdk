@@ -104,7 +104,9 @@ func decodeFromPacket(data []byte) (*header, []byte, error) {
 }
 
 func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
+	fmt.Println("Original Data: " + base64.StdEncoding.EncodeToString(payload))
 	data, err := Encrypt(payload, secret)
+	fmt.Println("Encrypted Data: " + base64.StdEncoding.EncodeToString(data))
 	if err != nil {
 		return nil, err
 	}
@@ -153,6 +155,7 @@ func decodePacketsToData(packets [][]byte, secret string) ([]byte, error) {
 	for _, b := range sortables {
 		encData = append(encData, b.data...)
 	}
+	fmt.Println("Encrypted Data: " + base64.StdEncoding.EncodeToString(encData))
 	return Decrypt(encData, secret)
 }
 
@@ -170,6 +173,10 @@ func (buff *PacketBuffer) Set(packet []byte) ([]byte, error) {
 	buff.mutex.Lock()
 	defer buff.mutex.Unlock()
 	header, _, err := decodeFromPacket(packet)
+	fmt.Println("Header")
+	fmt.Println(header)
+	fmt.Println("Packet")
+	fmt.Println(base64.StdEncoding.EncodeToString(packet))
 	if err != nil {
 		return nil, err
 	}
