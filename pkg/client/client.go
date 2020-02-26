@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
@@ -239,34 +238,12 @@ func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error
 	return data, err
 }
 
-func split(buf []byte, lim int) [][]byte {
-	var chunk []byte
-	chunks := make([][]byte, 0, len(buf)/lim+1)
-	for len(buf) >= lim {
-		chunk, buf = buf[:lim], buf[lim:]
-		chunks = append(chunks, chunk)
-	}
-	if len(buf) > 0 {
-		chunks = append(chunks, buf[:len(buf)])
-	}
-	return chunks
-}
-
 func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) error {
-	var err error
-	dataList := split(data, util.MTU)
-	guid := uuid.New().String()
-	total := len(dataList)
-	for i, data := range dataList {
+	packets, err := util.EncodeDataAsPackets(data)
+	for _, packet := range packets {
 		e := client.retryReadWrite(func() error {
 			return util.Optimize(func() error {
-				cln := (*client.cln)
-				ctx := cln.Conn().Context()
-				ctx = context.WithValue(ctx, util.WriteGuidCtxKey, guid)
-				ctx = context.WithValue(ctx, util.WriteIndexCtxKey, i)
-				ctx = context.WithValue(ctx, util.WriteTotalCtxKey, total)
-				cln.Conn().SetContext(ctx)
-				return cln.WriteCharacteristic(c, data, false)
+				return (*client.cln).WriteCharacteristic(c, packet, false)
 			})
 		})
 		if e != nil {

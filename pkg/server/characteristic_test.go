@@ -65,11 +65,11 @@ func getRandBytes(t *testing.T) []byte {
 }
 
 func getDummyServer() *BLEServer {
-	return &BLEServer{"SomeName", "someAddr", "passwd123", Running, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, map[string][]bufferEntry{}, testBlankListener{}}
+	return &BLEServer{"SomeName", "someAddr", "passwd123", Running, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, map[string][][]byte{}, testBlankListener{}}
 }
 
-func getMockReq(data []byte, ctx context.Context) ble.Request {
-	return ble.NewRequest(&mockConn{ctx: ctx}, data, 0)
+func getMockReq(data []byte) ble.Request {
+	return ble.NewRequest(&mockConn{ctx: context.Background()}, data, 0)
 }
 
 func getMockRsp(data []byte) *mockRspWriter {
@@ -81,20 +81,22 @@ func TestWriteHandler(t *testing.T) {
 	expected := getRandBytes(t)
 	encData, err := util.Encrypt(expected, server.secret)
 	assert.NilError(t, err)
-	wasCalled := false
+	packets, err := util.EncodeDataAsPackets(encData)
+	assert.NilError(t, err)
+	callCount := 0
 	handler := generateWriteHandler(server, util.MainServiceUUID, func(addr string, actual []byte, err error) {
 		assert.Equal(t, addr, dummyAddr)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, actual, expected)
-		wasCalled = true
+		callCount++
 	})
 
 	// test write handler behavior
-	ctx := context.WithValue(context.Background(), util.WriteGuidCtxKey, "someUUID")
-	ctx = context.WithValue(ctx, util.WriteIndexCtxKey, 0)
-	ctx = context.WithValue(ctx, util.WriteTotalCtxKey, 1)
-	handler(getMockReq(encData, ctx), getMockRsp([]byte{}))
-	assert.Check(t, wasCalled, "Handler should have been called")
+	for _, packet := range packets {
+		handler(getMockReq(packet), getMockRsp([]byte{}))
+	}
+
+	assert.Equal(t, callCount, 1)
 }
 
 func TestReadHandler(t *testing.T) {
@@ -104,7 +106,7 @@ func TestReadHandler(t *testing.T) {
 		return expected, nil
 	})
 
-	req := getMockReq([]byte{}, context.Background())
+	req := getMockReq([]byte{})
 	rsp := getMockRsp([]byte{})
 
 	// test read handler behavior

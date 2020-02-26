@@ -68,7 +68,6 @@ func (c dummyClient) RawConnect(ble.AdvFilter) error { return nil }
 func (c dummyClient) WriteValue(char string, data []byte) error {
 	buf := bytes.NewBuffer(data)
 	c.mockedWriteBuffer[char] = buf
-	time.Sleep(time.Millisecond * 100)
 	return nil
 }
 

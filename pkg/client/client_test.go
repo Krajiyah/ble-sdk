@@ -196,11 +196,13 @@ func mockData(t *testing.T, data []byte, buffer *bytes.Buffer) {
 }
 
 func getWriteBufferData(t *testing.T, buffers *[]*bytes.Buffer) []byte {
-	encData := []byte{}
+	packets := [][]byte{}
 	for _, buffer := range *buffers {
 		data := buffer.Bytes()
-		encData = append(encData, data...)
+		packets = append(packets, data)
 	}
+	encData, err := util.DecodePacketsToData(packets)
+	assert.NilError(t, err)
 	data, err := util.Decrypt(encData, testSecret)
 	assert.NilError(t, err)
 	return data
