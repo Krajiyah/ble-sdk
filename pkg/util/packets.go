@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	guidSize   = 16
+	guidSize   = 32
 	headerSize = guidSize + 4 + 4 + 4
 )
 

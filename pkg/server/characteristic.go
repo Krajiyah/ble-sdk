@@ -55,6 +55,7 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 			return
 		}
 		fmt.Println("WORKS! " + uuid)
+		fmt.Println(payload)
 		onWrite(addr, payload, nil)
 	}
 }
