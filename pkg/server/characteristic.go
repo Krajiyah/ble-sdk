@@ -70,8 +70,8 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 		server.buffer[guid64] = [][]byte{}
 		if err != nil {
 			fmt.Println("Guid: " + guid64)
-			fmt.Printf("LEN: %d", len(payload))
-			fmt.Printf("Secret: %s", server.secret)
+			fmt.Printf("CHAR: %s\n", uuid)
+			fmt.Printf("Secret: %s\n", server.secret)
 			onWrite(addr, nil, err)
 			return
 		}
