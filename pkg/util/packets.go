@@ -124,13 +124,12 @@ func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
 		}
 		fmt.Println("GUID")
 		fmt.Println(base64.StdEncoding.EncodeToString(h.Guid))
-		fmt.Printf("Chunk Length: %d\n", len(chunk))
+		fmt.Println("Chunk")
+		fmt.Println(base64.StdEncoding.EncodeToString(chunk))
 		packet, err := encodeToPacket(chunk, h)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("Packet")
-		fmt.Println(base64.StdEncoding.EncodeToString(packet))
 		packets = append(packets, packet)
 	}
 	return packets, nil
@@ -138,29 +137,21 @@ func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
 
 type packetSortable struct {
 	header *header
-	chunk  []byte
+	chunk  *bytes.Buffer
 }
 
-func decodePacketsToData(packets [][]byte, secret string) ([]byte, error) {
-	sortables := []packetSortable{}
-	for _, packet := range packets {
-		h, chunk, err := decodeFromPacket(packet)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Println("GUID (v2)")
-		fmt.Println(base64.StdEncoding.EncodeToString(h.Guid))
-		fmt.Printf("Chunk Length (v2): %d\n", len(chunk))
-		fmt.Println("Packet (v2)")
-		fmt.Println(base64.StdEncoding.EncodeToString(packet))
-		sortables = append(sortables, packetSortable{header: h, chunk: chunk})
-	}
-	sort.Slice(sortables, func(i, j int) bool {
-		return sortables[i].header.Index < sortables[j].header.Index
-	})
+func decodePacketsToData(packets []*packetSortable, secret string) ([]byte, error) {
 	encData := []byte{}
-	for _, b := range sortables {
-		encData = append(encData, b.chunk...)
+	sort.Slice(packets, func(i, j int) bool {
+		return packets[i].header.Index < packets[j].header.Index
+	})
+	for _, packet := range packets {
+		chunk := packet.chunk.Bytes()
+		fmt.Println("GUID")
+		fmt.Println(base64.StdEncoding.EncodeToString(packet.header.Guid))
+		fmt.Println("Chunk")
+		fmt.Println(base64.StdEncoding.EncodeToString(chunk))
+		encData = append(encData, chunk...)
 	}
 	fmt.Println("Encrypted Data: " + base64.StdEncoding.EncodeToString(encData))
 	return Decrypt(encData, secret)
@@ -168,36 +159,31 @@ func decodePacketsToData(packets [][]byte, secret string) ([]byte, error) {
 
 type PacketBuffer struct {
 	mutex  *sync.Mutex
-	data   map[string][][]byte
+	data   map[string][]*packetSortable
 	secret string
 }
 
 func NewPacketBuffer(secret string) *PacketBuffer {
-	return &PacketBuffer{secret: secret, mutex: &sync.Mutex{}, data: map[string][][]byte{}}
+	return &PacketBuffer{secret: secret, mutex: &sync.Mutex{}, data: map[string][]*packetSortable{}}
 }
 
 func (buff *PacketBuffer) Set(packet []byte) ([]byte, error) {
 	buff.mutex.Lock()
 	defer buff.mutex.Unlock()
 	header, chunk, err := decodeFromPacket(packet)
-	fmt.Println("GUID (v1)")
-	fmt.Println(base64.StdEncoding.EncodeToString(header.Guid))
-	fmt.Printf("Chunk Length (v1): %d\n", len(chunk))
-	fmt.Println("Packet (v1)")
-	fmt.Println(base64.StdEncoding.EncodeToString(packet))
 	if err != nil {
 		return nil, err
 	}
 	guid64 := base64.StdEncoding.EncodeToString(header.Guid)
 	if _, ok := buff.data[guid64]; !ok {
-		buff.data[guid64] = [][]byte{}
+		buff.data[guid64] = []*packetSortable{}
 	}
 	packets := buff.data[guid64]
-	packets = append(packets, packet)
+	packets = append(packets, &packetSortable{header: header, chunk: bytes.NewBuffer(chunk)})
 	buff.data[guid64] = packets
 	if uint32(len(packets)) < header.Total {
 		return nil, nil
 	}
-	buff.data[guid64] = [][]byte{}
+	buff.data[guid64] = nil
 	return decodePacketsToData(packets, buff.secret)
 }

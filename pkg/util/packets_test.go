@@ -19,33 +19,22 @@ func TestBytesToNum(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestEncodeDecodePacketsLarge(t *testing.T) {
-	expected := getRandBytes(largeDataSize)
-	packets, err := EncodeDataAsPackets(expected, secret)
-	assert.NilError(t, err)
-	actual, err := decodePacketsToData(packets, secret)
-	assert.NilError(t, err)
-	assert.DeepEqual(t, expected, actual)
-}
-
-func TestEncodeDecodePacketsSmall(t *testing.T) {
-	expected := getRandBytes(smallDataSize)
-	packets, err := EncodeDataAsPackets(expected, secret)
-	assert.NilError(t, err)
-	actual, err := decodePacketsToData(packets, secret)
-	assert.NilError(t, err)
-	assert.DeepEqual(t, expected, actual)
+func testEncodeAndBuff(size int) func(*testing.T) {
+	return func(t *testing.T) {
+		expected := getRandBytes(size)
+		packets, err := EncodeDataAsPackets(expected, secret)
+		assert.NilError(t, err)
+		buff := NewPacketBuffer(secret)
+		var actual []byte
+		for _, packet := range packets {
+			actual, err = buff.Set(packet)
+			assert.NilError(t, err)
+		}
+		assert.DeepEqual(t, expected, actual)
+	}
 }
 
 func TestEncodeAndBuff(t *testing.T) {
-	expected := getRandBytes(smallDataSize)
-	packets, err := EncodeDataAsPackets(expected, secret)
-	assert.NilError(t, err)
-	buff := NewPacketBuffer(secret)
-	var actual []byte
-	for _, packet := range packets {
-		actual, err = buff.Set(packet)
-		assert.NilError(t, err)
-	}
-	assert.DeepEqual(t, expected, actual)
+	t.Run("Small", testEncodeAndBuff(smallDataSize))
+	t.Run("Large", testEncodeAndBuff(largeDataSize))
 }
