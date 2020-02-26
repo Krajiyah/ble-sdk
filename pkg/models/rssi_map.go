@@ -1,11 +1,11 @@
 package models
 
 import (
-	"bytes"
-	"encoding/gob"
 	"encoding/json"
 	"strings"
 	"sync"
+
+	"github.com/Krajiyah/ble-sdk/pkg/util"
 )
 
 // RssiMap is type alias for rssi map (routing tables)
@@ -32,7 +32,7 @@ func NewRssiMapFromRaw(raw map[string]map[string]int) *RssiMap {
 
 // Data will return serialized form of struct as bytes
 func (rm *RssiMap) Data() ([]byte, error) {
-	return encode(rm.GetAll())
+	return util.Encode(rm.GetAll())
 }
 
 // Set will update the map
@@ -83,10 +83,8 @@ func (rm *RssiMap) String() string {
 
 // GetRssiMapFromBytes constructs client state request from characteristic write payload
 func GetRssiMapFromBytes(data []byte) (*RssiMap, error) {
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
 	var m map[string]map[string]int
-	err := dec.Decode(&m)
+	err := util.Decode(data, &m)
 	if err != nil {
 		return nil, err
 	}
