@@ -68,7 +68,9 @@ func encodeToPacket(chunk []byte, h header) ([]byte, error) {
 }
 
 func decodeFromPacket(data []byte) (*header, []byte, error) {
-	packet := bytes.NewBuffer(data)
+	copiedData := make([]byte, len(data))
+	copy(copiedData[:], data[:len(data)])
+	packet := bytes.NewBuffer(copiedData)
 	guid := make([]byte, guidSize)
 	_, err := packet.Read(guid)
 	if err != nil {
