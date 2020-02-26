@@ -9,8 +9,8 @@ import (
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
-	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/linux"
+	"github.com/go-ble/ble"
+	"github.com/go-ble/ble/linux"
 	"golang.org/x/net/context"
 )
 
@@ -285,7 +285,7 @@ func IsForwarder(a ble.Advertisement) bool {
 
 func (client *BLEClient) wrapFilter(fn func(ble.Advertisement) bool) func(ble.Advertisement) bool {
 	return func(a ble.Advertisement) bool {
-		addr := a.Address().String()
+		addr := a.Addr().String()
 		rssi := a.RSSI()
 		client.rssiMap.Set(client.addr, addr, rssi)
 		b := fn(a)
@@ -297,7 +297,7 @@ func (client *BLEClient) wrapFilter(fn func(ble.Advertisement) bool) func(ble.Ad
 }
 
 func (client *BLEClient) serverFilter(a ble.Advertisement) bool {
-	return util.AddrEqualAddr(a.Address().String(), client.serverAddr)
+	return util.AddrEqualAddr(a.Addr().String(), client.serverAddr)
 }
 
 // RawScan exposes underlying BLE scanner
@@ -320,7 +320,7 @@ func (client *BLEClient) scan() {
 		time.Sleep(ScanInterval)
 		client.RawScan(func(a ble.Advertisement) {
 			rssi := a.RSSI()
-			addr := a.Address().String()
+			addr := a.Addr().String()
 			client.rssiMap.Set(client.addr, addr, rssi)
 		})
 	}

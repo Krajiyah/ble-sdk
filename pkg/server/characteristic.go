@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
-	"github.com/currantlabs/ble"
+	"github.com/go-ble/ble"
 )
 
 // BLEReadCharacteristic is a struct representation of characteristic that can handle read operations from clients

@@ -11,8 +11,8 @@ import (
 	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
-	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/linux"
+	"github.com/go-ble/ble"
+	"github.com/go-ble/ble/linux"
 	"golang.org/x/net/context"
 )
 
@@ -152,7 +152,7 @@ func (forwarder *BLEForwarder) scanLoop() {
 
 func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	rssi := a.RSSI()
-	addr := a.Address().String()
+	addr := a.Addr().String()
 	forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
 	if !client.IsForwarder(a) {
 		return nil
@@ -244,7 +244,7 @@ func (forwarder *BLEForwarder) connect(addr string) (int, error) {
 	forwarder.connectedAddr = ""
 	rssi := 0
 	err := forwarder.forwardingClient.RawConnect(func(a ble.Advertisement) bool {
-		b := util.AddrEqualAddr(a.Address().String(), addr)
+		b := util.AddrEqualAddr(a.Addr().String(), addr)
 		if b {
 			rssi = a.RSSI()
 		}
@@ -355,8 +355,12 @@ func newEndReadForwardChar(forwarder *BLEForwarder) *server.BLEReadCharacteristi
 		if !forwarder.isConnectedToServer() {
 			return forwarder.forwardingClient.ReadValue(util.EndReadForwardCharUUID)
 		}
-		data, err := forwarder.forwardingClient.ReadValue(forwarder.readCharUUID)
-		forwarder.readCharUUIDMutex.Unlock()
-		return data, err
+		if forwarder.readCharUUID != "" {
+			data, err := forwarder.forwardingClient.ReadValue(forwarder.readCharUUID)
+			forwarder.readCharUUID = ""
+			forwarder.readCharUUIDMutex.Unlock()
+			return data, err
+		}
+		return nil, errors.New("StartReadChar not invoked, so can not EndReadChar")
 	}, DoInBackground: noop}
 }

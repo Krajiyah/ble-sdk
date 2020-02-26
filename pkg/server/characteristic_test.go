@@ -8,7 +8,7 @@ import (
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
-	"github.com/currantlabs/ble"
+	"github.com/go-ble/ble"
 	"gotest.tools/assert"
 )
 

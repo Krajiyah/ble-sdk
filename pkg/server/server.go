@@ -7,8 +7,8 @@ import (
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
-	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/linux"
+	"github.com/go-ble/ble"
+	"github.com/go-ble/ble/linux"
 )
 
 const (
