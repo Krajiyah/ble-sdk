@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"strconv"
 	"time"
@@ -22,6 +21,11 @@ type BLEServerInt interface {
 	Run() error
 }
 
+type bufferEntry struct {
+	Index int
+	Data  []byte
+}
+
 // BLEServer is the struct used for instantiating a ble server
 type BLEServer struct {
 	name            string
@@ -31,7 +35,7 @@ type BLEServer struct {
 	connectionGraph *ConnectionGraph
 	rssiMap         *RssiMap
 	clientStateMap  map[string]BLEClientState
-	buffer          map[string]*bytes.Buffer
+	buffer          map[string][]bufferEntry
 	listener        BLEServerStatusListener
 }
 
@@ -49,7 +53,7 @@ func newBLEServer(name string, addr string, secret string, listener BLEServerSta
 	return &BLEServer{
 		name, addr, secret, Running,
 		NewConnectionGraph(), NewRssiMap(),
-		map[string]BLEClientState{}, map[string]*bytes.Buffer{}, listener,
+		map[string]BLEClientState{}, map[string][]bufferEntry{}, listener,
 	}
 }
 

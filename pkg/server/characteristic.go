@@ -1,12 +1,12 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"strings"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
+	"github.com/bradfitz/slice"
 	"github.com/go-ble/ble"
 )
 
@@ -44,14 +44,26 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 	return func(req ble.Request, rsp ble.ResponseWriter) {
 		addr := getAddrFromReq(req)
 		data := req.Data()
-		if _, ok := server.buffer[addr]; !ok {
-			server.buffer[addr] = bytes.NewBuffer([]byte{})
+		ctx := req.Conn().Context()
+		guid := ctx.Value(util.WriteGuidCtxKey).(string)
+		i := ctx.Value(util.WriteIndexCtxKey).(int)
+		total := ctx.Value(util.WriteTotalCtxKey).(int)
+		if _, ok := server.buffer[guid]; !ok {
+			server.buffer[guid] = []bufferEntry{}
 		}
-		if string(data) != util.WriteTerminator {
-			server.buffer[addr].Write(data)
+		arr := server.buffer[guid]
+		arr = append(arr, bufferEntry{Index: i, Data: data})
+		server.buffer[guid] = arr
+		if len(arr) < total {
 			return
 		}
-		encryptedData := server.buffer[addr].Bytes()
+		slice.Sort(arr, func(i, j int) bool {
+			return arr[i].Index < arr[j].Index
+		})
+		encryptedData := []byte{}
+		for _, b := range arr {
+			encryptedData = append(encryptedData, b.Data...)
+		}
 		data, err := util.Decrypt(encryptedData, server.secret)
 		if err != nil {
 			onWrite(addr, nil, err)

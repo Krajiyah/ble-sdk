@@ -39,6 +39,23 @@ func setForwarderConnection() {
 	testRssiMap.Set(testAddr, testForwarderAddr, testRSSI)
 }
 
+type mockConn struct {
+	ctx context.Context
+}
+
+func (c *mockConn) Context() context.Context          { return c.ctx }
+func (c *mockConn) SetContext(ctx context.Context)    { c.ctx = ctx }
+func (c *mockConn) LocalAddr() ble.Addr               { return ble.NewAddr(testAddr) }
+func (c *mockConn) RemoteAddr() ble.Addr              { return ble.NewAddr(testAddr) }
+func (c *mockConn) RxMTU() int                        { return util.MTU }
+func (c *mockConn) SetRxMTU(mtu int)                  {}
+func (c *mockConn) TxMTU() int                        { return util.MTU }
+func (c *mockConn) SetTxMTU(mtu int)                  {}
+func (c *mockConn) Disconnected() <-chan struct{}     { return make(chan struct{}) }
+func (c *mockConn) Read(p []byte) (n int, err error)  { return 0, nil }
+func (c *mockConn) Write(p []byte) (n int, err error) { return 0, nil }
+func (c *mockConn) Close() error                      { return nil }
+
 type dummyCoreClient struct {
 	testAddr            string
 	mockedReadCharData  *bytes.Buffer
@@ -95,7 +112,7 @@ func (c *dummyCoreClient) Unsubscribe(char *ble.Characteristic, ind bool) error 
 func (c *dummyCoreClient) ClearSubscriptions() error                            { return nil }
 func (c *dummyCoreClient) CancelConnection() error                              { return nil }
 func (c *dummyCoreClient) Disconnected() <-chan struct{}                        { return nil }
-func (c *dummyCoreClient) Conn() ble.Conn                                       { return nil }
+func (c *dummyCoreClient) Conn() ble.Conn                                       { return &mockConn{ctx: context.Background()} }
 
 type testBleConnector struct {
 	addr    string
@@ -182,9 +199,7 @@ func getWriteBufferData(t *testing.T, buffers *[]*bytes.Buffer) []byte {
 	encData := []byte{}
 	for _, buffer := range *buffers {
 		data := buffer.Bytes()
-		if string(data) != util.WriteTerminator {
-			encData = append(encData, data...)
-		}
+		encData = append(encData, data...)
 	}
 	data, err := util.Decrypt(encData, testSecret)
 	assert.NilError(t, err)

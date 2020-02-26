@@ -2,10 +2,12 @@ package client
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
 
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
@@ -253,11 +255,18 @@ func split(buf []byte, lim int) [][]byte {
 func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) error {
 	var err error
 	dataList := split(data, util.MTU)
-	dataList = append(dataList, []byte(util.WriteTerminator))
-	for _, data := range dataList {
+	guid := uuid.New().String()
+	total := len(dataList)
+	for i, data := range dataList {
 		e := client.retryReadWrite(func() error {
 			return util.Optimize(func() error {
-				return (*client.cln).WriteCharacteristic(c, data, false)
+				cln := (*client.cln)
+				ctx := cln.Conn().Context()
+				ctx = context.WithValue(ctx, util.WriteGuidCtxKey, guid)
+				ctx = context.WithValue(ctx, util.WriteIndexCtxKey, i)
+				ctx = context.WithValue(ctx, util.WriteTotalCtxKey, total)
+				cln.Conn().SetContext(ctx)
+				return cln.WriteCharacteristic(c, data, false)
 			})
 		})
 		if e != nil {
