@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
@@ -45,34 +44,14 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 	return func(req ble.Request, rsp ble.ResponseWriter) {
 		addr := getAddrFromReq(req)
 		data := req.Data()
-		header, err := util.GetHeaderFromPacket(data)
-		fmt.Println("Guid: " + base64.StdEncoding.EncodeToString(header.Guid))
-		fmt.Printf("Total: %d\n", header.Total)
-		fmt.Printf("Index: %d\n", header.Index)
-		fmt.Printf("Size: %d\n", header.PayloadSize)
+		payload, err := server.buffer.Set(data)
 		if err != nil {
-			onWrite(addr, nil, err)
-			return
-		}
-		guid64 := base64.StdEncoding.EncodeToString(header.Guid)
-		if _, ok := server.buffer[guid64]; !ok {
-			server.buffer[guid64] = [][]byte{}
-		}
-		arr := server.buffer[guid64]
-		arr = append(arr, data)
-		server.buffer[guid64] = arr
-		if uint32(len(arr)) < header.Total {
-			fmt.Println("Not filled yet...continue")
-			return
-		}
-		fmt.Println("Filled!")
-		payload, err := util.DecodePacketsToData(arr, server.secret)
-		server.buffer[guid64] = [][]byte{}
-		if err != nil {
-			fmt.Println("Guid: " + guid64)
 			fmt.Printf("CHAR: %s\n", uuid)
 			fmt.Printf("Secret: %s\n", server.secret)
 			onWrite(addr, nil, err)
+			return
+		}
+		if payload == nil {
 			return
 		}
 		onWrite(addr, payload, nil)

@@ -57,7 +57,8 @@ func (l testBlankListener) OnClientLog(r ClientLogRequest) {}
 func (l testBlankListener) OnReadOrWriteError(err error)   {}
 
 func getDummyServer() *BLEServer {
-	return &BLEServer{"SomeName", "someAddr", "passwd123", Running, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, map[string][][]byte{}, testBlankListener{}}
+	secret := "passwd123"
+	return &BLEServer{"SomeName", "someAddr", secret, Running, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, util.NewPacketBuffer(secret), testBlankListener{}}
 }
 
 func getMockReq(data []byte) ble.Request {

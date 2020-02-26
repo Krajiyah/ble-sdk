@@ -30,7 +30,7 @@ type BLEServer struct {
 	connectionGraph *ConnectionGraph
 	rssiMap         *RssiMap
 	clientStateMap  map[string]BLEClientState
-	buffer          map[string][][]byte
+	buffer          *util.PacketBuffer
 	listener        BLEServerStatusListener
 }
 
@@ -48,7 +48,7 @@ func newBLEServer(name string, addr string, secret string, listener BLEServerSta
 	return &BLEServer{
 		name, addr, secret, Running,
 		NewConnectionGraph(), NewRssiMap(),
-		map[string]BLEClientState{}, map[string][][]byte{}, listener,
+		map[string]BLEClientState{}, util.NewPacketBuffer(secret), listener,
 	}
 }
 

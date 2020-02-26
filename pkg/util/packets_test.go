@@ -16,7 +16,7 @@ func TestEncodeDecodePacketsLarge(t *testing.T) {
 	expected := getRandBytes(largeDataSize)
 	packets, err := EncodeDataAsPackets(expected, secret)
 	assert.NilError(t, err)
-	actual, err := DecodePacketsToData(packets, secret)
+	actual, err := decodePacketsToData(packets, secret)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, expected, actual)
 }
@@ -25,7 +25,7 @@ func TestEncodeDecodePacketsSmall(t *testing.T) {
 	expected := getRandBytes(smallDataSize)
 	packets, err := EncodeDataAsPackets(expected, secret)
 	assert.NilError(t, err)
-	actual, err := DecodePacketsToData(packets, secret)
+	actual, err := decodePacketsToData(packets, secret)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, expected, actual)
 }

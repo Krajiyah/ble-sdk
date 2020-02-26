@@ -3,8 +3,10 @@ package util
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"sync"
 
 	"github.com/bradfitz/slice"
 )
@@ -131,7 +133,7 @@ type packetSortable struct {
 	data  []byte
 }
 
-func DecodePacketsToData(packets [][]byte, secret string) ([]byte, error) {
+func decodePacketsToData(packets [][]byte, secret string) ([]byte, error) {
 	sortables := []packetSortable{}
 	for _, packet := range packets {
 		h, chunk, err := decodeFromPacket(packet)
@@ -150,10 +152,34 @@ func DecodePacketsToData(packets [][]byte, secret string) ([]byte, error) {
 	return Decrypt(encData, secret)
 }
 
-func GetHeaderFromPacket(packet []byte) (*header, error) {
-	h, _, err := decodeFromPacket(packet)
+type PacketBuffer struct {
+	mutex  *sync.Mutex
+	data   map[string][][]byte
+	secret string
+}
+
+func NewPacketBuffer(secret string) *PacketBuffer {
+	return &PacketBuffer{secret: secret, mutex: &sync.Mutex{}, data: map[string][][]byte{}}
+}
+
+func (buff *PacketBuffer) Set(packet []byte) ([]byte, error) {
+	buff.mutex.Lock()
+	defer buff.mutex.Unlock()
+	header, _, err := decodeFromPacket(packet)
 	if err != nil {
 		return nil, err
 	}
-	return h, nil
+	guid64 := base64.StdEncoding.EncodeToString(header.Guid)
+
+	if _, ok := buff.data[guid64]; !ok {
+		buff.data[guid64] = [][]byte{}
+	}
+	packets := buff.data[guid64]
+	packets = append(packets, packet)
+	buff.data[guid64] = packets
+	if uint32(len(packets)) < header.Total {
+		return nil, nil
+	}
+	buff.data[guid64] = [][]byte{}
+	return decodePacketsToData(packets, buff.secret)
 }
