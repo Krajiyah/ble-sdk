@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"sync"
@@ -241,9 +242,14 @@ func (client *BLEClient) optimizedReadChar(c *ble.Characteristic) ([]byte, error
 func (client *BLEClient) optimizedWriteChar(c *ble.Characteristic, data []byte) error {
 	packets, err := util.EncodeDataAsPackets(data)
 	for _, packet := range packets {
+		header, _ := util.GetHeaderFromPacket(packet)
+		fmt.Println("Guid: " + base64.StdEncoding.EncodeToString(header.Guid))
+		fmt.Printf("Total: %d\n", header.Total)
+		fmt.Printf("Index: %d\n", header.Index)
+		fmt.Printf("Size: %d\n", header.PayloadSize)
 		e := client.retryReadWrite(func() error {
 			return util.Optimize(func() error {
-				return (*client.cln).WriteCharacteristic(c, packet, false)
+				return (*client.cln).WriteCharacteristic(c, packet, true)
 			})
 		})
 		if e != nil {
