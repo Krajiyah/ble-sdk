@@ -88,7 +88,7 @@ func decodeFromPacket(data []byte) (*header, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	payload := make([]byte, bytesToNum(payloadSize))
+	payload := make([]byte, int(bytesToNum(payloadSize)))
 	_, err = packet.Read(payload)
 	if err != nil {
 		return nil, nil, err
@@ -170,7 +170,6 @@ func (buff *PacketBuffer) Set(packet []byte) ([]byte, error) {
 		return nil, err
 	}
 	guid64 := base64.StdEncoding.EncodeToString(header.Guid)
-
 	if _, ok := buff.data[guid64]; !ok {
 		buff.data[guid64] = [][]byte{}
 	}
