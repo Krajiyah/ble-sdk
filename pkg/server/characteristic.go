@@ -61,10 +61,13 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 		arr := server.buffer[guid64]
 		arr = append(arr, data)
 		server.buffer[guid64] = arr
-		if len(arr) < int(header.Total) {
+		if uint32(len(arr)) < header.Total {
+			fmt.Println("Not filled yet...continue")
 			return
 		}
+		fmt.Println("Filled!")
 		encryptedData, err := util.DecodePacketsToData(arr)
+		server.buffer[guid64] = [][]byte{}
 		if err != nil {
 			onWrite(addr, nil, err)
 			return
