@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/bradfitz/slice"
@@ -57,7 +58,7 @@ func encodeToPacket(chunk []byte, h header) ([]byte, error) {
 	packet.Write([]byte(h.Guid))
 	packet.Write(numToBytes(h.Index))
 	packet.Write(numToBytes(h.Total))
-	packet.Write(numToBytes(uint32(len(chunk))))
+	packet.Write(numToBytes(h.PayloadSize))
 	packet.Write(chunk)
 	b := packet.Bytes()
 	if len(b) > MTU {
@@ -108,7 +109,6 @@ func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
 		return nil, err
 	}
 	guid := getRandBytes(guidSize)
-	dataLength := uint32(len(data))
 	chunks := split(data, MTU-headerSize)
 	total := len(chunks)
 	packets := [][]byte{}
@@ -117,12 +117,16 @@ func EncodeDataAsPackets(payload []byte, secret string) ([][]byte, error) {
 			Guid:        guid,
 			Index:       uint32(i),
 			Total:       uint32(total),
-			PayloadSize: dataLength,
+			PayloadSize: uint32(len(chunk)),
 		}
+		fmt.Println("Header")
+		fmt.Println(h)
 		packet, err := encodeToPacket(chunk, h)
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println("Packet")
+		fmt.Println(base64.StdEncoding.EncodeToString(packet))
 		packets = append(packets, packet)
 	}
 	return packets, nil
