@@ -60,16 +60,16 @@ func generateReadHandler(server *BLEServer, uuid string, load func(string, conte
 		addr := getAddrFromReq(req)
 		data, err := load(addr, req.Conn().Context())
 		if err != nil {
-			server.listener.OnReadOrWriteError(err)
+			server.listener.OnInternalError(err)
 			return
 		}
 		if data == nil || len(data) == 0 {
-			server.listener.OnReadOrWriteError(errors.New("empty data returned from read char loader"))
+			server.listener.OnInternalError(errors.New("empty data returned from read char loader"))
 			return
 		}
 		encryptedData, err := util.Encrypt(data, server.secret)
 		if err != nil {
-			server.listener.OnReadOrWriteError(err)
+			server.listener.OnInternalError(err)
 			return
 		}
 		rsp.Write(encryptedData)

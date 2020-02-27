@@ -49,6 +49,10 @@ func (l *exampleListener) OnTimeSync() {
 	fmt.Println("Client has syncronized time with server.")
 }
 
+func (l *exampleListener) OnInternalError(err error) {
+	fmt.Println("Internal Error: " + err.Error())
+}
+
 func main() {
 	if Name == "" || BLESecret == "" || BLEClientAddr == "" || BLEServerAddr == "" {
 		fmt.Println("please compile this with BLESecret, BLEClientAddr, and BLEServerAddr as ldflag")

@@ -16,8 +16,9 @@ const (
 	PollingInterval = time.Second * 2
 )
 
-// BLEServerInt is a interface used to abstract BLEServer
-type BLEServerInt interface {
+type Server interface {
+	GetRssiMap() *RssiMap
+	GetConnectionGraph() *ConnectionGraph
 	Run() error
 }
 
@@ -128,13 +129,13 @@ func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 	lastHeard := map[string]int64{}
 	return &BLEWriteCharacteristic{util.ClientStateUUID, func(a string, data []byte, err error) {
 		if err != nil {
-			server.listener.OnReadOrWriteError(err)
+			server.listener.OnInternalError(err)
 			return
 		}
 		r, err := GetClientStateRequestFromBytes(data)
 		lastHeard[r.Addr] = util.UnixTS()
 		if err != nil {
-			server.listener.OnReadOrWriteError(err)
+			server.listener.OnInternalError(err)
 			return
 		}
 		state := BLEClientState{Name: r.Name, Status: Connected, ConnectedAddr: r.ConnectedAddr, RssiMap: r.RssiMap}
@@ -162,12 +163,12 @@ func newTimeSyncChar(server *BLEServer) *BLEReadCharacteristic {
 func newClientLogChar(server *BLEServer) *BLEWriteCharacteristic {
 	return &BLEWriteCharacteristic{util.ClientLogUUID, func(_ string, data []byte, err error) {
 		if err != nil {
-			server.listener.OnReadOrWriteError(err)
+			server.listener.OnInternalError(err)
 			return
 		}
 		r, err := GetClientLogRequestFromBytes(data)
 		if err != nil {
-			server.listener.OnReadOrWriteError(err)
+			server.listener.OnInternalError(err)
 			return
 		}
 		server.listener.OnClientLog(*r)

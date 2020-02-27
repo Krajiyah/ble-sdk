@@ -54,7 +54,7 @@ func (l testBlankListener) OnServerStatusChanged(s BLEServerStatus, err error) {
 func (l testBlankListener) OnClientStateMapChanged(c *ConnectionGraph, r *RssiMap, m map[string]BLEClientState) {
 }
 func (l testBlankListener) OnClientLog(r ClientLogRequest) {}
-func (l testBlankListener) OnReadOrWriteError(err error)   {}
+func (l testBlankListener) OnInternalError(err error)      {}
 
 func getDummyServer() *BLEServer {
 	secret := "passwd123"

@@ -32,7 +32,7 @@ func (l myServerListener) OnClientStateMapChanged(c *models.ConnectionGraph, r *
 func (l myServerListener) OnClientLog(r models.ClientLogRequest) {
 	fmt.Println(fmt.Sprintf("Client pushed log entry: %+v", r))
 }
-func (l myServerListener) OnReadOrWriteError(err error) {
+func (l myServerListener) OnInternalError(err error) {
 	fmt.Println(fmt.Sprintf("There was an error in handling a read or write operations from a characteristic: %s", err))
 }
 

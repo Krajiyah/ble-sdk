@@ -18,34 +18,31 @@ import (
 
 const (
 	scanDuration         = time.Second * 2
-	maxConnectAttempts   = 5
 	errNotConnected      = "Forwarder is not connected"
 	errInvalidForwardReq = "Invalid forwarding request"
 )
 
-// BLEForwarder is a struct used to handle mesh network behaviors for forwarder
 type BLEForwarder struct {
 	name              string
 	addr              string
-	forwardingServer  server.BLEServerInt
-	forwardingClient  client.BLEClientInt
+	forwardingServer  server.Server
+	forwardingClient  client.Client
 	serverAddr        string
-	connectedAddr     string
 	toConnectAddr     string
 	rssiMap           *models.RssiMap
 	connectionGraph   *models.ConnectionGraph
 	readCharUUIDMutex *sync.Mutex
 	readCharUUID      string
 	listener          models.BLEForwarderListener
+	ctx               context.Context
 }
 
 func newBLEForwarder(name, addr, serverAddr string, listener models.BLEForwarderListener) *BLEForwarder {
 	return &BLEForwarder{
 		name, addr, nil, nil,
-		serverAddr, "", "",
-		models.NewRssiMap(), models.NewConnectionGraph(),
+		serverAddr, "", models.NewRssiMap(), models.NewConnectionGraph(),
 		&sync.Mutex{}, "",
-		listener,
+		listener, context.Background(),
 	}
 }
 
@@ -66,12 +63,11 @@ type forwarderServerListener struct {
 func (l *forwarderServerListener) OnClientStateMapChanged(*models.ConnectionGraph, *models.RssiMap, map[string]models.BLEClientState) {
 }
 func (l *forwarderServerListener) OnClientLog(models.ClientLogRequest) {}
-func (l *forwarderServerListener) OnReadOrWriteError(err error)        { l.listener.OnReadOrWriteError(err) }
+func (l *forwarderServerListener) OnInternalError(err error)           { l.listener.OnInternalError(err) }
 func (l *forwarderServerListener) OnServerStatusChanged(s models.BLEServerStatus, err error) {
 	l.listener.OnServerStatusChanged(s, err)
 }
 
-// NewBLEForwarder is a function that creates a new ble forwarder
 func NewBLEForwarder(name string, addr string, secret string, serverAddr string, listener models.BLEForwarderListener) (*BLEForwarder, error) {
 	d, err := linux.NewDevice()
 	if err != nil {
@@ -92,27 +88,26 @@ func NewBLEForwarder(name string, addr string, secret string, serverAddr string,
 	return f, nil
 }
 
-// GetRssiMap returns underlying data for rssi map
 func (forwarder *BLEForwarder) GetRssiMap() map[string]map[string]int {
-	return forwarder.rssiMap.GetAll()
+	a := forwarder.forwardingServer.GetRssiMap()
+	b := forwarder.forwardingClient.GetConnection().GetRssiMap()
+	c := forwarder.rssiMap
+	rm := models.NewRssiMapFromRaw(a.GetAll())
+	rm.Merge(b)
+	rm.Merge(c)
+	return rm.GetAll()
 }
 
-// GetConnectionGraph returns underlying data for connection graph
 func (forwarder *BLEForwarder) GetConnectionGraph() map[string]string {
-	return forwarder.connectionGraph.GetAll()
+	a := forwarder.forwardingServer.GetConnectionGraph()
+	b := models.NewConnectionGraphFromRaw(map[string]string{forwarder.addr: forwarder.forwardingClient.GetConnection().GetConnectedAddr()})
+	c := forwarder.connectionGraph
+	cg := models.NewConnectionGraphFromRaw(a.GetAll())
+	cg.Merge(b)
+	cg.Merge(c)
+	return cg.GetAll()
 }
 
-// GetClient returns the client abstraction for the forwarder
-func (forwarder *BLEForwarder) GetClient() *client.BLEClient {
-	return forwarder.forwardingClient.(*client.BLEClient)
-}
-
-// GetServer returns the server abstraction for the forwarder
-func (forwarder *BLEForwarder) GetServer() *server.BLEServer {
-	return forwarder.forwardingServer.(*server.BLEServer)
-}
-
-// Run is a method that runs the forwarder forever
 func (forwarder *BLEForwarder) Run() error {
 	go forwarder.scanLoop()
 	return forwarder.forwardingServer.Run()
@@ -121,7 +116,7 @@ func (forwarder *BLEForwarder) Run() error {
 func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, error) {
 	ret := []ble.Advertisement{}
 	mutex := sync.Mutex{}
-	err := forwarder.forwardingClient.RawScanWithDuration(scanDuration, func(a ble.Advertisement) {
+	err := forwarder.forwardingClient.GetConnection().ScanForDuration(forwarder.ctx, scanDuration, func(a ble.Advertisement) {
 		mutex.Lock()
 		ret = append(ret, a)
 		mutex.Unlock()
@@ -138,26 +133,24 @@ func (forwarder *BLEForwarder) scanLoop() {
 		advs, err := forwarder.collectAdvirtisements()
 		if err != nil {
 			e := errors.Wrap(err, "collectAdvirtisements error")
-			forwarder.listener.OnConnectionError(e)
+			forwarder.listener.OnInternalError(e)
 		}
 		for _, a := range advs {
 			err := forwarder.onScanned(a)
 			if err != nil {
 				e := errors.Wrap(err, "onScanned error")
-				forwarder.listener.OnError(e)
+				forwarder.listener.OnInternalError(e)
 			}
 		}
 	}
 }
 
 func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
-	rssi := a.RSSI()
 	addr := a.Addr().String()
-	forwarder.rssiMap.Set(forwarder.addr, addr, rssi)
-	if !client.IsForwarder(a) {
+	if !client.HasMainService(a) {
 		return nil
 	}
-	err := forwarder.keepTryConnect(addr)
+	err := forwarder.connect(addr)
 	if err != nil {
 		return err
 	}
@@ -169,7 +162,7 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if err != nil {
 		return err
 	}
-	err = forwarder.keepTryConnect(forwarder.toConnectAddr)
+	err = forwarder.connect(forwarder.toConnectAddr)
 	if err != nil {
 		return err
 	}
@@ -177,7 +170,12 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 }
 
 func (forwarder *BLEForwarder) updateClientState() error {
-	r := models.ClientStateRequest{Name: forwarder.name, Addr: forwarder.addr, ConnectedAddr: forwarder.serverAddr, RssiMap: forwarder.rssiMap.GetAll()}
+	r := models.ClientStateRequest{
+		Name:          forwarder.name,
+		Addr:          forwarder.addr,
+		ConnectedAddr: forwarder.serverAddr,
+		RssiMap:       forwarder.GetRssiMap(),
+	}
 	data, err := r.Data()
 	if err != nil {
 		return err
@@ -208,7 +206,7 @@ func (forwarder *BLEForwarder) updateNetworkState(addr string) error {
 }
 
 func (forwarder *BLEForwarder) refreshShortestPath() error {
-	path, err := util.ShortestPath(forwarder.rssiMap.GetAll(), forwarder.addr, forwarder.serverAddr)
+	path, err := util.ShortestPath(forwarder.GetRssiMap(), forwarder.addr, forwarder.serverAddr)
 	if err != nil {
 		return errors.Wrap(err, "Could not calc shortest path.")
 	}
@@ -217,98 +215,71 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 	}
 	nextHop := path[1]
 	forwarder.toConnectAddr = nextHop
-	err = forwarder.keepTryConnect(nextHop)
+	err = forwarder.connect(nextHop)
 	return err
 }
 
-func (forwarder *BLEForwarder) keepTryConnect(addr string) error {
-	if addr == "" || util.AddrEqualAddr(addr, forwarder.connectedAddr) {
+func (forwarder *BLEForwarder) connect(addr string) error {
+	conn := forwarder.forwardingClient.GetConnection()
+	if addr == "" || util.AddrEqualAddr(addr, conn.GetConnectedAddr()) {
 		return nil
 	}
-	err := errors.New("")
-	attempts := 0
-	rssi := 0
-	for err != nil && attempts < maxConnectAttempts {
-		rssi, err = forwarder.connect(addr)
-		if err != nil {
-			e := errors.Wrap(err, "keepTryConnect single connection error")
-			forwarder.listener.OnConnectionError(e)
-		}
-		attempts++
-	}
-	forwarder.listener.OnConnected(addr, attempts, rssi)
-	return nil
-}
-
-func (forwarder *BLEForwarder) connect(addr string) (int, error) {
-	forwarder.connectedAddr = ""
-	rssi := 0
-	err := forwarder.forwardingClient.RawConnect(func(a ble.Advertisement) bool {
-		b := util.AddrEqualAddr(a.Addr().String(), addr)
-		if b {
-			rssi = a.RSSI()
-		}
-		return b
+	return conn.Connect(forwarder.ctx, func(a ble.Advertisement) bool {
+		return util.AddrEqualAddr(a.Addr().String(), addr)
 	})
-	if err != nil {
-		return 0, err
-	}
-	forwarder.connectedAddr = addr
-	forwarder.connectionGraph.Set(forwarder.addr, addr)
-	return rssi, nil
 }
 
 func (forwarder *BLEForwarder) isConnected() bool {
-	return forwarder.connectedAddr != ""
+	return forwarder.forwardingClient.GetConnection().GetConnectedAddr() != ""
 }
 
 func (forwarder *BLEForwarder) isConnectedToServer() bool {
-	return util.AddrEqualAddr(forwarder.connectedAddr, forwarder.serverAddr)
+	return util.AddrEqualAddr(forwarder.forwardingClient.GetConnection().GetConnectedAddr(), forwarder.serverAddr)
 }
 
 func noop() {}
 
 func newReadRssiMapChar(forwarder *BLEForwarder) *server.BLEReadCharacteristic {
 	return &server.BLEReadCharacteristic{Uuid: util.ReadRssiMapCharUUID, HandleRead: func(addr string, ctx context.Context) ([]byte, error) {
-		return forwarder.rssiMap.Data()
+		return models.NewRssiMapFromRaw(forwarder.GetRssiMap()).Data()
 	}, DoInBackground: noop}
 }
 
 func newReadConnectionGraphChar(forwarder *BLEForwarder) *server.BLEReadCharacteristic {
 	return &server.BLEReadCharacteristic{Uuid: util.ReadConnectionGraphUUID, HandleRead: func(addr string, ctx context.Context) ([]byte, error) {
-		return forwarder.connectionGraph.Data()
+		return models.NewConnectionGraphFromRaw(forwarder.GetConnectionGraph()).Data()
 	}, DoInBackground: noop}
 }
 
 func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic {
 	return &server.BLEWriteCharacteristic{Uuid: util.WriteForwardCharUUID, HandleWrite: func(addr string, data []byte, err error) {
 		if err != nil {
-			forwarder.listener.OnReadOrWriteError(err)
+			forwarder.listener.OnInternalError(err)
 			return
 		}
 		if !forwarder.isConnected() {
-			forwarder.listener.OnConnectionError(errors.New(errNotConnected))
+			forwarder.listener.OnInternalError(errors.New(errNotConnected))
 			return
 		}
 		if !forwarder.isConnectedToServer() {
 			err := forwarder.forwardingClient.WriteValue(util.WriteForwardCharUUID, data)
 			if err != nil {
-				forwarder.listener.OnReadOrWriteError(err)
+				forwarder.listener.OnInternalError(err)
 				return
 			}
 		} else {
 			r, err := models.GetForwarderRequestFromBytes(data)
 			if err != nil {
-				forwarder.listener.OnError(err)
+				forwarder.listener.OnInternalError(err)
 				return
 			}
 			if r.IsRead || !r.IsWrite {
-				forwarder.listener.OnError(errors.New(errInvalidForwardReq))
+				forwarder.listener.OnInternalError(errors.New(errInvalidForwardReq))
 				return
 			}
 			err = forwarder.forwardingClient.WriteValue(r.CharUUID, r.Payload)
 			if err != nil {
-				forwarder.listener.OnReadOrWriteError(err)
+				forwarder.listener.OnInternalError(err)
 				return
 			}
 		}
@@ -318,27 +289,27 @@ func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic
 func newStartReadForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic {
 	return &server.BLEWriteCharacteristic{Uuid: util.StartReadForwardCharUUID, HandleWrite: func(addr string, data []byte, err error) {
 		if err != nil {
-			forwarder.listener.OnReadOrWriteError(err)
+			forwarder.listener.OnInternalError(err)
 			return
 		}
 		if !forwarder.isConnected() {
-			forwarder.listener.OnConnectionError(errors.New(errNotConnected))
+			forwarder.listener.OnInternalError(errors.New(errNotConnected))
 			return
 		}
 		if !forwarder.isConnectedToServer() {
 			err := forwarder.forwardingClient.WriteValue(util.StartReadForwardCharUUID, data)
 			if err != nil {
-				forwarder.listener.OnReadOrWriteError(err)
+				forwarder.listener.OnInternalError(err)
 				return
 			}
 		} else {
 			r, err := models.GetForwarderRequestFromBytes(data)
 			if err != nil {
-				forwarder.listener.OnError(err)
+				forwarder.listener.OnInternalError(err)
 				return
 			}
 			if r.IsWrite || !r.IsRead {
-				forwarder.listener.OnError(errors.New(errInvalidForwardReq))
+				forwarder.listener.OnInternalError(errors.New(errInvalidForwardReq))
 				return
 			}
 			forwarder.readCharUUIDMutex.Lock()

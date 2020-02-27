@@ -2,7 +2,7 @@ package util
 
 const (
 	// MTU is used for the max size of bytes allowed for data transmittion between ble client and server
-	MTU = 256
+	MTU = 150
 	// MainServiceUUID represents UUID for ble service for all ble characteristics
 	MainServiceUUID = "00010000-0001-1000-8000-00805F9B34FB"
 	// ClientStateUUID represents UUID for ble characteristic which handles writes from client to server for client state changes
