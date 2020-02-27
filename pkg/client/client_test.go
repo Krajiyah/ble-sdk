@@ -20,19 +20,6 @@ const (
 	testRSSI          = -50
 )
 
-type testListener struct {
-	attempts int
-	rssi     int
-}
-
-func (l *testListener) OnDisconnected()       {}
-func (l *testListener) OnTimeSync()           {}
-func (l *testListener) OnInternalError(error) {}
-func (l *testListener) OnConnected(_ string, a int, r int) {
-	l.attempts = a
-	l.rssi = r
-}
-
 func setServerConnection() *TestConnection {
 	rm := NewRssiMap()
 	rm.Set(testAddr, testServerAddr, testRSSI)
@@ -45,8 +32,8 @@ func setForwarderConnection() *TestConnection {
 	return NewTestConnection(testAddr, testForwarderAddr, rm)
 }
 
-func getTestClient(c *TestConnection) (*BLEClient, *testListener) {
-	l := &testListener{}
+func getTestClient(c *TestConnection) (*BLEClient, *TestListener) {
+	l := &TestListener{}
 	client := newBLEClient("some name", testAddr, testSecret, testServerAddr, l)
 	client.connection = c
 	return client, l
@@ -102,8 +89,8 @@ func TestConnectLoop(t *testing.T) {
 	connection := setServerConnection()
 	client, listener := getTestClient(connection)
 	client.connectLoop()
-	assert.Equal(t, listener.attempts, 1)
-	assert.Equal(t, listener.rssi, testRSSI)
+	assert.Equal(t, listener.Attempts, 1)
+	assert.Equal(t, listener.Rssi, testRSSI)
 	assert.DeepEqual(t, client.connection.GetConnectedAddr(), client.serverAddr)
 }
 

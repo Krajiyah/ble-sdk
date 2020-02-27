@@ -119,7 +119,7 @@ func (c *dummyCoreClient) Subscribe(char *ble.Characteristic, ind bool, h ble.No
 func (c *dummyCoreClient) Unsubscribe(char *ble.Characteristic, ind bool) error { return nil }
 func (c *dummyCoreClient) ClearSubscriptions() error                            { return nil }
 func (c *dummyCoreClient) CancelConnection() error                              { return nil }
-func (c *dummyCoreClient) Disconnected() <-chan struct{}                        { return nil }
+func (c *dummyCoreClient) Disconnected() <-chan struct{}                        { return make(chan struct{}) }
 func (c *dummyCoreClient) Conn() ble.Conn                                       { return &mockConn{ctx: context.Background()} }
 
 func setCharacteristic(c *RealConnection, uuid string) {
@@ -135,7 +135,7 @@ func setDummyCoreClient(c *RealConnection, d ble.Client) {
 }
 
 func newConnection() *RealConnection {
-	c := NewRealConnection(testAddr, testSecret)
+	c := NewRealConnection(testAddr, testSecret, &TestListener{})
 	c.methods = &testCoreMethods{}
 	return c
 }

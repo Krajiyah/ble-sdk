@@ -50,13 +50,15 @@ type RealConnection struct {
 	methods         coreMethods
 	characteristics map[string]*ble.Characteristic
 	mutex           *sync.Mutex
+	listener        models.BLEClientListener
 }
 
-func NewRealConnection(addr string, secret string) *RealConnection {
+func NewRealConnection(addr string, secret string, listener models.BLEClientListener) *RealConnection {
 	return &RealConnection{
 		srcAddr: addr, rssiMap: models.NewRssiMap(),
 		secret: secret, mutex: &sync.Mutex{},
 		methods: &realCoreMethods{}, characteristics: map[string]*ble.Characteristic{},
+		listener: listener,
 	}
 }
 
@@ -105,6 +107,10 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 			}
 			return b
 		})
+		go func() {
+			<-cln.Disconnected()
+			c.listener.OnDisconnected()
+		}()
 		if err != nil {
 			return errors.Wrap(err, "coreMethods Connect issue: ")
 		}

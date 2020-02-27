@@ -49,7 +49,7 @@ func newBLEClient(name string, addr string, secret string, serverAddr string, li
 	return &BLEClient{
 		name, addr, secret, Disconnected, 0,
 		&sync.Mutex{}, nil, serverAddr,
-		util.MakeINFContext(), NewRealConnection(addr, secret), listener,
+		util.MakeINFContext(), NewRealConnection(addr, secret, listener), listener,
 	}
 }
 
@@ -200,9 +200,6 @@ func (client *BLEClient) connectLoop() {
 	client.connectionLoopMutex.Lock()
 	defer client.connectionLoopMutex.Unlock()
 	client.status = Disconnected
-	if client.connectionAttempts > 0 {
-		client.listener.OnDisconnected()
-	}
 	client.connectionAttempts = 0
 	err := errors.New("")
 	for err != nil {
