@@ -134,16 +134,21 @@ func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, err
 func (forwarder *BLEForwarder) scanLoop() {
 	for {
 		time.Sleep(client.ScanInterval)
+		fmt.Println("Scanning...")
 		advs, err := forwarder.collectAdvirtisements()
 		if err != nil {
 			e := errors.Wrap(err, "collectAdvirtisements error")
 			forwarder.listener.OnInternalError(e)
+			continue
 		}
-		for _, a := range advs {
+		fmt.Printf("Advs collected: %d\n", len(advs))
+		for i, a := range advs {
 			err := forwarder.onScanned(a)
 			if err != nil {
 				e := errors.Wrap(err, "onScanned error")
 				forwarder.listener.OnInternalError(e)
+			} else {
+				fmt.Printf("Processed scans %d / %d\n", i, len(advs))
 			}
 		}
 	}
