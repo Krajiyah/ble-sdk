@@ -106,7 +106,6 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 		}
 		var connectedAddr string
 		var rssi int
-		ctx, _ = context.WithTimeout(ctx, connectTimeout)
 		cln, err := c.methods.Connect(ctx, func(a ble.Advertisement) bool {
 			c.updateRssiMap(a)
 			b := filter(a)
