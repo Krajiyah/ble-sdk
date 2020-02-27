@@ -134,21 +134,17 @@ func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, err
 func (forwarder *BLEForwarder) scanLoop() {
 	for {
 		time.Sleep(client.ScanInterval)
-		fmt.Println("Scanning...")
 		advs, err := forwarder.collectAdvirtisements()
 		if err != nil {
 			e := errors.Wrap(err, "collectAdvirtisements error")
 			forwarder.listener.OnInternalError(e)
 			continue
 		}
-		fmt.Printf("Advs collected: %d\n", len(advs))
-		for i, a := range advs {
+		for _, a := range advs {
 			err := forwarder.onScanned(a)
 			if err != nil {
 				e := errors.Wrap(err, "onScanned error")
 				forwarder.listener.OnInternalError(e)
-			} else {
-				fmt.Printf("Processed scans %d / %d\n", i, len(advs))
 			}
 		}
 	}
@@ -159,15 +155,20 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if !client.HasMainService(a) {
 		return nil
 	}
+	fmt.Println("Found some kind of real service!")
 	err := forwarder.connect(addr)
 	if err != nil {
 		return err
 	}
+	fmt.Println("Connected")
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
 		err = forwarder.updateClientState()
+		fmt.Println("updateClientState")
 	} else {
 		err = forwarder.updateNetworkState(addr)
+		fmt.Println("updateNetworkState")
 	}
+	fmt.Println("done w/ connect 1")
 	if err != nil {
 		return err
 	}
@@ -175,6 +176,7 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("done w/ connect 2")
 	return forwarder.refreshShortestPath()
 }
 
@@ -215,17 +217,19 @@ func (forwarder *BLEForwarder) updateNetworkState(addr string) error {
 }
 
 func (forwarder *BLEForwarder) refreshShortestPath() error {
+	fmt.Println("Calc short path....")
 	path, err := util.ShortestPath(forwarder.GetRssiMap(), forwarder.addr, forwarder.serverAddr)
 	if err != nil {
 		return errors.Wrap(err, "Could not calc shortest path.")
 	}
+	fmt.Printf("Done! Path len: %d\n", len(path))
 	if len(path) < 2 {
 		return fmt.Errorf("Invalid path to server: %s", path)
 	}
 	nextHop := path[1]
 	forwarder.toConnectAddr = nextHop
-	err = forwarder.connect(nextHop)
-	return err
+	fmt.Println("Connecting to nextHOP")
+	return forwarder.connect(nextHop)
 }
 
 func (forwarder *BLEForwarder) connect(addr string) error {
