@@ -206,6 +206,10 @@ func (client *BLEClient) connectLoop() {
 	for err != nil {
 		client.connectionAttempts++
 		err = client.connect()
+		// TODO: removeme
+		if client.connectionAttempts == 5 {
+			panic(err)
+		}
 	}
 	client.status = Connected
 	connectedAddr := client.connection.GetConnectedAddr()

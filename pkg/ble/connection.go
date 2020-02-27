@@ -77,6 +77,7 @@ func retry(fn func() error) error {
 }
 
 func retryAndOptimize(fn func() error) error { return retry(func() error { return util.Optimize(fn) }) }
+func retryAndCatch(fn func() error) error    { return retry(func() error { return util.CatchErrs(fn) }) }
 
 func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
 	addr := a.Addr().String()
@@ -90,7 +91,7 @@ func (c *RealConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
 func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	return retryAndOptimize(func() error {
+	return retryAndCatch(func() error {
 		if c.cln != nil {
 			c.connectedAddr = ""
 			(*c.cln).CancelConnection()
@@ -177,9 +178,7 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 	packets, err := util.EncodeDataAsPackets(data, c.secret)
 	for _, packet := range packets {
 		e := retryAndOptimize(func() error {
-			return util.Optimize(func() error {
-				return (*c.cln).WriteCharacteristic(char, packet, true)
-			})
+			return (*c.cln).WriteCharacteristic(char, packet, true)
 		})
 		if e != nil {
 			err = e
