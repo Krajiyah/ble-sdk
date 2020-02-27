@@ -100,7 +100,9 @@ func (client *BLEClient) pingLoop() {
 		}
 		if client.timeSync == nil {
 			err := client.syncTime()
-			client.listener.OnInternalError(err)
+			if err != nil {
+				client.listener.OnInternalError(err)
+			}
 		}
 	}
 }
