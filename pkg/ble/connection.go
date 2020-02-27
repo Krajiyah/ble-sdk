@@ -14,6 +14,7 @@ import (
 
 const (
 	maxRetryAttempts = 5
+	connectTimeout   = time.Second * 2
 )
 
 type coreMethods interface {
@@ -97,6 +98,7 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 			(*c.cln).CancelConnection()
 		}
 		var connectedAddr string
+		ctx, _ := context.WithTimeout(ctx, connectTimeout)
 		cln, err := c.methods.Connect(ctx, func(a ble.Advertisement) bool {
 			c.updateRssiMap(a)
 			b := filter(a)
