@@ -12,15 +12,13 @@ import (
 )
 
 type TestListener struct {
-	Attempts int
-	Rssi     int
+	Rssi int
 }
 
 func (l *TestListener) OnDisconnected()       {}
 func (l *TestListener) OnTimeSync()           {}
 func (l *TestListener) OnInternalError(error) {}
-func (l *TestListener) OnConnected(_ string, a int, r int) {
-	l.Attempts = a
+func (l *TestListener) OnConnected(_ string, r int) {
 	l.Rssi = r
 }
 

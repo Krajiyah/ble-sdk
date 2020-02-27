@@ -16,7 +16,8 @@ const (
 	maxRetryAttempts = 5
 )
 
-type disconnectListener interface {
+type connectionListener interface {
+	OnConnected(string, int)
 	OnDisconnected()
 }
 
@@ -54,10 +55,10 @@ type RealConnection struct {
 	methods         coreMethods
 	characteristics map[string]*ble.Characteristic
 	mutex           *sync.Mutex
-	listener        disconnectListener
+	listener        connectionListener
 }
 
-func NewRealConnection(addr string, secret string, listener disconnectListener) *RealConnection {
+func NewRealConnection(addr string, secret string, listener connectionListener) *RealConnection {
 	return &RealConnection{
 		srcAddr: addr, rssiMap: models.NewRssiMap(),
 		secret: secret, mutex: &sync.Mutex{},
@@ -103,11 +104,13 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 			(*c.cln).CancelConnection()
 		}
 		var connectedAddr string
+		var rssi int
 		cln, err := c.methods.Connect(ctx, func(a ble.Advertisement) bool {
 			c.updateRssiMap(a)
 			b := filter(a)
 			if b {
 				connectedAddr = a.Addr().String()
+				rssi = a.RSSI()
 			}
 			return b
 		})
@@ -134,6 +137,7 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 					c.characteristics[uuid] = char
 				}
 				c.connectedAddr = connectedAddr
+				c.listener.OnConnected(connectedAddr, rssi)
 				return nil
 			}
 		}
@@ -169,7 +173,7 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	err = retryAndOptimize(func() error {
 		dat, e := (*c.cln).ReadLongCharacteristic(char)
 		encData = dat
-		return e
+		return errors.Wrap(e, "ReadLongCharacteristic issue: ")
 	})
 	if err != nil {
 		return nil, err
@@ -191,7 +195,7 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 			return (*c.cln).WriteCharacteristic(char, packet, true)
 		})
 		if e != nil {
-			err = e
+			err = errors.Wrap(e, "WriteCharacteristic issue: ")
 		}
 	}
 	return err

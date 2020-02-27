@@ -1,7 +1,7 @@
 package models
 
 type BLEClientListener interface {
-	OnConnected(string, int, int)
+	OnConnected(string, int)
 	OnDisconnected()
 	OnTimeSync()
 	OnInternalError(error)
@@ -15,7 +15,7 @@ type BLEServerStatusListener interface {
 }
 
 type BLEForwarderListener interface {
-	OnConnected(string, int, int)
+	OnConnected(string, int)
 	OnDisconnected()
 	OnTimeSync()
 	OnInternalError(error)

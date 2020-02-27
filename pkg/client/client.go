@@ -36,7 +36,7 @@ type BLEClient struct {
 	addr                string
 	secret              string
 	status              BLEClientStatus
-	connectionAttempts  int
+	connectionAttempts  int // TODO: removeme
 	connectionLoopMutex *sync.Mutex
 	timeSync            *util.TimeSync
 	serverAddr          string
@@ -47,7 +47,7 @@ type BLEClient struct {
 
 func newBLEClient(name string, addr string, secret string, serverAddr string, listener BLEClientListener) *BLEClient {
 	return &BLEClient{
-		name, addr, secret, Disconnected, 0,
+		name, addr, secret, Disconnected, 0, // TODO: removeme
 		&sync.Mutex{}, nil, serverAddr,
 		util.MakeINFContext(), NewRealConnection(addr, secret, listener), listener,
 	}
@@ -200,10 +200,10 @@ func (client *BLEClient) connectLoop() {
 	client.connectionLoopMutex.Lock()
 	defer client.connectionLoopMutex.Unlock()
 	client.status = Disconnected
-	client.connectionAttempts = 0
+	client.connectionAttempts = 0 // TODO: removeme
 	err := errors.New("")
 	for err != nil {
-		client.connectionAttempts++
+		client.connectionAttempts++ // TODO: removeme
 		err = client.connect()
 		// TODO: removeme
 		if client.connectionAttempts == 5 {
@@ -211,9 +211,6 @@ func (client *BLEClient) connectLoop() {
 		}
 	}
 	client.status = Connected
-	connectedAddr := client.connection.GetConnectedAddr()
-	rssi, _ := client.connection.GetRssiMap().Get(client.addr, connectedAddr)
-	client.listener.OnConnected(connectedAddr, client.connectionAttempts, rssi)
 }
 
 func (client *BLEClient) connect() error {
