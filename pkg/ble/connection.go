@@ -116,13 +116,13 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 			}
 			return b
 		})
+		if err != nil {
+			return errors.Wrap(err, "coreMethods Connect issue: ")
+		}
 		go func() {
 			<-cln.Disconnected()
 			c.listener.OnDisconnected()
 		}()
-		if err != nil {
-			return errors.Wrap(err, "coreMethods Connect issue: ")
-		}
 		c.cln = &cln
 		_, err = cln.ExchangeMTU(util.MTU)
 		if err != nil {
