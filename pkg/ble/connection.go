@@ -14,7 +14,7 @@ import (
 
 const (
 	maxRetryAttempts = 5
-	connectTimeout   = time.Second * 2
+	connectTimeout   = time.Second * 5
 )
 
 type coreMethods interface {
