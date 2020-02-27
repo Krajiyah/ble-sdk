@@ -24,8 +24,11 @@ const (
 
 type Client interface {
 	GetConnection() Connection
-	WriteValue(uuid string, data []byte) error
-	ReadValue(uuid string) ([]byte, error)
+	WriteValue(string, []byte) error
+	ReadValue(string) ([]byte, error)
+	Log(ClientLogRequest) error
+	UnixTS() (int64, error)
+	Run()
 }
 
 type BLEClient struct {

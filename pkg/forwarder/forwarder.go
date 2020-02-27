@@ -108,6 +108,10 @@ func (forwarder *BLEForwarder) GetConnectionGraph() map[string]string {
 	return cg.GetAll()
 }
 
+func (forwarder *BLEForwarder) GetClient() client.Client {
+	return forwarder.forwardingClient
+}
+
 func (forwarder *BLEForwarder) Run() error {
 	go forwarder.scanLoop()
 	return forwarder.forwardingServer.Run()

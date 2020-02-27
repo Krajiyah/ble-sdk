@@ -61,6 +61,10 @@ func (c *dummyClient) WriteValue(char string, data []byte) error {
 	return nil
 }
 
+func (c *dummyClient) Log(ClientLogRequest) error { return nil }
+func (c *dummyClient) UnixTS() (int64, error)     { return 0, nil }
+func (c *dummyClient) Run()                       {}
+
 type dummyServer struct {
 	rssiMap *RssiMap
 }
