@@ -224,7 +224,7 @@ func (client *BLEClient) connect() error {
 		return util.AddrEqualAddr(a.Addr().String(), client.serverAddr)
 	})
 	if err != nil {
-		client.listener.OnInternalError(errors.Wrap(err, "Could not connect to server: %s\nSo now trying to connect to a forwarder.\n"))
+		client.listener.OnInternalError(errors.Wrap(err, "Could not connect to server.\nSo now trying to connect to a forwarder.\n"))
 		err = client.connection.Connect(client.ctx, HasMainService)
 	}
 	return err
