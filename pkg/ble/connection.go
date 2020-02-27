@@ -16,6 +16,10 @@ const (
 	maxRetryAttempts = 5
 )
 
+type disconnectListener interface {
+	OnDisconnected()
+}
+
 type coreMethods interface {
 	Connect(context.Context, ble.AdvFilter) (ble.Client, error)
 	Scan(context.Context, bool, ble.AdvHandler, ble.AdvFilter) error
@@ -50,10 +54,10 @@ type RealConnection struct {
 	methods         coreMethods
 	characteristics map[string]*ble.Characteristic
 	mutex           *sync.Mutex
-	listener        models.BLEClientListener
+	listener        disconnectListener
 }
 
-func NewRealConnection(addr string, secret string, listener models.BLEClientListener) *RealConnection {
+func NewRealConnection(addr string, secret string, listener disconnectListener) *RealConnection {
 	return &RealConnection{
 		srcAddr: addr, rssiMap: models.NewRssiMap(),
 		secret: secret, mutex: &sync.Mutex{},
