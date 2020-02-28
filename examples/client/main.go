@@ -27,8 +27,8 @@ type exampleListener struct {
 	c *client.BLEClient
 }
 
-func (l *exampleListener) OnConnected(addr string, attempts int, rssi int) {
-	fmt.Printf("Client connected to server (%s) after %d attempts with rssi %d", addr, attempts, rssi)
+func (l *exampleListener) OnConnected(addr string, rssi int) {
+	fmt.Printf("Client connected to server (%s) with rssi %d", addr, rssi)
 	for {
 		time.Sleep(time.Second * 1)
 		fmt.Println("Attempting to write to extra write char...")
@@ -47,6 +47,10 @@ func (l *exampleListener) OnDisconnected() {
 
 func (l *exampleListener) OnTimeSync() {
 	fmt.Println("Client has syncronized time with server.")
+}
+
+func (l *exampleListener) OnInternalError(err error) {
+	fmt.Println("Internal Error: " + err.Error())
 }
 
 func main() {

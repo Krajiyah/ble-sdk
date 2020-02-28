@@ -9,9 +9,10 @@ import (
 )
 
 func TestTimeout(t *testing.T) {
+	x := time.Second * 3
 	err := Timeout(func() error {
-		time.Sleep(timeout + time.Second)
+		time.Sleep(x + time.Second)
 		return errors.New("should not get called")
-	}, timeout)
+	}, x)
 	assert.ErrorContains(t, err, "Timeout")
 }

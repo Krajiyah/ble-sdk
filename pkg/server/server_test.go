@@ -25,7 +25,7 @@ func (l testBLEServerStatusListener) OnClientStateMapChanged(c *ConnectionGraph,
 	state = m
 }
 func (l testBLEServerStatusListener) OnClientLog(r ClientLogRequest) { logs = append(logs, r) }
-func (l testBLEServerStatusListener) OnReadOrWriteError(err error)   { errs = append(errs, err) }
+func (l testBLEServerStatusListener) OnInternalError(err error)      { errs = append(errs, err) }
 
 func assertSimilar(t *testing.T, x int64, y int64) {
 	diff := x - y

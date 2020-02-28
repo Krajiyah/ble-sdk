@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"time"
 
+	. "github.com/Krajiyah/ble-sdk/pkg/ble"
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux"
 )
 
 const (
@@ -16,63 +16,41 @@ const (
 	PollingInterval = time.Second * 2
 )
 
-// BLEServerInt is a interface used to abstract BLEServer
-type BLEServerInt interface {
-	Run() error
+type Server interface {
+	GetRssiMap() *RssiMap
+	GetConnectionGraph() *ConnectionGraph
 }
 
 // BLEServer is the struct used for instantiating a ble server
 type BLEServer struct {
-	name             string
-	addr             string
-	secret           string
-	status           BLEServerStatus
-	connectionGraph  *ConnectionGraph
-	rssiMap          *RssiMap
-	clientStateMap   map[string]BLEClientState
-	packetAggregator util.PacketAggregator
-	listener         BLEServerStatusListener
+	name            string
+	addr            string
+	secret          string
+	status          BLEServerStatus
+	connectionGraph *ConnectionGraph
+	rssiMap         *RssiMap
+	clientStateMap  map[string]BLEClientState
+	buffer          *util.PacketBuffer
+	listener        BLEServerStatusListener
 }
 
-// NewBLEServer creates a new BLEService
-func NewBLEServer(name string, addr string, secret string, listener BLEServerStatusListener,
-	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, error) {
-	d, err := linux.NewDevice()
+func NewBLEServer(name string, addr string, secret string, cListener BLEClientListener, sListener BLEServerStatusListener,
+	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, Connection, error) {
+	server := newBLEServer(name, addr, secret, sListener)
+	service := getService(server, moreReadChars, moreWriteChars)
+	conn, err := NewRealConnection(addr, secret, cListener, &ServiceInfo{Service: service, ServiceName: name, UUID: ble.MustParse(util.MainServiceUUID)})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return NewBLEServerSharedDevice(d, name, addr, secret, listener, moreReadChars, moreWriteChars)
+	return server, conn, nil
 }
 
 func newBLEServer(name string, addr string, secret string, listener BLEServerStatusListener) *BLEServer {
 	return &BLEServer{
 		name, addr, secret, Running,
 		NewConnectionGraph(), NewRssiMap(),
-		map[string]BLEClientState{}, util.NewPacketAggregator(), listener,
+		map[string]BLEClientState{}, util.NewPacketBuffer(secret), listener,
 	}
-}
-
-// NewBLEServerSharedDevice creates a new BLEService using shared ble device
-func NewBLEServerSharedDevice(device ble.Device, name string, addr string, secret string, listener BLEServerStatusListener,
-	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, error) {
-	server := newBLEServer(name, addr, secret, listener)
-	ble.SetDefaultDevice(device)
-	err := ble.AddService(getService(server, moreReadChars, moreWriteChars))
-	if err != nil {
-		return nil, err
-	}
-	return server, nil
-}
-
-// Run is the method called by BLEService struct for when the service is ready to listen to ble clients
-func (server *BLEServer) Run() error {
-	ctx := util.MakeINFContext()
-	err := ble.AdvertiseNameAndServices(ctx, server.name, ble.MustParse(util.MainServiceUUID))
-	server.setStatus(Crashed, err)
-	for addr := range server.clientStateMap {
-		server.setClientState(addr, BLEClientState{Name: "", Status: Disconnected, ConnectedAddr: "", RssiMap: map[string]map[string]int{}})
-	}
-	return err
 }
 
 // GetRssiMap returns the current state of the network from server perspective
@@ -128,13 +106,13 @@ func newClientStatusChar(server *BLEServer) *BLEWriteCharacteristic {
 	lastHeard := map[string]int64{}
 	return &BLEWriteCharacteristic{util.ClientStateUUID, func(a string, data []byte, err error) {
 		if err != nil {
-			server.listener.OnReadOrWriteError(err)
+			server.listener.OnInternalError(err)
 			return
 		}
 		r, err := GetClientStateRequestFromBytes(data)
 		lastHeard[r.Addr] = util.UnixTS()
 		if err != nil {
-			server.listener.OnReadOrWriteError(err)
+			server.listener.OnInternalError(err)
 			return
 		}
 		state := BLEClientState{Name: r.Name, Status: Connected, ConnectedAddr: r.ConnectedAddr, RssiMap: r.RssiMap}
@@ -162,12 +140,12 @@ func newTimeSyncChar(server *BLEServer) *BLEReadCharacteristic {
 func newClientLogChar(server *BLEServer) *BLEWriteCharacteristic {
 	return &BLEWriteCharacteristic{util.ClientLogUUID, func(_ string, data []byte, err error) {
 		if err != nil {
-			server.listener.OnReadOrWriteError(err)
+			server.listener.OnInternalError(err)
 			return
 		}
 		r, err := GetClientLogRequestFromBytes(data)
 		if err != nil {
-			server.listener.OnReadOrWriteError(err)
+			server.listener.OnInternalError(err)
 			return
 		}
 		server.listener.OnClientLog(*r)

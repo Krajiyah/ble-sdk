@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/go-ble/ble"
+	"github.com/pkg/errors"
 )
 
 const (
 	inf     = 1000000
-	timeout = time.Second * 5
+	timeout = time.Second * 20
 )
 
 func AddrEqualAddr(a string, b string) bool {
@@ -40,17 +41,17 @@ func MakeINFContext() context.Context {
 	return ble.WithSigHandler(context.WithTimeout(context.Background(), inf*time.Hour))
 }
 
-func Optimize(fn func() error) error {
-	return Timeout(func() error {
-		var err error
-		TryCatchBlock{
-			Try: func() {
-				err = fn()
-			},
-			Catch: func(e error) {
-				err = e
-			},
-		}.Do()
-		return err
-	}, timeout)
+func CatchErrs(fn func() error) error {
+	var err error
+	TryCatchBlock{
+		Try: func() {
+			err = fn()
+		},
+		Catch: func(e error) {
+			err = errors.Wrap(e, "caught panic: ")
+		},
+	}.Do()
+	return err
 }
+
+func Optimize(fn func() error) error { return Timeout(func() error { return CatchErrs(fn) }, timeout) }

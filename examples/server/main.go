@@ -32,7 +32,7 @@ func (l myServerListener) OnClientStateMapChanged(c *models.ConnectionGraph, r *
 func (l myServerListener) OnClientLog(r models.ClientLogRequest) {
 	fmt.Println(fmt.Sprintf("Client pushed log entry: %+v", r))
 }
-func (l myServerListener) OnReadOrWriteError(err error) {
+func (l myServerListener) OnInternalError(err error) {
 	fmt.Println(fmt.Sprintf("There was an error in handling a read or write operations from a characteristic: %s", err))
 }
 
@@ -66,12 +66,8 @@ func main() {
 		}},
 	}
 	fmt.Println("Starting BLE server...")
-	serv, err := server.NewBLEServer(Name, BLESecret, bluetoothAddress, myServerListener{}, moreReadChars, moreWriteChars)
+	_, _, err := server.NewBLEServer(Name, BLESecret, bluetoothAddress, nil, myServerListener{}, moreReadChars, moreWriteChars)
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble server: " + err.Error())
-	}
-	err = serv.Run()
-	if err != nil {
-		fmt.Println("Ooops! Something went wrong with running the ble server: " + err.Error())
 	}
 }

@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
@@ -43,68 +42,37 @@ func newReadChar(server *BLEServer, uuid string, load func(string, context.Conte
 func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr string, data []byte, err error)) func(req ble.Request, rsp ble.ResponseWriter) {
 	return func(req ble.Request, rsp ble.ResponseWriter) {
 		addr := getAddrFromReq(req)
-		guid, err := server.packetAggregator.AddPacketFromPacketBytes(req.Data())
+		data := req.Data()
+		payload, err := server.buffer.Set(data)
 		if err != nil {
 			onWrite(addr, nil, err)
 			return
 		}
-		if server.packetAggregator.HasDataFromPacketStream(guid) {
-			encryptedData, _ := server.packetAggregator.PopAllDataFromPackets(guid)
-			data, err := util.Decrypt(encryptedData, server.secret)
-			if err != nil {
-				onWrite(addr, nil, err)
-				return
-			}
-			onWrite(addr, data, nil)
+		if payload == nil {
+			return
 		}
+		onWrite(addr, payload, nil)
 	}
-}
-
-type sessionKeyType string
-
-func getSessionKey(uuid string, addr string) sessionKeyType {
-	return sessionKeyType(fmt.Sprintf("session || %s || %s", uuid, addr))
 }
 
 func generateReadHandler(server *BLEServer, uuid string, load func(string, context.Context) ([]byte, error)) func(req ble.Request, rsp ble.ResponseWriter) {
 	return func(req ble.Request, rsp ble.ResponseWriter) {
 		addr := getAddrFromReq(req)
-		sessionKey := getSessionKey(uuid, addr)
-		ctx := req.Conn().Context()
-		var guid string
-		if ctx.Value(sessionKey) != nil {
-			guid = ctx.Value(sessionKey).(string)
-		} else {
-			data, err := load(addr, ctx)
-			if err != nil {
-				server.listener.OnReadOrWriteError(err)
-				return
-			}
-			if data == nil || len(data) == 0 {
-				server.listener.OnReadOrWriteError(errors.New("empty data returned from read char loader"))
-				return
-			}
-			encryptedData, err := util.Encrypt(data, server.secret)
-			if err != nil {
-				server.listener.OnReadOrWriteError(err)
-				return
-			}
-			guid, err = server.packetAggregator.AddData(encryptedData)
-			if err != nil {
-				server.listener.OnReadOrWriteError(err)
-				return
-			}
-			ctx = context.WithValue(ctx, sessionKey, guid)
-			req.Conn().SetContext(ctx)
+		data, err := load(addr, req.Conn().Context())
+		if err != nil {
+			server.listener.OnInternalError(err)
+			return
 		}
-		packetData, isLastPacket, err := server.packetAggregator.PopPacketDataFromStream(guid)
-		if isLastPacket {
-			ctx = context.WithValue(ctx, sessionKey, nil)
-			req.Conn().SetContext(ctx)
+		if data == nil || len(data) == 0 {
+			server.listener.OnInternalError(errors.New("empty data returned from read char loader"))
+			return
 		}
-		if err == nil {
-			rsp.Write(packetData)
+		encryptedData, err := util.Encrypt(data, server.secret)
+		if err != nil {
+			server.listener.OnInternalError(err)
+			return
 		}
+		rsp.Write(encryptedData)
 	}
 }
 
