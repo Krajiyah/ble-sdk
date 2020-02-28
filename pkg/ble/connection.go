@@ -86,7 +86,7 @@ func retry(fn func() error) error {
 
 func retryAndOptimize(fn func() error) error { return retry(func() error { return util.Optimize(fn) }) }
 
-// func retryAndCatch(fn func() error) error    { return retry(func() error { return util.CatchErrs(fn) }) }
+func retryAndCatch(fn func() error) error { return retry(func() error { return util.CatchErrs(fn) }) }
 
 func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
 	addr := a.Addr().String()
@@ -100,13 +100,14 @@ func (c *RealConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
 func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	err := retryAndOptimize(func() error {
+	err := retryAndCatch(func() error {
 		if c.cln != nil {
 			c.connectedAddr = ""
 			(*c.cln).CancelConnection()
 		}
 		var connectedAddr string
 		var rssi int
+		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
 		cln, err := c.methods.Connect(ctx, func(a ble.Advertisement) bool {
 			c.updateRssiMap(a)
 			b := filter(a)
@@ -146,7 +147,6 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 		return errors.New("Could not find MainServiceUUID in broadcasted services")
 	})
 	if err != nil && c.cln != nil {
-		fmt.Println("DUE TO ERROR CANCEL CONNECT")
 		(*c.cln).CancelConnection()
 	}
 	return err

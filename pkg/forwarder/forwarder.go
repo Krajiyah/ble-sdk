@@ -155,12 +155,10 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if !client.HasMainService(a) {
 		return nil
 	}
-	fmt.Println("Found some kind of real service!")
 	err := forwarder.connect(addr)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Connected")
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
 		err = forwarder.updateClientState()
 	} else {
