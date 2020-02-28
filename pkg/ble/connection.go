@@ -157,7 +157,6 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) error {
 	return c.wrapConnectOrDial(func() (ble.Client, string, error) {
 		var addr string
-		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
 		cln, err := c.methods.Connect(ctx, func(a ble.Advertisement) bool {
 			c.updateRssiMap(a)
 			b := filter(a)
@@ -172,7 +171,6 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 
 func (c *RealConnection) Dial(ctx context.Context, addr string) error {
 	return c.wrapConnectOrDial(func() (ble.Client, string, error) {
-		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
 		cln, err := c.methods.Dial(ctx, ble.NewAddr(addr))
 		return cln, addr, err
 	})
