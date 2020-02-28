@@ -85,7 +85,8 @@ func retry(fn func() error) error {
 }
 
 func retryAndOptimize(fn func() error) error { return retry(func() error { return util.Optimize(fn) }) }
-func retryAndCatch(fn func() error) error    { return retry(func() error { return util.CatchErrs(fn) }) }
+
+// func retryAndCatch(fn func() error) error    { return retry(func() error { return util.CatchErrs(fn) }) }
 
 func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
 	addr := a.Addr().String()
@@ -99,7 +100,7 @@ func (c *RealConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
 func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	return retryAndCatch(func() error {
+	err := retryAndOptimize(func() error {
 		if c.cln != nil {
 			c.connectedAddr = ""
 			(*c.cln).CancelConnection()
@@ -115,6 +116,7 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 			}
 			return b
 		})
+		c.cln = &cln
 		if err != nil {
 			return errors.Wrap(err, "coreMethods Connect issue: ")
 		}
@@ -122,7 +124,6 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 			<-cln.Disconnected()
 			c.listener.OnDisconnected()
 		}()
-		c.cln = &cln
 		_, err = cln.ExchangeMTU(util.MTU)
 		if err != nil {
 			return errors.Wrap(err, "ExchangeMTU issue: ")
@@ -144,6 +145,11 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 		}
 		return errors.New("Could not find MainServiceUUID in broadcasted services")
 	})
+	if err != nil && c.cln != nil {
+		fmt.Println("DUE TO ERROR CANCEL CONNECT")
+		(*c.cln).CancelConnection()
+	}
+	return err
 }
 
 func (c *RealConnection) Scan(ctx context.Context, handle func(ble.Advertisement)) error {

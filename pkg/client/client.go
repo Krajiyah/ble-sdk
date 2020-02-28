@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -36,7 +37,6 @@ type BLEClient struct {
 	addr                string
 	secret              string
 	status              BLEClientStatus
-	connectionAttempts  int // TODO: removeme
 	connectionLoopMutex *sync.Mutex
 	timeSync            *util.TimeSync
 	serverAddr          string
@@ -47,7 +47,7 @@ type BLEClient struct {
 
 func newBLEClient(name string, addr string, secret string, serverAddr string, listener BLEClientListener) *BLEClient {
 	return &BLEClient{
-		name, addr, secret, Disconnected, 0, // TODO: removeme
+		name, addr, secret, Disconnected,
 		&sync.Mutex{}, nil, serverAddr,
 		util.MakeINFContext(), NewRealConnection(addr, secret, listener), listener,
 	}
@@ -200,14 +200,12 @@ func (client *BLEClient) connectLoop() {
 	client.connectionLoopMutex.Lock()
 	defer client.connectionLoopMutex.Unlock()
 	client.status = Disconnected
-	client.connectionAttempts = 0 // TODO: removeme
 	err := errors.New("")
 	for err != nil {
-		client.connectionAttempts++ // TODO: removeme
 		err = client.connect()
-		// TODO: removeme
-		if client.connectionAttempts == 5 {
-			panic(err)
+		if err != nil {
+			fmt.Println("ConnectLoop connect issue: ")
+			fmt.Println(err)
 		}
 	}
 	client.status = Connected
