@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	maxRetryAttempts = 5
+	stopDelay             = time.Second * 3
+	setDefaultDeviceDelay = time.Second * 2
+	maxRetryAttempts      = 5
 )
 
 type connectionListener interface {
@@ -55,10 +57,12 @@ type RealConnection struct {
 
 func (c *RealConnection) resetDevice() error {
 	err := c.methods.Stop()
+	time.Sleep(stopDelay)
 	if err != nil {
 		return errors.Wrap(err, "Stop issue")
 	}
 	err = c.methods.SetDefaultDevice()
+	time.Sleep(setDefaultDeviceDelay)
 	if err != nil {
 		return errors.Wrap(err, "SetDefaultDevice issue")
 	}

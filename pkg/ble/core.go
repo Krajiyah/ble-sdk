@@ -59,19 +59,8 @@ func (bc *realCoreMethods) Stop() error {
 		return ble.Stop()
 	})
 	if err != nil && err.Error() != "default device is not set" {
-		return bc.resetHCI()
+		return err
 	}
-	return nil
-}
-
-func (bc *realCoreMethods) resetHCI() error {
-	// TODO: do I need this?
-	// _, err := exec.Command("hciconfig", "hci0", "reset").Output()
-	// time.Sleep(hciResetDelay)
-	// if err != nil {
-	// 	return errors.Wrap(err, "HCI RESET FAILURE")
-	// }
-	// fmt.Println("HCI RESET COMPLETE!")
 	return nil
 }
 
@@ -107,21 +96,13 @@ func (bc *realCoreMethods) newLinuxDevice() (ble.Device, error) {
 
 func (bc *realCoreMethods) SetDefaultDevice() error {
 	return retry(func() error {
-		err := util.CatchErrs(func() error {
+		return util.CatchErrs(func() error {
 			device, err := bc.newLinuxDevice()
 			if err != nil {
-				return err
+				return errors.Wrap(err, "newLinuxDevice issue")
 			}
 			ble.SetDefaultDevice(device)
 			return nil
 		})
-		if err != nil {
-			e := bc.resetHCI()
-			if e == nil {
-				return err
-			}
-			return errors.Wrap(err, e.Error())
-		}
-		return nil
 	})
 }
