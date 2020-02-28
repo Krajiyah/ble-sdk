@@ -150,10 +150,12 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if !client.HasMainService(a) {
 		return nil
 	}
+	fmt.Println("Test1/5")
 	err := forwarder.connect(addr)
 	if err != nil {
 		return err
 	}
+	fmt.Println("Test2/5")
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
 		err = forwarder.updateClientState()
 	} else {
@@ -162,10 +164,12 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("Test3/5")
 	err = forwarder.connect(forwarder.toConnectAddr)
 	if err != nil {
 		return err
 	}
+	fmt.Println("Test4/5")
 	return forwarder.refreshShortestPath()
 }
 
@@ -213,6 +217,7 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 	if len(path) < 2 {
 		return fmt.Errorf("Invalid path to server: %s", path)
 	}
+	fmt.Println("Test 5/5")
 	nextHop := path[1]
 	forwarder.toConnectAddr = nextHop
 	return forwarder.connect(nextHop)
