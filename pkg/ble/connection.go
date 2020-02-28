@@ -42,20 +42,23 @@ type ServiceInfo struct {
 }
 
 type RealConnection struct {
-	srcAddr         string
-	connectedAddr   string
-	rssiMap         *models.RssiMap
-	secret          string
-	cln             ble.Client
-	serviceInfo     *ServiceInfo
-	methods         coreMethods
-	characteristics map[string]*ble.Characteristic
-	mutex           *sync.Mutex
-	listener        connectionListener
-	ctx             context.Context
+	srcAddr          string
+	connectedAddr    string
+	rssiMap          *models.RssiMap
+	secret           string
+	cln              ble.Client
+	serviceInfo      *ServiceInfo
+	methods          coreMethods
+	characteristics  map[string]*ble.Characteristic
+	connectionMutex  *sync.Mutex
+	resetDeviceMutex *sync.Mutex
+	listener         connectionListener
+	ctx              context.Context
 }
 
 func (c *RealConnection) resetDevice() error {
+	c.resetDeviceMutex.Lock()
+	defer c.resetDeviceMutex.Unlock()
 	err := c.methods.Stop()
 	time.Sleep(stopDelay)
 	if err != nil {
@@ -82,7 +85,7 @@ func (c *RealConnection) resetDevice() error {
 func newRealConnection(addr string, secret string, listener connectionListener, methods coreMethods, serviceInfo *ServiceInfo) (*RealConnection, error) {
 	conn := &RealConnection{
 		srcAddr: addr, rssiMap: models.NewRssiMap(),
-		secret: secret, mutex: &sync.Mutex{},
+		secret: secret, connectionMutex: &sync.Mutex{}, resetDeviceMutex: &sync.Mutex{},
 		methods: methods, characteristics: map[string]*ble.Characteristic{},
 		listener: listener, serviceInfo: serviceInfo, ctx: util.MakeINFContext(),
 	}
@@ -145,8 +148,8 @@ func (c *RealConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
 type connnectOrDialHelper func() (ble.Client, string, error)
 
 func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.connectionMutex.Lock()
+	defer c.connectionMutex.Unlock()
 	err := retryAndOptimize(c, func() error {
 		if c.cln != nil {
 			c.cln.CancelConnection()
