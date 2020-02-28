@@ -114,12 +114,18 @@ func (forwarder *BLEForwarder) Run() error {
 
 func (forwarder *BLEForwarder) collectAdvirtisements() (chan ble.Advertisement, error) {
 	advs := make(chan ble.Advertisement)
+	closed := false
 	err := forwarder.forwardingClient.GetConnection().ScanForDuration(scanDuration, func(a ble.Advertisement) {
-		go func() { advs <- a }()
+		go func() {
+			if !closed {
+				advs <- a
+			}
+		}()
 	})
 	if err != nil && err.Error() == "context deadline exceeded" {
 		err = nil
 	}
+	closed = true
 	close(advs)
 	return advs, err
 }

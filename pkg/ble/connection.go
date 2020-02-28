@@ -66,7 +66,7 @@ func (bc *realCoreMethods) Stop() error {
 	err := util.CatchErrs(func() error {
 		return ble.Stop()
 	})
-	if err != nil {
+	if err != nil && err.Error() != "default device is not set" {
 		fmt.Println("Error Downing BLE: " + err.Error())
 		return bc.resetHCI()
 	}
@@ -76,6 +76,7 @@ func (bc *realCoreMethods) Stop() error {
 func (bc *realCoreMethods) resetHCI() error {
 	out, err := exec.Command("hciconfig", "hci0", "reset").Output()
 	if err != nil {
+		fmt.Println("HCI RESET FAILED!!!: " + err.Error() + " :: " + string(out))
 		return err
 	}
 	fmt.Println("HCI RESET COMPLETE: " + string(out))
