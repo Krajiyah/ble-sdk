@@ -112,17 +112,17 @@ func retryAndOptimize(c *RealConnection, fn func() error, reconnect bool) error 
 	return retry(func() error {
 		err := util.Optimize(fn)
 		if err != nil {
-			// TODO: do I need this?
-			// e := c.resetDevice()
-			// if e != nil {
-			// 	return errors.Wrap(e, " AND "+err.Error())
-			// }
-			// if reconnect {
-			// 	e := c.Dial(c.connectedAddr)
-			// 	if e != nil {
-			// 		return errors.Wrap(e, " AND "+err.Error())
-			// 	}
-			// }
+			e := c.resetDevice()
+			if e != nil {
+				return errors.Wrap(e, " AND "+err.Error())
+			}
+			if reconnect {
+				fmt.Println("Reconnecting...")
+				e := c.Dial(c.connectedAddr)
+				if e != nil {
+					return errors.Wrap(e, " AND "+err.Error())
+				}
+			}
 		}
 		return err
 	})
