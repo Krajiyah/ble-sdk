@@ -80,13 +80,15 @@ func (bc *realCoreMethods) AddService(s *ble.Service) error {
 }
 
 func (bc *realCoreMethods) SetDefaultDevice() error {
-	return util.CatchErrs(func() error {
-		device, err := linux.NewDevice()
-		if err != nil {
-			return err
-		}
-		ble.SetDefaultDevice(device)
-		return nil
+	return retry(func() error {
+		return util.CatchErrs(func() error {
+			device, err := linux.NewDevice()
+			if err != nil {
+				return err
+			}
+			ble.SetDefaultDevice(device)
+			return nil
+		})
 	})
 }
 
