@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	maxRetryAttempts = 5
-	connectTimeout   = 5 * time.Second
+	maxRetryAttempts = 5 // TODO: remove me and make infinite
 )
 
 type connectionListener interface {
@@ -147,7 +146,24 @@ func retry(fn func() error) error {
 	return nil
 }
 
-func retryAndOptimize(fn func() error) error { return retry(func() error { return util.Optimize(fn) }) }
+func retryAndOptimize(c *RealConnection, fn func() error, reconnect bool) error {
+	return retry(func() error {
+		err := util.Optimize(fn)
+		if err != nil {
+			e := c.resetDevice()
+			if e != nil {
+				return errors.Wrap(e, " AND "+err.Error())
+			}
+			if reconnect {
+				e := c.Dial(c.connectedAddr)
+				if e != nil {
+					return errors.Wrap(e, " AND "+err.Error())
+				}
+			}
+		}
+		return err
+	})
+}
 
 func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
 	addr := a.Addr().String()
@@ -165,7 +181,7 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.connectedAddr = ""
-	err := retryAndOptimize(func() error {
+	err := retryAndOptimize(c, func() error {
 		if c.cln != nil {
 			c.cln.CancelConnection()
 		}
@@ -175,15 +191,9 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 			return errors.Wrap(err, "ConnectOrDial issue: ")
 		}
 		return c.handleCln(cln, addr)
-	})
+	}, false)
 	if err != nil && c.cln != nil {
 		c.cln.CancelConnection()
-	}
-	if err != nil {
-		e := c.resetDevice()
-		if e != nil {
-			return errors.Wrap(e, " AND "+err.Error())
-		}
 	}
 	return err
 }
@@ -267,11 +277,11 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 		return nil, err
 	}
 	var encData []byte
-	err = retryAndOptimize(func() error {
+	err = retryAndOptimize(c, func() error {
 		dat, e := c.cln.ReadLongCharacteristic(char)
 		encData = dat
 		return errors.Wrap(e, "ReadLongCharacteristic issue: ")
-	})
+	}, true)
 	if err != nil {
 		return nil, err
 	}
@@ -288,9 +298,9 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 	}
 	packets, err := util.EncodeDataAsPackets(data, c.secret)
 	for _, packet := range packets {
-		e := retryAndOptimize(func() error {
+		e := retryAndOptimize(c, func() error {
 			return c.cln.WriteCharacteristic(char, packet, true)
-		})
+		}, true)
 		if e != nil {
 			err = errors.Wrap(e, "WriteCharacteristic issue: ")
 		}
