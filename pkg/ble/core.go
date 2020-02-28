@@ -4,12 +4,17 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"time"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
 	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/pkg/errors"
+)
+
+const (
+	hciResetDelay = 10 * time.Second
 )
 
 type coreMethods interface {
@@ -62,11 +67,12 @@ func (bc *realCoreMethods) Stop() error {
 }
 
 func (bc *realCoreMethods) resetHCI() error {
-	out, err := exec.Command("hciconfig", "hci0", "reset").Output()
+	_, err := exec.Command("hciconfig", "hci0", "reset").Output()
 	if err != nil {
 		return errors.Wrap(err, "HCI RESET FAILURE")
 	}
-	fmt.Println("HCI RESET COMPLETE: " + string(out))
+	fmt.Println("HCI RESET COMPLETE!")
+	time.Sleep(hciResetDelay)
 	return nil
 }
 
@@ -111,7 +117,11 @@ func (bc *realCoreMethods) SetDefaultDevice() error {
 			return nil
 		})
 		if err != nil {
-			return bc.resetHCI()
+			e := bc.resetHCI()
+			if e == nil {
+				return err
+			}
+			return errors.Wrap(err, e.Error())
 		}
 		return nil
 	})
