@@ -37,6 +37,12 @@ func (bc *testCoreMethods) filter(fn func(addr string, rssi int)) {
 	}
 }
 
+func (bc *testCoreMethods) Stop() error             { return nil }
+func (bc *testCoreMethods) SetDefaultDevice() error { return nil }
+func (bc *testCoreMethods) AdvertiseNameAndServices(ctx context.Context, name string, uuids ...ble.UUID) error {
+	return nil
+}
+func (bc *testCoreMethods) AddService(s *ble.Service) error { return nil }
 func (bc *testCoreMethods) Dial(_ context.Context, a ble.Addr) (ble.Client, error) {
 	return newDummyCoreClient(), nil
 }
@@ -135,18 +141,18 @@ func setCharacteristic(c *RealConnection, uuid string) {
 }
 
 func setDummyCoreClient(c *RealConnection, d ble.Client) {
-	c.cln = &d
+	c.cln = d
 }
 
-func newConnection() *RealConnection {
-	c := NewRealConnection(testAddr, testSecret, &TestListener{})
-	c.methods = &testCoreMethods{}
+func newConnection(t *testing.T) *RealConnection {
+	c, err := newRealConnection(testAddr, testSecret, &TestListener{}, &testCoreMethods{}, nil)
+	assert.NilError(t, err)
 	return c
 }
 
 func TestConnect(t *testing.T) {
-	c := newConnection()
-	err := c.Connect(context.Background(), func(a ble.Advertisement) bool {
+	c := newConnection(t)
+	err := c.Connect(func(a ble.Advertisement) bool {
 		return true
 	})
 	assert.NilError(t, err)
@@ -155,9 +161,9 @@ func TestConnect(t *testing.T) {
 }
 
 func TestScan(t *testing.T) {
-	c := newConnection()
+	c := newConnection(t)
 	actual := make(chan ble.Advertisement)
-	err := c.Scan(context.Background(), func(a ble.Advertisement) {
+	err := c.Scan(func(a ble.Advertisement) {
 		go func() { actual <- a }()
 	})
 	assert.NilError(t, err)
@@ -168,7 +174,7 @@ func TestScan(t *testing.T) {
 }
 
 func TestRead(t *testing.T) {
-	c := newConnection()
+	c := newConnection(t)
 	setCharacteristic(c, testCharUUID)
 	d := newDummyCoreClient()
 	setDummyCoreClient(c, d)
@@ -183,7 +189,7 @@ func TestRead(t *testing.T) {
 }
 
 func TestWrite(t *testing.T) {
-	c := newConnection()
+	c := newConnection(t)
 	setCharacteristic(c, testCharUUID)
 	d := newDummyCoreClient()
 	setDummyCoreClient(c, d)

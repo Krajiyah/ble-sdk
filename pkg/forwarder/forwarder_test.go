@@ -154,7 +154,9 @@ func TestRssiMapChar(t *testing.T) {
 	rm.Set(testAddr, testServerAddr, -90)
 	rm.Set(testAddr, clientAddr, -10000)
 	s := getDummyForwarder(t, testAddr, rm)
-	s.forwarder.Run()
+	go func() {
+		s.forwarder.Run()
+	}()
 	time.Sleep(2 * client.ScanInterval)
 	assert.DeepEqual(t, s.forwarder.GetRssiMap(), rm.GetAll())
 	readChars, _ := getChars(s.forwarder)
@@ -179,8 +181,8 @@ func prepare2ForwarderState(t *testing.T) (*testStructs, *testStructs) {
 	mockRMReadBuffer(t, expectedRssiMap, mockedReadValue1)
 	mockCGReadBuffer(t, NewConnectionGraph(), mockedReadValue2)
 	mockCGReadBuffer(t, NewConnectionGraph(), mockedReadValue1)
-	f1.Run()
-	f2.Run()
+	go func() { f1.Run() }()
+	go func() { f2.Run() }()
 	time.Sleep(client.ScanInterval * 2)
 	return s1, s2
 }

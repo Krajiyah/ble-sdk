@@ -32,10 +32,10 @@ func setForwarderConnection() *TestConnection {
 	return NewTestConnection(testAddr, testForwarderAddr, rm)
 }
 
-func getTestClient(c *TestConnection) *BLEClient {
+func getTestClient(t *testing.T, c *TestConnection) *BLEClient {
 	l := &TestListener{}
-	client := newBLEClient("some name", testAddr, testSecret, testServerAddr, l)
-	client.connection = c
+	client, err := NewBLEClientWithSharedConn("some name", testAddr, testSecret, testServerAddr, l, c)
+	assert.NilError(t, err)
 	return client
 }
 
@@ -51,7 +51,7 @@ func mockUnixTS(buffer *bytes.Buffer) int64 {
 
 func TestUnixTS(t *testing.T) {
 	connection := setServerConnection()
-	client := getTestClient(connection)
+	client := getTestClient(t, connection)
 
 	// mock server read
 	expected := mockUnixTS(connection.GetMockedReadBuffer(util.TimeSyncUUID))
@@ -71,7 +71,7 @@ func TestUnixTS(t *testing.T) {
 
 func TestLog(t *testing.T) {
 	connection := setServerConnection()
-	client := getTestClient(connection)
+	client := getTestClient(t, connection)
 
 	// test client write
 	expected := ClientLogRequest{"SomeAddress", Info, "Some Message"}
@@ -87,14 +87,14 @@ func TestLog(t *testing.T) {
 
 func TestConnectLoop(t *testing.T) {
 	connection := setServerConnection()
-	client := getTestClient(connection)
+	client := getTestClient(t, connection)
 	client.connectLoop()
 	assert.DeepEqual(t, client.connection.GetConnectedAddr(), client.serverAddr)
 }
 
 func TestScanLoop(t *testing.T) {
 	connection := setServerConnection()
-	client := getTestClient(connection)
+	client := getTestClient(t, connection)
 	go client.scanLoop()
 	time.Sleep(ScanInterval + (ScanInterval / 2))
 	assert.DeepEqual(t, client.connection.GetRssiMap().GetAll(), connection.GetRssiMap().GetAll())
@@ -102,7 +102,7 @@ func TestScanLoop(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	connection := setServerConnection()
-	client := getTestClient(connection)
+	client := getTestClient(t, connection)
 	client.Run()
 	time.Sleep(afterConnectionDelay)
 	ts := mockUnixTS(connection.GetMockedReadBuffer(util.TimeSyncUUID))
@@ -115,7 +115,7 @@ func TestRun(t *testing.T) {
 func TestForwardedWrite(t *testing.T) {
 	connection := setForwarderConnection()
 	connection.SetConnectedAddr(testForwarderAddr)
-	client := getTestClient(connection)
+	client := getTestClient(t, connection)
 
 	// 1st forward request
 	req := ClientLogRequest{testAddr, Info, "Hello World!"}
@@ -140,7 +140,7 @@ func TestForwardedWrite(t *testing.T) {
 func TestForwardedRead(t *testing.T) {
 	connection := setForwarderConnection()
 	connection.SetConnectedAddr(testForwarderAddr)
-	client := getTestClient(connection)
+	client := getTestClient(t, connection)
 
 	// mock forwarder read
 	expected := mockUnixTS(connection.GetMockedReadBuffer(util.TimeSyncUUID))

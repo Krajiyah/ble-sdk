@@ -12,7 +12,6 @@ import (
 	"github.com/Krajiyah/ble-sdk/pkg/server"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux"
 	"golang.org/x/net/context"
 )
 
@@ -69,17 +68,13 @@ func (l *forwarderServerListener) OnServerStatusChanged(s models.BLEServerStatus
 }
 
 func NewBLEForwarder(name string, addr string, secret string, serverAddr string, listener models.BLEForwarderListener) (*BLEForwarder, error) {
-	d, err := linux.NewDevice()
-	if err != nil {
-		return nil, err
-	}
 	f := newBLEForwarder(name, addr, serverAddr, listener)
 	readChars, writeChars := getChars(f)
-	serv, err := server.NewBLEServerSharedDevice(d, name, addr, secret, &forwarderServerListener{listener: listener}, readChars, writeChars)
+	serv, conn, err := server.NewBLEServer(name, addr, secret, listener, &forwarderServerListener{listener: listener}, readChars, writeChars)
 	if err != nil {
 		return nil, err
 	}
-	clien, err := client.NewBLEClientSharedDevice(d, name, addr, secret, serverAddr, listener)
+	clien, err := client.NewBLEClientWithSharedConn(name, addr, secret, serverAddr, listener, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -114,13 +109,13 @@ func (forwarder *BLEForwarder) GetClient() client.Client {
 
 func (forwarder *BLEForwarder) Run() error {
 	go forwarder.scanLoop()
-	return forwarder.forwardingServer.Run()
+	select {}
 }
 
 func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, error) {
 	ret := []ble.Advertisement{}
 	mutex := sync.Mutex{}
-	err := forwarder.forwardingClient.GetConnection().ScanForDuration(forwarder.ctx, scanDuration, func(a ble.Advertisement) {
+	err := forwarder.forwardingClient.GetConnection().ScanForDuration(scanDuration, func(a ble.Advertisement) {
 		mutex.Lock()
 		ret = append(ret, a)
 		mutex.Unlock()
@@ -228,7 +223,7 @@ func (forwarder *BLEForwarder) connect(addr string) error {
 	if addr == "" || util.AddrEqualAddr(addr, conn.GetConnectedAddr()) {
 		return nil
 	}
-	return conn.Dial(forwarder.ctx, addr)
+	return conn.Dial(addr)
 }
 
 func (forwarder *BLEForwarder) isConnected() bool {

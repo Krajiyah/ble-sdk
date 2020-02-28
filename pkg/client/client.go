@@ -12,8 +12,6 @@ import (
 	. "github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -40,30 +38,24 @@ type BLEClient struct {
 	connectionLoopMutex *sync.Mutex
 	timeSync            *util.TimeSync
 	serverAddr          string
-	ctx                 context.Context
 	connection          Connection
 	listener            BLEClientListener
 }
 
-func newBLEClient(name string, addr string, secret string, serverAddr string, listener BLEClientListener) *BLEClient {
+func NewBLEClientWithSharedConn(name string, addr string, secret string, serverAddr string, listener BLEClientListener, conn Connection) (*BLEClient, error) {
 	return &BLEClient{
 		name, addr, secret, Disconnected,
 		&sync.Mutex{}, nil, serverAddr,
-		util.MakeINFContext(), NewRealConnection(addr, secret, listener), listener,
-	}
+		conn, listener,
+	}, nil
 }
 
 func NewBLEClient(name string, addr string, secret string, serverAddr string, listener BLEClientListener) (*BLEClient, error) {
-	d, err := linux.NewDevice()
+	conn, err := NewRealConnection(addr, secret, listener, nil)
 	if err != nil {
 		return nil, err
 	}
-	return NewBLEClientSharedDevice(d, name, addr, secret, serverAddr, listener)
-}
-
-func NewBLEClientSharedDevice(device ble.Device, name string, addr string, secret string, serverAddr string, listener BLEClientListener) (*BLEClient, error) {
-	ble.SetDefaultDevice(device)
-	return newBLEClient(name, addr, secret, serverAddr, listener), nil
+	return NewBLEClientWithSharedConn(name, addr, secret, serverAddr, listener, conn)
 }
 
 func (client *BLEClient) Run() {
@@ -76,7 +68,7 @@ func (client *BLEClient) Run() {
 func (client *BLEClient) scanLoop() {
 	for {
 		time.Sleep(ScanInterval)
-		err := client.connection.Scan(client.ctx, func(a ble.Advertisement) {})
+		err := client.connection.Scan(func(a ble.Advertisement) {})
 		if err != nil {
 			client.listener.OnInternalError(err)
 		}
@@ -212,10 +204,10 @@ func (client *BLEClient) connectLoop() {
 }
 
 func (client *BLEClient) connect() error {
-	err := client.connection.Dial(client.ctx, client.serverAddr)
+	err := client.connection.Dial(client.serverAddr)
 	if err != nil {
 		client.listener.OnInternalError(errors.Wrap(err, "Could not connect to server.\nSo now trying to connect to a forwarder.\n"))
-		err = client.connection.Connect(client.ctx, HasMainService)
+		err = client.connection.Connect(HasMainService)
 	}
 	return err
 }

@@ -66,12 +66,8 @@ func main() {
 		}},
 	}
 	fmt.Println("Starting BLE server...")
-	serv, err := server.NewBLEServer(Name, BLESecret, bluetoothAddress, myServerListener{}, moreReadChars, moreWriteChars)
+	_, _, err := server.NewBLEServer(Name, BLESecret, bluetoothAddress, nil, myServerListener{}, moreReadChars, moreWriteChars)
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble server: " + err.Error())
-	}
-	err = serv.Run()
-	if err != nil {
-		fmt.Println("Ooops! Something went wrong with running the ble server: " + err.Error())
 	}
 }

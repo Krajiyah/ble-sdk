@@ -80,6 +80,8 @@ func NewTestConnection(addr string, toConnectAddr string, rm *models.RssiMap) *T
 	return &TestConnection{toConnectAddr: toConnectAddr, srcAddr: addr, rssiMap: rm, mockedReadValue: map[string]*bytes.Buffer{}, mockedWriteValue: map[string]*bytes.Buffer{}}
 }
 
+func (c *TestConnection) Context() context.Context { return context.TODO() }
+
 func (c *TestConnection) SetToConnectAddr(addr string) { c.toConnectAddr = addr }
 
 func (c *TestConnection) SetConnectedAddr(addr string) { c.connectedAddr = addr }
@@ -99,18 +101,18 @@ func (c *TestConnection) GetMockedWriteBufferData(uuid string) []byte {
 
 func (c *TestConnection) GetConnectedAddr() string    { return c.connectedAddr }
 func (c *TestConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
-func (c *TestConnection) Connect(context.Context, ble.AdvFilter) error {
+func (c *TestConnection) Connect(ble.AdvFilter) error {
 	c.connectedAddr = c.toConnectAddr
 	return nil
 }
-func (c *TestConnection) Dial(_ context.Context, a string) error {
+func (c *TestConnection) Dial(a string) error {
 	c.connectedAddr = a
 	return nil
 }
-func (c *TestConnection) ScanForDuration(context.Context, time.Duration, func(ble.Advertisement)) error {
+func (c *TestConnection) ScanForDuration(time.Duration, func(ble.Advertisement)) error {
 	return nil
 }
-func (c *TestConnection) Scan(_ context.Context, fn func(ble.Advertisement)) error {
+func (c *TestConnection) Scan(fn func(ble.Advertisement)) error {
 	for addr, rssi := range c.rssiMap.GetAll()[c.srcAddr] {
 		fn(DummyAdv{DummyAddr{addr}, rssi, false})
 	}

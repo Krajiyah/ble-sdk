@@ -9,6 +9,7 @@ import (
 	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
+	"github.com/go-ble/ble/linux"
 	"github.com/pkg/errors"
 )
 
@@ -23,9 +24,13 @@ type connectionListener interface {
 }
 
 type coreMethods interface {
+	Stop() error
+	SetDefaultDevice() error
 	Connect(context.Context, ble.AdvFilter) (ble.Client, error)
 	Dial(context.Context, ble.Addr) (ble.Client, error)
 	Scan(context.Context, bool, ble.AdvHandler, ble.AdvFilter) error
+	AdvertiseNameAndServices(context.Context, string, ...ble.UUID) error
+	AddService(*ble.Service) error
 }
 
 type realCoreMethods struct{}
@@ -42,15 +47,38 @@ func (bc *realCoreMethods) Scan(ctx context.Context, b bool, h ble.AdvHandler, f
 	return ble.Scan(ctx, b, h, f)
 }
 
+func (bc *realCoreMethods) Stop() error { return ble.Stop() }
+
+func (bc *realCoreMethods) AdvertiseNameAndServices(ctx context.Context, name string, uuids ...ble.UUID) error {
+	return ble.AdvertiseNameAndServices(ctx, name, uuids...)
+}
+func (bc *realCoreMethods) AddService(s *ble.Service) error { return ble.AddService(s) }
+
+func (bc *realCoreMethods) SetDefaultDevice() error {
+	device, err := linux.NewDevice()
+	if err != nil {
+		return err
+	}
+	ble.SetDefaultDevice(device)
+	return nil
+}
+
 type Connection interface {
 	GetConnectedAddr() string
 	GetRssiMap() *models.RssiMap
-	Connect(context.Context, ble.AdvFilter) error
-	Dial(context.Context, string) error
-	Scan(context.Context, func(ble.Advertisement)) error
-	ScanForDuration(context.Context, time.Duration, func(ble.Advertisement)) error
+	Connect(ble.AdvFilter) error
+	Dial(string) error
+	Scan(func(ble.Advertisement)) error
+	ScanForDuration(time.Duration, func(ble.Advertisement)) error
 	ReadValue(string) ([]byte, error)
 	WriteValue(string, []byte) error
+	Context() context.Context
+}
+
+type ServiceInfo struct {
+	Service     *ble.Service
+	ServiceName string
+	UUID        ble.UUID
 }
 
 type RealConnection struct {
@@ -58,20 +86,49 @@ type RealConnection struct {
 	connectedAddr   string
 	rssiMap         *models.RssiMap
 	secret          string
-	cln             *ble.Client
+	cln             ble.Client
+	serviceInfo     *ServiceInfo
 	methods         coreMethods
 	characteristics map[string]*ble.Characteristic
 	mutex           *sync.Mutex
 	listener        connectionListener
+	ctx             context.Context
 }
 
-func NewRealConnection(addr string, secret string, listener connectionListener) *RealConnection {
-	return &RealConnection{
+func (c *RealConnection) resetDevice() error {
+	c.methods.Stop() // ignore error since it only yields error for empty device
+	err := c.methods.SetDefaultDevice()
+	if err != nil {
+		return err
+	}
+	if c.serviceInfo == nil {
+		return nil
+	}
+	err = c.methods.AddService(c.serviceInfo.Service)
+	if err != nil {
+		return err
+	}
+	go func() {
+		c.methods.AdvertiseNameAndServices(c.ctx, c.serviceInfo.ServiceName, c.serviceInfo.UUID)
+	}()
+	return nil
+}
+
+func newRealConnection(addr string, secret string, listener connectionListener, methods coreMethods, serviceInfo *ServiceInfo) (*RealConnection, error) {
+	conn := &RealConnection{
 		srcAddr: addr, rssiMap: models.NewRssiMap(),
 		secret: secret, mutex: &sync.Mutex{},
-		methods: &realCoreMethods{}, characteristics: map[string]*ble.Characteristic{},
-		listener: listener,
+		methods: methods, characteristics: map[string]*ble.Characteristic{},
+		listener: listener, serviceInfo: serviceInfo, ctx: util.MakeINFContext(),
 	}
+	if err := conn.resetDevice(); err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func NewRealConnection(addr string, secret string, listener connectionListener, serviceInfo *ServiceInfo) (*RealConnection, error) {
+	return newRealConnection(addr, secret, listener, &realCoreMethods{}, serviceInfo)
 }
 
 func retry(fn func() error) error {
@@ -92,16 +149,44 @@ func retry(fn func() error) error {
 
 func retryAndOptimize(fn func() error) error { return retry(func() error { return util.Optimize(fn) }) }
 
-func retryAndCatch(fn func() error) error { return retry(func() error { return util.CatchErrs(fn) }) }
-
 func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
 	addr := a.Addr().String()
 	rssi := a.RSSI()
 	c.rssiMap.Set(c.srcAddr, addr, rssi)
 }
 
+func (c *RealConnection) Context() context.Context    { return c.ctx }
 func (c *RealConnection) GetConnectedAddr() string    { return c.connectedAddr }
 func (c *RealConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
+
+type connnectOrDialHelper func() (ble.Client, string, error)
+
+func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.connectedAddr = ""
+	err := retryAndOptimize(func() error {
+		if c.cln != nil {
+			c.cln.CancelConnection()
+		}
+		cln, addr, err := fn()
+		c.cln = cln
+		if err != nil {
+			return errors.Wrap(err, "ConnectOrDial issue: ")
+		}
+		return c.handleCln(cln, addr)
+	})
+	if err != nil && c.cln != nil {
+		c.cln.CancelConnection()
+	}
+	if err != nil {
+		e := c.resetDevice()
+		if e != nil {
+			return errors.Wrap(e, " AND "+err.Error())
+		}
+	}
+	return err
+}
 
 func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 	go func() {
@@ -131,33 +216,10 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 	return errors.New("Could not find MainServiceUUID in broadcasted services")
 }
 
-type connnectOrDialHelper func() (ble.Client, string, error)
-
-func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	err := retryAndCatch(func() error {
-		if c.cln != nil {
-			c.connectedAddr = ""
-			(*c.cln).CancelConnection()
-		}
-		cln, addr, err := fn()
-		c.cln = &cln
-		if err != nil {
-			return errors.Wrap(err, "coreMethods ConnectOrDial issue: ")
-		}
-		return c.handleCln(cln, addr)
-	})
-	if err != nil && c.cln != nil {
-		(*c.cln).CancelConnection()
-	}
-	return err
-}
-
-func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) error {
+func (c *RealConnection) Connect(filter ble.AdvFilter) error {
 	return c.wrapConnectOrDial(func() (ble.Client, string, error) {
 		var addr string
-		cln, err := c.methods.Connect(ctx, func(a ble.Advertisement) bool {
+		cln, err := c.methods.Connect(c.ctx, func(a ble.Advertisement) bool {
 			c.updateRssiMap(a)
 			b := filter(a)
 			if b {
@@ -169,23 +231,27 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 	})
 }
 
-func (c *RealConnection) Dial(ctx context.Context, addr string) error {
+func (c *RealConnection) Dial(addr string) error {
 	return c.wrapConnectOrDial(func() (ble.Client, string, error) {
-		cln, err := c.methods.Dial(ctx, ble.NewAddr(addr))
+		cln, err := c.methods.Dial(c.ctx, ble.NewAddr(addr))
 		return cln, addr, err
 	})
 }
 
-func (c *RealConnection) Scan(ctx context.Context, handle func(ble.Advertisement)) error {
+func (c *RealConnection) scan(ctx context.Context, handle func(ble.Advertisement)) error {
 	return c.methods.Scan(ctx, true, func(a ble.Advertisement) {
 		c.updateRssiMap(a)
 		handle(a)
 	}, nil)
 }
 
-func (c *RealConnection) ScanForDuration(ctx context.Context, duration time.Duration, handle func(ble.Advertisement)) error {
-	ctx, _ = context.WithTimeout(ctx, duration)
-	return c.Scan(ctx, handle)
+func (c *RealConnection) Scan(handle func(ble.Advertisement)) error {
+	return c.scan(c.ctx, handle)
+}
+
+func (c *RealConnection) ScanForDuration(duration time.Duration, handle func(ble.Advertisement)) error {
+	ctx, _ := context.WithTimeout(c.ctx, duration)
+	return c.scan(ctx, handle)
 }
 
 func (c *RealConnection) getCharacteristic(uuid string) (*ble.Characteristic, error) {
@@ -202,7 +268,7 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	}
 	var encData []byte
 	err = retryAndOptimize(func() error {
-		dat, e := (*c.cln).ReadLongCharacteristic(char)
+		dat, e := c.cln.ReadLongCharacteristic(char)
 		encData = dat
 		return errors.Wrap(e, "ReadLongCharacteristic issue: ")
 	})
@@ -223,7 +289,7 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 	packets, err := util.EncodeDataAsPackets(data, c.secret)
 	for _, packet := range packets {
 		e := retryAndOptimize(func() error {
-			return (*c.cln).WriteCharacteristic(char, packet, true)
+			return c.cln.WriteCharacteristic(char, packet, true)
 		})
 		if e != nil {
 			err = errors.Wrap(e, "WriteCharacteristic issue: ")
