@@ -228,9 +228,7 @@ func (forwarder *BLEForwarder) connect(addr string) error {
 	if addr == "" || util.AddrEqualAddr(addr, conn.GetConnectedAddr()) {
 		return nil
 	}
-	return conn.Connect(forwarder.ctx, func(a ble.Advertisement) bool {
-		return util.AddrEqualAddr(a.Addr().String(), addr)
-	})
+	return conn.Dial(forwarder.ctx, addr)
 }
 
 func (forwarder *BLEForwarder) isConnected() bool {

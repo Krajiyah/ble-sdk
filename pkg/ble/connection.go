@@ -24,6 +24,7 @@ type connectionListener interface {
 
 type coreMethods interface {
 	Connect(context.Context, ble.AdvFilter) (ble.Client, error)
+	Dial(context.Context, ble.Addr) (ble.Client, error)
 	Scan(context.Context, bool, ble.AdvHandler, ble.AdvFilter) error
 }
 
@@ -31,6 +32,10 @@ type realCoreMethods struct{}
 
 func (bc *realCoreMethods) Connect(ctx context.Context, f ble.AdvFilter) (ble.Client, error) {
 	return ble.Connect(ctx, f)
+}
+
+func (bc *realCoreMethods) Dial(ctx context.Context, addr ble.Addr) (ble.Client, error) {
+	return ble.Dial(ctx, addr)
 }
 
 func (bc *realCoreMethods) Scan(ctx context.Context, b bool, h ble.AdvHandler, f ble.AdvFilter) error {
@@ -41,6 +46,7 @@ type Connection interface {
 	GetConnectedAddr() string
 	GetRssiMap() *models.RssiMap
 	Connect(context.Context, ble.AdvFilter) error
+	Dial(context.Context, string) error
 	Scan(context.Context, func(ble.Advertisement)) error
 	ScanForDuration(context.Context, time.Duration, func(ble.Advertisement)) error
 	ReadValue(string) ([]byte, error)
@@ -97,7 +103,37 @@ func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
 func (c *RealConnection) GetConnectedAddr() string    { return c.connectedAddr }
 func (c *RealConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
 
-func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) error {
+func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
+	go func() {
+		<-cln.Disconnected()
+		c.listener.OnDisconnected()
+	}()
+	_, err := cln.ExchangeMTU(util.MTU)
+	if err != nil {
+		return errors.Wrap(err, "ExchangeMTU issue: ")
+	}
+	p, err := cln.DiscoverProfile(true)
+	if err != nil {
+		return errors.Wrap(err, "DiscoverProfile issue: ")
+	}
+	rssi := cln.ReadRSSI()
+	for _, s := range p.Services {
+		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
+			for _, char := range s.Characteristics {
+				uuid := util.UuidToStr(char.UUID)
+				c.characteristics[uuid] = char
+			}
+			c.connectedAddr = addr
+			c.listener.OnConnected(addr, rssi)
+			return nil
+		}
+	}
+	return errors.New("Could not find MainServiceUUID in broadcasted services")
+}
+
+type connnectOrDialHelper func() (ble.Client, string, error)
+
+func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	err := retryAndCatch(func() error {
@@ -105,51 +141,41 @@ func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) erro
 			c.connectedAddr = ""
 			(*c.cln).CancelConnection()
 		}
-		var connectedAddr string
-		var rssi int
-		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
-		cln, err := c.methods.Connect(ctx, func(a ble.Advertisement) bool {
-			c.updateRssiMap(a)
-			b := filter(a)
-			if b {
-				connectedAddr = a.Addr().String()
-				rssi = a.RSSI()
-			}
-			return b
-		})
+		cln, addr, err := fn()
 		c.cln = &cln
 		if err != nil {
-			return errors.Wrap(err, "coreMethods Connect issue: ")
+			return errors.Wrap(err, "coreMethods ConnectOrDial issue: ")
 		}
-		go func() {
-			<-cln.Disconnected()
-			c.listener.OnDisconnected()
-		}()
-		_, err = cln.ExchangeMTU(util.MTU)
-		if err != nil {
-			return errors.Wrap(err, "ExchangeMTU issue: ")
-		}
-		p, err := cln.DiscoverProfile(true)
-		if err != nil {
-			return errors.Wrap(err, "DiscoverProfile issue: ")
-		}
-		for _, s := range p.Services {
-			if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
-				for _, char := range s.Characteristics {
-					uuid := util.UuidToStr(char.UUID)
-					c.characteristics[uuid] = char
-				}
-				c.connectedAddr = connectedAddr
-				c.listener.OnConnected(connectedAddr, rssi)
-				return nil
-			}
-		}
-		return errors.New("Could not find MainServiceUUID in broadcasted services")
+		return c.handleCln(cln, addr)
 	})
 	if err != nil && c.cln != nil {
 		(*c.cln).CancelConnection()
 	}
 	return err
+}
+
+func (c *RealConnection) Connect(ctx context.Context, filter ble.AdvFilter) error {
+	return c.wrapConnectOrDial(func() (ble.Client, string, error) {
+		var addr string
+		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
+		cln, err := c.methods.Connect(ctx, func(a ble.Advertisement) bool {
+			c.updateRssiMap(a)
+			b := filter(a)
+			if b {
+				addr = a.Addr().String()
+			}
+			return b
+		})
+		return cln, addr, err
+	})
+}
+
+func (c *RealConnection) Dial(ctx context.Context, addr string) error {
+	return c.wrapConnectOrDial(func() (ble.Client, string, error) {
+		ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
+		cln, err := c.methods.Dial(ctx, ble.NewAddr(addr))
+		return cln, addr, err
+	})
 }
 
 func (c *RealConnection) Scan(ctx context.Context, handle func(ble.Advertisement)) error {

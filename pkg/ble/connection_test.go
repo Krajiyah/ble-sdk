@@ -37,6 +37,10 @@ func (bc *testCoreMethods) filter(fn func(addr string, rssi int)) {
 	}
 }
 
+func (bc *testCoreMethods) Dial(_ context.Context, a ble.Addr) (ble.Client, error) {
+	return newDummyCoreClient(), nil
+}
+
 func (bc *testCoreMethods) Connect(_ context.Context, f ble.AdvFilter) (ble.Client, error) {
 	bc.filter(func(addr string, rssi int) { f(DummyAdv{DummyAddr{addr}, rssi, false}) })
 	return newDummyCoreClient(), nil

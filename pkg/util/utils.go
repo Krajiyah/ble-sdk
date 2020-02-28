@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-ble/ble"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -47,7 +48,7 @@ func CatchErrs(fn func() error) error {
 			err = fn()
 		},
 		Catch: func(e error) {
-			err = e
+			err = errors.Wrap(e, "caught panic: ")
 		},
 	}.Do()
 	return err

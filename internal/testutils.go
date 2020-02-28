@@ -103,6 +103,10 @@ func (c *TestConnection) Connect(context.Context, ble.AdvFilter) error {
 	c.connectedAddr = c.toConnectAddr
 	return nil
 }
+func (c *TestConnection) Dial(_ context.Context, a string) error {
+	c.connectedAddr = a
+	return nil
+}
 func (c *TestConnection) ScanForDuration(context.Context, time.Duration, func(ble.Advertisement)) error {
 	return nil
 }

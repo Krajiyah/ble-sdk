@@ -212,9 +212,7 @@ func (client *BLEClient) connectLoop() {
 }
 
 func (client *BLEClient) connect() error {
-	err := client.connection.Connect(client.ctx, func(a ble.Advertisement) bool {
-		return util.AddrEqualAddr(a.Addr().String(), client.serverAddr)
-	})
+	err := client.connection.Dial(client.ctx, client.serverAddr)
 	if err != nil {
 		client.listener.OnInternalError(errors.Wrap(err, "Could not connect to server.\nSo now trying to connect to a forwarder.\n"))
 		err = client.connection.Connect(client.ctx, HasMainService)
