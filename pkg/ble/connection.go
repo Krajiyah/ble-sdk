@@ -35,31 +35,59 @@ type coreMethods interface {
 type realCoreMethods struct{}
 
 func (bc *realCoreMethods) Connect(ctx context.Context, f ble.AdvFilter) (ble.Client, error) {
-	return ble.Connect(ctx, f)
+	var client ble.Client
+	err := util.CatchErrs(func() error {
+		c, e := ble.Connect(ctx, f)
+		client = c
+		return e
+	})
+	return client, err
+
 }
 
 func (bc *realCoreMethods) Dial(ctx context.Context, addr ble.Addr) (ble.Client, error) {
-	return ble.Dial(ctx, addr)
+	var client ble.Client
+	err := util.CatchErrs(func() error {
+		c, e := ble.Dial(ctx, addr)
+		client = c
+		return e
+	})
+	return client, err
 }
 
 func (bc *realCoreMethods) Scan(ctx context.Context, b bool, h ble.AdvHandler, f ble.AdvFilter) error {
-	return ble.Scan(ctx, b, h, f)
+	return util.CatchErrs(func() error {
+		return ble.Scan(ctx, b, h, f)
+	})
 }
 
-func (bc *realCoreMethods) Stop() error { return ble.Stop() }
+func (bc *realCoreMethods) Stop() error {
+	return util.CatchErrs(func() error {
+		return ble.Stop()
+	})
+}
 
 func (bc *realCoreMethods) AdvertiseNameAndServices(ctx context.Context, name string, uuids ...ble.UUID) error {
-	return ble.AdvertiseNameAndServices(ctx, name, uuids...)
+	return util.CatchErrs(func() error {
+		return ble.AdvertiseNameAndServices(ctx, name, uuids...)
+	})
 }
-func (bc *realCoreMethods) AddService(s *ble.Service) error { return ble.AddService(s) }
+
+func (bc *realCoreMethods) AddService(s *ble.Service) error {
+	return util.CatchErrs(func() error {
+		return ble.AddService(s)
+	})
+}
 
 func (bc *realCoreMethods) SetDefaultDevice() error {
-	device, err := linux.NewDevice()
-	if err != nil {
-		return err
-	}
-	ble.SetDefaultDevice(device)
-	return nil
+	return util.CatchErrs(func() error {
+		device, err := linux.NewDevice()
+		if err != nil {
+			return err
+		}
+		ble.SetDefaultDevice(device)
+		return nil
+	})
 }
 
 type Connection interface {
