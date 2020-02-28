@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/RyanCarrier/dijkstra v1.0.0
 	github.com/bradfitz/slice v0.0.0-20180809154707-2b758aa73013
+	github.com/currantlabs/ble v0.0.0-20171229162446-c1d21c164cf8
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/go-ble/ble v0.0.0-20200120171844-0a73a9da88eb

@@ -3,14 +3,12 @@ package ble
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"sync"
 	"time"
 
 	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux"
 	"github.com/pkg/errors"
 )
 
@@ -21,93 +19,6 @@ const (
 type connectionListener interface {
 	OnConnected(string, int)
 	OnDisconnected()
-}
-
-type coreMethods interface {
-	Stop() error
-	SetDefaultDevice() error
-	Connect(context.Context, ble.AdvFilter) (ble.Client, error)
-	Dial(context.Context, ble.Addr) (ble.Client, error)
-	Scan(context.Context, bool, ble.AdvHandler, ble.AdvFilter) error
-	AdvertiseNameAndServices(context.Context, string, ...ble.UUID) error
-	AddService(*ble.Service) error
-}
-
-type realCoreMethods struct{}
-
-func (bc *realCoreMethods) Connect(ctx context.Context, f ble.AdvFilter) (ble.Client, error) {
-	var client ble.Client
-	err := util.CatchErrs(func() error {
-		c, e := ble.Connect(ctx, f)
-		client = c
-		return e
-	})
-	return client, err
-
-}
-
-func (bc *realCoreMethods) Dial(ctx context.Context, addr ble.Addr) (ble.Client, error) {
-	var client ble.Client
-	err := util.CatchErrs(func() error {
-		c, e := ble.Dial(ctx, addr)
-		client = c
-		return e
-	})
-	return client, err
-}
-
-func (bc *realCoreMethods) Scan(ctx context.Context, b bool, h ble.AdvHandler, f ble.AdvFilter) error {
-	return util.CatchErrs(func() error {
-		return ble.Scan(ctx, b, h, f)
-	})
-}
-
-func (bc *realCoreMethods) Stop() error {
-	err := util.CatchErrs(func() error {
-		return ble.Stop()
-	})
-	if err != nil && err.Error() != "default device is not set" {
-		return bc.resetHCI()
-	}
-	return nil
-}
-
-func (bc *realCoreMethods) resetHCI() error {
-	out, err := exec.Command("hciconfig", "hci0", "reset").Output()
-	if err != nil {
-		return errors.Wrap(err, "HCI RESET FAILURE")
-	}
-	fmt.Println("HCI RESET COMPLETE: " + string(out))
-	return nil
-}
-
-func (bc *realCoreMethods) AdvertiseNameAndServices(ctx context.Context, name string, uuids ...ble.UUID) error {
-	return util.CatchErrs(func() error {
-		return ble.AdvertiseNameAndServices(ctx, name, uuids...)
-	})
-}
-
-func (bc *realCoreMethods) AddService(s *ble.Service) error {
-	return util.CatchErrs(func() error {
-		return ble.AddService(s)
-	})
-}
-
-func (bc *realCoreMethods) SetDefaultDevice() error {
-	return retry(func() error {
-		err := util.CatchErrs(func() error {
-			device, err := linux.NewDevice()
-			if err != nil {
-				return err
-			}
-			ble.SetDefaultDevice(device)
-			return nil
-		})
-		if err != nil {
-			return bc.resetHCI()
-		}
-		return nil
-	})
 }
 
 type Connection interface {
@@ -143,10 +54,13 @@ type RealConnection struct {
 }
 
 func (c *RealConnection) resetDevice() error {
-	c.methods.Stop() // ignore error since it only yields error for empty device
-	err := c.methods.SetDefaultDevice()
+	err := c.methods.Stop()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Stop issue")
+	}
+	err = c.methods.SetDefaultDevice()
+	if err != nil {
+		return errors.Wrap(err, "SetDefaultDevice issue")
 	}
 	if c.serviceInfo == nil {
 		return nil
@@ -169,7 +83,7 @@ func newRealConnection(addr string, secret string, listener connectionListener, 
 		listener: listener, serviceInfo: serviceInfo, ctx: util.MakeINFContext(),
 	}
 	if err := conn.resetDevice(); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "newRealConnection resetDevice issue")
 	}
 	return conn, nil
 }
@@ -250,17 +164,14 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 		<-cln.Disconnected()
 		c.listener.OnDisconnected()
 	}()
-	fmt.Println("------------------")
 	_, err := cln.ExchangeMTU(util.MTU)
 	if err != nil {
 		return errors.Wrap(err, "ExchangeMTU issue: ")
 	}
-	fmt.Println("ExchangeMTU")
 	p, err := cln.DiscoverProfile(true)
 	if err != nil {
 		return errors.Wrap(err, "DiscoverProfile issue: ")
 	}
-	fmt.Println("DiscoverProfile")
 	rssi := cln.ReadRSSI()
 	for _, s := range p.Services {
 		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
@@ -270,7 +181,6 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 			}
 			c.connectedAddr = addr
 			c.listener.OnConnected(addr, rssi)
-			fmt.Println("CONNECTED")
 			return nil
 		}
 	}
