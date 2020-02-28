@@ -3,6 +3,7 @@ package ble
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"sync"
 	"time"
 
@@ -62,9 +63,23 @@ func (bc *realCoreMethods) Scan(ctx context.Context, b bool, h ble.AdvHandler, f
 }
 
 func (bc *realCoreMethods) Stop() error {
-	return util.CatchErrs(func() error {
+	err := util.CatchErrs(func() error {
 		return ble.Stop()
 	})
+	if err != nil {
+		fmt.Println("Error Downing BLE: " + err.Error())
+		return bc.resetHCI()
+	}
+	return nil
+}
+
+func (bc *realCoreMethods) resetHCI() error {
+	out, err := exec.Command("hciconfig", "hci0", "reset").Output()
+	if err != nil {
+		return err
+	}
+	fmt.Println("HCI RESET COMPLETE: " + string(out))
+	return nil
 }
 
 func (bc *realCoreMethods) AdvertiseNameAndServices(ctx context.Context, name string, uuids ...ble.UUID) error {
@@ -81,7 +96,7 @@ func (bc *realCoreMethods) AddService(s *ble.Service) error {
 
 func (bc *realCoreMethods) SetDefaultDevice() error {
 	return retry(func() error {
-		return util.CatchErrs(func() error {
+		err := util.CatchErrs(func() error {
 			device, err := linux.NewDevice()
 			if err != nil {
 				return err
@@ -89,6 +104,11 @@ func (bc *realCoreMethods) SetDefaultDevice() error {
 			ble.SetDefaultDevice(device)
 			return nil
 		})
+		if err != nil {
+			fmt.Println("Error Starting BLE: " + err.Error())
+			return bc.resetHCI()
+		}
+		return nil
 	})
 }
 
