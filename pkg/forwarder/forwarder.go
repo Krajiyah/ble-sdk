@@ -112,22 +112,23 @@ func (forwarder *BLEForwarder) Run() error {
 	select {}
 }
 
-func (forwarder *BLEForwarder) collectAdvirtisements() (chan ble.Advertisement, error) {
+func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, error) {
 	advs := make(chan ble.Advertisement)
-	closed := false
 	err := forwarder.forwardingClient.GetConnection().ScanForDuration(scanDuration, func(a ble.Advertisement) {
-		go func() {
-			if !closed {
-				advs <- a
-			}
-		}()
+		util.CatchErrs(func() error {
+			go func() { advs <- a }()
+			return nil
+		})
 	})
 	if err != nil && err.Error() == "context deadline exceeded" {
 		err = nil
 	}
-	closed = true
 	close(advs)
-	return advs, err
+	ret := []ble.Advertisement{}
+	for a := range advs {
+		ret = append(ret, a)
+	}
+	return ret, err
 }
 
 func (forwarder *BLEForwarder) scanLoop() {
@@ -140,7 +141,7 @@ func (forwarder *BLEForwarder) scanLoop() {
 			continue
 		}
 		fmt.Println("Collected advs")
-		for a := range advs {
+		for _, a := range advs {
 			err := forwarder.onScanned(a)
 			if err != nil {
 				e := errors.Wrap(err, "onScanned error")
