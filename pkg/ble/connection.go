@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	maxRetryAttempts = 10
+	maxRetryAttempts = 5
 )
 
 type connectionListener interface {
