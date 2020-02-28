@@ -2,8 +2,6 @@ package ble
 
 import (
 	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
@@ -67,12 +65,13 @@ func (bc *realCoreMethods) Stop() error {
 }
 
 func (bc *realCoreMethods) resetHCI() error {
-	_, err := exec.Command("hciconfig", "hci0", "reset").Output()
-	if err != nil {
-		return errors.Wrap(err, "HCI RESET FAILURE")
-	}
-	fmt.Println("HCI RESET COMPLETE!")
-	time.Sleep(hciResetDelay)
+	// TODO: do I need this?
+	// _, err := exec.Command("hciconfig", "hci0", "reset").Output()
+	// time.Sleep(hciResetDelay)
+	// if err != nil {
+	// 	return errors.Wrap(err, "HCI RESET FAILURE")
+	// }
+	// fmt.Println("HCI RESET COMPLETE!")
 	return nil
 }
 
