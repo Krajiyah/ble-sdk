@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	maxRetryAttempts = 5 // TODO: remove me and make infinite
+	maxRetryAttempts = 10
 )
 
 type connectionListener interface {
@@ -208,7 +208,6 @@ type connnectOrDialHelper func() (ble.Client, string, error)
 func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.connectedAddr = ""
 	err := retryAndOptimize(c, func() error {
 		if c.cln != nil {
 			c.cln.CancelConnection()
@@ -231,14 +230,17 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 		<-cln.Disconnected()
 		c.listener.OnDisconnected()
 	}()
+	fmt.Println("------------------")
 	_, err := cln.ExchangeMTU(util.MTU)
 	if err != nil {
 		return errors.Wrap(err, "ExchangeMTU issue: ")
 	}
+	fmt.Println("ExchangeMTU")
 	p, err := cln.DiscoverProfile(true)
 	if err != nil {
 		return errors.Wrap(err, "DiscoverProfile issue: ")
 	}
+	fmt.Println("DiscoverProfile")
 	rssi := cln.ReadRSSI()
 	for _, s := range p.Services {
 		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
@@ -248,6 +250,7 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 			}
 			c.connectedAddr = addr
 			c.listener.OnConnected(addr, rssi)
+			fmt.Println("CONNECTED")
 			return nil
 		}
 	}
@@ -312,6 +315,9 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	}, true)
 	if err != nil {
 		return nil, err
+	}
+	if len(encData) == 0 {
+		return nil, errors.New("Received Empty Data")
 	}
 	return util.Decrypt(encData, c.secret)
 }
