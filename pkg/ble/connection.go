@@ -123,11 +123,11 @@ func retryAndOptimize(c *RealConnection, fn func() error, reconnect bool) error 
 			return nil
 		}
 		err = c.resetDevice()
-		if err != nil {
-			return errors.Wrap(err, " AND "+err.Error())
+		if err == nil {
+			return nil
 		}
 		if !reconnect {
-			return nil
+			return err
 		}
 		fmt.Println("Reconnecting...")
 		err = c.Dial(c.connectedAddr)
