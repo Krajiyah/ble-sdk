@@ -122,21 +122,21 @@ func retryAndOptimize(c *RealConnection, fn func() error, reconnect bool) error 
 		if err == nil {
 			return nil
 		}
-		err = c.resetDevice()
-		if err == nil {
-			return nil
-		}
-		if !reconnect {
+		e := c.resetDevice()
+		if e == nil {
 			return err
 		}
+		if !reconnect {
+			return errors.Wrap(err, " AND "+e.Error())
+		}
 		fmt.Println("Reconnecting...")
-		err = c.Dial(c.connectedAddr)
-		if err == nil {
-			return nil
+		e = c.Dial(c.connectedAddr)
+		if e == nil {
+			return err
 		}
 		fmt.Println("Dial error in retryAndOptimize: " + err.Error())
-		if strings.Contains(err.Error(), "EOF") {
-			panic(errors.New(util.ForcePanicMsgPrefix + err.Error()))
+		if strings.Contains(e.Error(), "EOF") {
+			panic(errors.New(util.ForcePanicMsgPrefix + err.Error() + " AND " + e.Error()))
 		}
 		return errors.Wrap(err, " AND "+err.Error())
 	})
