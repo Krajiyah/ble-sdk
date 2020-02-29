@@ -1,5 +1,11 @@
 package util
 
+import "strings"
+
+const (
+	ForcePanicMsgPrefix = "force_panic: "
+)
+
 type TryCatchBlock struct {
 	Try     func()
 	Catch   func(error)
@@ -18,7 +24,11 @@ func (tcf TryCatchBlock) Do() {
 		defer func() {
 			if r := recover(); r != nil {
 				err, _ := r.(error)
-				tcf.Catch(err)
+				if strings.HasPrefix(err.Error(), ForcePanicMsgPrefix) {
+					panic(err)
+				} else {
+					tcf.Catch(err)
+				}
 			}
 		}()
 	}
