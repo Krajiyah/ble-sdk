@@ -3,6 +3,7 @@ package ble
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -118,20 +119,26 @@ func retry(fn func() error) error {
 func retryAndOptimize(c *RealConnection, fn func() error, reconnect bool) error {
 	return retry(func() error {
 		err := util.Optimize(fn)
-		if err != nil {
-			e := c.resetDevice()
-			if e != nil {
-				return errors.Wrap(e, " AND "+err.Error())
-			}
-			if reconnect {
-				fmt.Println("Reconnecting...")
-				e := c.Dial(c.connectedAddr)
-				if e != nil {
-					return errors.Wrap(e, " AND "+err.Error())
-				}
-			}
+		if err == nil {
+			return nil
 		}
-		return err
+		e := c.resetDevice()
+		if e == nil {
+			return err
+		}
+		if !reconnect {
+			return errors.Wrap(err, " AND "+e.Error())
+		}
+		fmt.Println("Reconnecting...")
+		e = c.Dial(c.connectedAddr)
+		if e == nil {
+			return err
+		}
+		fmt.Println("Dial error in retryAndOptimize: " + err.Error())
+		if strings.Contains(e.Error(), "EOF") {
+			panic(errors.New(util.ForcePanicMsgPrefix + err.Error() + " AND " + e.Error()))
+		}
+		return errors.Wrap(err, " AND "+err.Error())
 	})
 }
 
@@ -269,13 +276,16 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 		return err
 	}
 	packets, err := util.EncodeDataAsPackets(data, c.secret)
+	if err != nil {
+		return err
+	}
 	for _, packet := range packets {
-		e := retryAndOptimize(c, func() error {
+		err := retryAndOptimize(c, func() error {
 			return c.cln.WriteCharacteristic(char, packet, true)
 		}, true)
-		if e != nil {
-			err = errors.Wrap(e, "WriteCharacteristic issue: ")
+		if err != nil {
+			return errors.Wrap(err, "WriteCharacteristic issue: ")
 		}
 	}
-	return err
+	return nil
 }
