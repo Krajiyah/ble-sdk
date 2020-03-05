@@ -134,10 +134,12 @@ func (err *retryAndOptimizeError) Error() error {
 		reconnect = err.dial.Error()
 	}
 	e := errors.New(fmt.Sprintf(`
+-------
 Method: %s
 Original: %s
 ResetDevice: %s
 Reconnect: %s
+-------
 `, err.method, original, resetDevice, reconnect))
 	if strings.Contains(reconnect, "EOF") {
 		panic(errors.New(util.ForcePanicMsgPrefix + e.Error()))
