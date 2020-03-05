@@ -3,7 +3,6 @@ package ble
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -160,9 +159,9 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 		cln, addr, err := fn()
 		c.cln = cln
 		if err != nil {
-			if strings.Contains(err.Error(), "EOF") {
-				panic(errors.New(util.ForcePanicMsgPrefix + err.Error()))
-			}
+			// if strings.Contains(err.Error(), "EOF") {
+			// 	panic(errors.New(util.ForcePanicMsgPrefix + err.Error()))
+			// }
 			return errors.Wrap(err, "ConnectOrDial issue: ")
 		}
 		return c.handleCln(cln, addr)
