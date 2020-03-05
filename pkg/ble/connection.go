@@ -3,7 +3,6 @@ package ble
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 const (
 	stopDelay             = time.Second * 3
 	setDefaultDeviceDelay = time.Second * 2
-	maxRetryAttempts      = 5
+	maxRetryAttempts      = 10
 )
 
 type connectionListener interface {
@@ -140,23 +139,18 @@ func (err *retryAndOptimizeError) Error() error {
 	} else if err.doesDial {
 		reconnect = pass
 	}
-	e := errors.New(fmt.Sprintf(`
+	return errors.New(fmt.Sprintf(`
 -------
 Method: %s
 Original: %s
 ResetDevice: %s
 Reconnect: 
 	%s
--------
-`, err.method, original, resetDevice, reconnect))
-	if strings.Contains(reconnect, "EOF") {
-		panic(errors.New(util.ForcePanicMsgPrefix + e.Error()))
-	}
-	return e
+-------`, err.method, original, resetDevice, reconnect))
 }
 
 func retryAndOptimize(c *RealConnection, method string, fn func() error, reconnect bool) error {
-	return retry(func() error {
+	err := retry(func() error {
 		err := &retryAndOptimizeError{method: method}
 		err.original = util.Optimize(fn)
 		if err.original == nil {
@@ -178,6 +172,7 @@ func retryAndOptimize(c *RealConnection, method string, fn func() error, reconne
 		}
 		return err.Error()
 	})
+	panic(errors.New(util.ForcePanicMsgPrefix + err.Error()))
 }
 
 func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
