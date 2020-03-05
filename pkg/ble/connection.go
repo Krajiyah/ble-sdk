@@ -99,15 +99,15 @@ func NewRealConnection(addr string, secret string, listener connectionListener, 
 	return newRealConnection(addr, secret, listener, &realCoreMethods{}, serviceInfo)
 }
 
-func retry(fn func() error) error {
+func retry(fn func(int) error) error {
 	err := errors.New("not error")
 	attempts := 0
 	for err != nil && attempts < maxRetryAttempts {
 		if attempts > 0 {
 			fmt.Printf("Error: %s\n Retrying...\n", err.Error())
 		}
-		err = fn()
 		attempts += 1
+		err = fn(attempts)
 	}
 	if err != nil {
 		return errors.Wrap(err, "Exceeded attempts issue: ")
@@ -117,6 +117,7 @@ func retry(fn func() error) error {
 
 type retryAndOptimizeError struct {
 	method    string
+	attempt   int
 	doesReset bool
 	doesDial  bool
 	original  error
@@ -142,16 +143,17 @@ func (err *retryAndOptimizeError) Error() error {
 	return errors.New(fmt.Sprintf(`
 -------
 Method: %s
+Attempt: %d
 Original: %s
 ResetDevice: %s
 Reconnect: 
 	%s
--------`, err.method, original, resetDevice, reconnect))
+-------`, err.method, err.attempt, original, resetDevice, reconnect))
 }
 
 func retryAndOptimize(c *RealConnection, method string, fn func() error, reconnect bool) error {
-	err := retry(func() error {
-		err := &retryAndOptimizeError{method: method}
+	err := retry(func(attempts int) error {
+		err := &retryAndOptimizeError{method: method, attempt: attempts}
 		err.original = util.Optimize(fn)
 		if err.original == nil {
 			return nil
