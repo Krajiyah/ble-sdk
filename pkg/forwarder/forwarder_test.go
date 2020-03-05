@@ -31,7 +31,7 @@ type dummyListener struct{}
 
 func (l dummyListener) OnServerStatusChanged(models.BLEServerStatus, error) {}
 func (l dummyListener) OnInternalError(error)                               {}
-func (l dummyListener) OnConnected(string, int)                             {}
+func (l dummyListener) OnConnected(string)                                  {}
 func (l dummyListener) OnDisconnected()                                     {}
 func (l dummyListener) OnTimeSync()                                         {}
 

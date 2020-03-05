@@ -2,6 +2,7 @@ package ble
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
@@ -95,11 +96,11 @@ func (bc *realCoreMethods) newLinuxDevice() (ble.Device, error) {
 }
 
 func (bc *realCoreMethods) SetDefaultDevice() error {
-	return retry(func() error {
+	return retry(func(attempts int) error {
 		return util.CatchErrs(func() error {
 			device, err := bc.newLinuxDevice()
 			if err != nil {
-				return errors.Wrap(err, "newLinuxDevice issue")
+				return errors.Wrap(err, fmt.Sprintf("newLinuxDevice issue (tried %d times)", attempts))
 			}
 			ble.SetDefaultDevice(device)
 			return nil

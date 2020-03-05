@@ -68,33 +68,39 @@ func (client *BLEClient) Run() {
 func (client *BLEClient) scanLoop() {
 	for {
 		time.Sleep(ScanInterval)
-		err := client.connection.Scan(func(a ble.Advertisement) {})
+		err := client.connection.Scan(func(_ ble.Advertisement) {})
 		if err != nil {
 			client.listener.OnInternalError(err)
 		}
 	}
 }
 
+func (client *BLEClient) ping(mutex *sync.Mutex) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	if client.status != Connected {
+		return nil
+	}
+	m := client.connection.GetRssiMap().GetAll()
+	connectedAddr := client.connection.GetConnectedAddr()
+	req := &ClientStateRequest{Name: client.name, Addr: client.addr, ConnectedAddr: connectedAddr, RssiMap: m}
+	b, _ := req.Data()
+	err := client.WriteValue(util.ClientStateUUID, b)
+	if err != nil {
+		return err
+	}
+	if client.timeSync == nil {
+		return client.syncTime()
+	}
+	return nil
+}
+
 func (client *BLEClient) pingLoop() {
+	mutex := &sync.Mutex{}
 	for {
 		time.Sleep(PingInterval)
-		if client.status != Connected {
-			continue
-		}
-		m := client.connection.GetRssiMap().GetAll()
-		connectedAddr := client.connection.GetConnectedAddr()
-		req := &ClientStateRequest{Name: client.name, Addr: client.addr, ConnectedAddr: connectedAddr, RssiMap: m}
-		b, _ := req.Data()
-		err := client.WriteValue(util.ClientStateUUID, b)
-		if err != nil {
+		if err := client.ping(mutex); err != nil {
 			client.listener.OnInternalError(err)
-			continue
-		}
-		if client.timeSync == nil {
-			err := client.syncTime()
-			if err != nil {
-				client.listener.OnInternalError(err)
-			}
 		}
 	}
 }

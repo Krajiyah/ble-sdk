@@ -3,7 +3,6 @@ package ble
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,11 +15,11 @@ import (
 const (
 	stopDelay             = time.Second * 3
 	setDefaultDeviceDelay = time.Second * 2
-	maxRetryAttempts      = 5
+	maxRetryAttempts      = 10
 )
 
 type connectionListener interface {
-	OnConnected(string, int)
+	OnConnected(string)
 	OnDisconnected()
 }
 
@@ -100,15 +99,15 @@ func NewRealConnection(addr string, secret string, listener connectionListener, 
 	return newRealConnection(addr, secret, listener, &realCoreMethods{}, serviceInfo)
 }
 
-func retry(fn func() error) error {
+func retry(fn func(int) error) error {
 	err := errors.New("not error")
 	attempts := 0
 	for err != nil && attempts < maxRetryAttempts {
 		if attempts > 0 {
 			fmt.Printf("Error: %s\n Retrying...\n", err.Error())
 		}
-		err = fn()
 		attempts += 1
+		err = fn(attempts)
 	}
 	if err != nil {
 		return errors.Wrap(err, "Exceeded attempts issue: ")
@@ -116,30 +115,68 @@ func retry(fn func() error) error {
 	return nil
 }
 
-func retryAndOptimize(c *RealConnection, fn func() error, reconnect bool) error {
-	return retry(func() error {
-		err := util.Optimize(fn)
-		if err == nil {
+type retryAndOptimizeError struct {
+	method    string
+	attempt   int
+	doesReset bool
+	doesDial  bool
+	original  error
+	reset     error
+	dial      error
+}
+
+func (err *retryAndOptimizeError) Error() error {
+	original := err.original.Error()
+	const pass = "✔"
+	resetDevice := "n/a"
+	reconnect := "n/a"
+	if err.reset != nil {
+		resetDevice = err.reset.Error()
+	} else if err.doesReset {
+		resetDevice = pass
+	}
+	if err.dial != nil {
+		reconnect = err.dial.Error()
+	} else if err.doesDial {
+		reconnect = pass
+	}
+	return errors.New(fmt.Sprintf(`
+-------
+Method: %s
+Attempt: %d
+Original: %s
+ResetDevice: %s
+Reconnect: %s
+-------`, err.method, err.attempt, original, resetDevice, reconnect))
+}
+
+func retryAndOptimize(c *RealConnection, method string, fn func() error, reconnect bool) error {
+	err := retry(func(attempts int) error {
+		err := &retryAndOptimizeError{method: method, attempt: attempts}
+		err.original = util.Optimize(fn)
+		if err.original == nil {
 			return nil
 		}
-		e := c.resetDevice()
-		if e == nil {
-			return err
+		err.doesReset = true
+		err.reset = c.resetDevice()
+		if err.reset == nil {
+			return err.Error()
 		}
 		if !reconnect {
-			return errors.Wrap(err, " AND "+e.Error())
+			return err.Error()
 		}
 		fmt.Println("Reconnecting...")
-		e = c.Dial(c.connectedAddr)
-		if e == nil {
-			return err
+		err.doesDial = true
+		err.dial = c.Dial(c.connectedAddr)
+		if err.dial == nil {
+			return err.Error()
 		}
-		fmt.Println("Dial error in retryAndOptimize: " + err.Error())
-		if strings.Contains(e.Error(), "EOF") {
-			panic(errors.New(util.ForcePanicMsgPrefix + err.Error() + " AND " + e.Error()))
-		}
-		return errors.Wrap(err, " AND "+err.Error())
+		return err.Error()
 	})
+	if err != nil {
+		panic(errors.New(util.ForcePanicMsgPrefix + err.Error()))
+	}
+	return nil
 }
 
 func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
@@ -157,14 +194,14 @@ type connnectOrDialHelper func() (ble.Client, string, error)
 func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 	c.connectionMutex.Lock()
 	defer c.connectionMutex.Unlock()
-	err := retryAndOptimize(c, func() error {
+	err := retryAndOptimize(c, "ConnectOrDial", func() error {
 		if c.cln != nil {
 			c.cln.CancelConnection()
 		}
 		cln, addr, err := fn()
 		c.cln = cln
 		if err != nil {
-			return errors.Wrap(err, "ConnectOrDial issue: ")
+			return err
 		}
 		return c.handleCln(cln, addr)
 	}, false)
@@ -187,7 +224,6 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 	if err != nil {
 		return errors.Wrap(err, "DiscoverProfile issue: ")
 	}
-	rssi := cln.ReadRSSI()
 	for _, s := range p.Services {
 		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
 			for _, char := range s.Characteristics {
@@ -195,7 +231,7 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 				c.characteristics[uuid] = char
 			}
 			c.connectedAddr = addr
-			c.listener.OnConnected(addr, rssi)
+			c.listener.OnConnected(addr)
 			return nil
 		}
 	}
@@ -253,10 +289,10 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 		return nil, err
 	}
 	var encData []byte
-	err = retryAndOptimize(c, func() error {
+	err = retryAndOptimize(c, "ReadLongCharacteristic", func() error {
 		dat, e := c.cln.ReadLongCharacteristic(char)
 		encData = dat
-		return errors.Wrap(e, "ReadLongCharacteristic issue: ")
+		return e
 	}, true)
 	if err != nil {
 		return nil, err
@@ -280,11 +316,11 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 		return err
 	}
 	for _, packet := range packets {
-		err := retryAndOptimize(c, func() error {
+		err := retryAndOptimize(c, "WriteCharacteristic", func() error {
 			return c.cln.WriteCharacteristic(char, packet, true)
 		}, true)
 		if err != nil {
-			return errors.Wrap(err, "WriteCharacteristic issue: ")
+			return err
 		}
 	}
 	return nil

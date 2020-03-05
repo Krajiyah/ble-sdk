@@ -24,7 +24,7 @@ func (l myListener) OnServerStatusChanged(s models.BLEServerStatus, err error)  
 func (l myListener) OnClientStateMapChanged(m map[string]models.BLEClientState) {}
 func (l myListener) OnClientLog(r models.ClientLogRequest)                      {}
 func (l myListener) OnInternalError(err error)                                  {}
-func (l myListener) OnConnected(addr string, rssi int)                          {}
+func (l myListener) OnConnected(addr string)                                    {}
 func (l myListener) OnDisconnected()                                            {}
 func (l myListener) OnTimeSync()                                                {}
 
