@@ -117,28 +117,36 @@ func retry(fn func() error) error {
 }
 
 type retryAndOptimizeError struct {
-	method   string
-	original error
-	reset    error
-	dial     error
+	method    string
+	doesReset bool
+	doesDial  bool
+	original  error
+	reset     error
+	dial      error
 }
 
 func (err *retryAndOptimizeError) Error() error {
 	original := err.original.Error()
-	resetDevice := ""
+	const pass = "✔"
+	resetDevice := "n/a"
+	reconnect := "n/a"
 	if err.reset != nil {
 		resetDevice = err.reset.Error()
+	} else if err.doesReset {
+		resetDevice = pass
 	}
-	reconnect := ""
 	if err.dial != nil {
 		reconnect = err.dial.Error()
+	} else if err.doesDial {
+		reconnect = pass
 	}
 	e := errors.New(fmt.Sprintf(`
 -------
 Method: %s
 Original: %s
 ResetDevice: %s
-Reconnect: %s
+Reconnect: 
+	%s
 -------
 `, err.method, original, resetDevice, reconnect))
 	if strings.Contains(reconnect, "EOF") {
@@ -154,6 +162,7 @@ func retryAndOptimize(c *RealConnection, method string, fn func() error, reconne
 		if err.original == nil {
 			return nil
 		}
+		err.doesReset = true
 		err.reset = c.resetDevice()
 		if err.reset == nil {
 			return err.Error()
@@ -162,6 +171,7 @@ func retryAndOptimize(c *RealConnection, method string, fn func() error, reconne
 			return err.Error()
 		}
 		fmt.Println("Reconnecting...")
+		err.doesDial = true
 		err.dial = c.Dial(c.connectedAddr)
 		if err.dial == nil {
 			return err.Error()
