@@ -107,9 +107,30 @@ func (forwarder *BLEForwarder) GetClient() client.Client {
 	return forwarder.forwardingClient
 }
 
+func (forwarder *BLEForwarder) runIter(mutex *sync.Mutex) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	advs, err := forwarder.collectAdvirtisements()
+	if err != nil {
+		return errors.Wrap(err, "collectAdvirtisements error")
+	}
+	for _, a := range advs {
+		err := forwarder.onScanned(a)
+		if err != nil {
+			return errors.Wrap(err, "onScanned error")
+		}
+	}
+	return nil
+}
+
 func (forwarder *BLEForwarder) Run() error {
-	go forwarder.scanLoop()
-	select {}
+	mutex := &sync.Mutex{}
+	for {
+		time.Sleep(client.ScanInterval)
+		if err := forwarder.runIter(mutex); err != nil {
+			forwarder.listener.OnInternalError(err)
+		}
+	}
 }
 
 func isClosed(ch <-chan ble.Advertisement) bool {
@@ -138,25 +159,6 @@ func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, err
 		return true
 	})
 	return ret, nil
-}
-
-func (forwarder *BLEForwarder) scanLoop() {
-	for {
-		time.Sleep(client.ScanInterval)
-		advs, err := forwarder.collectAdvirtisements()
-		if err != nil {
-			e := errors.Wrap(err, "collectAdvirtisements error")
-			forwarder.listener.OnInternalError(e)
-			continue
-		}
-		for _, a := range advs {
-			err := forwarder.onScanned(a)
-			if err != nil {
-				e := errors.Wrap(err, "onScanned error")
-				forwarder.listener.OnInternalError(e)
-			}
-		}
-	}
 }
 
 func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
