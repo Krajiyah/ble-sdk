@@ -146,8 +146,7 @@ Method: %s
 Attempt: %d
 Original: %s
 ResetDevice: %s
-Reconnect: 
-	%s
+Reconnect: %s
 -------`, err.method, err.attempt, original, resetDevice, reconnect))
 }
 
@@ -174,7 +173,10 @@ func retryAndOptimize(c *RealConnection, method string, fn func() error, reconne
 		}
 		return err.Error()
 	})
-	panic(errors.New(util.ForcePanicMsgPrefix + err.Error()))
+	if err != nil {
+		panic(errors.New(util.ForcePanicMsgPrefix + err.Error()))
+	}
+	return nil
 }
 
 func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
