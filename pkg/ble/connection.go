@@ -124,7 +124,7 @@ func retryAndOptimize(c *RealConnection, fn func() error, reconnect bool) error 
 		}
 		e := c.resetDevice()
 		if e == nil {
-			return err
+			return errors.Wrap(err, "Was able to resetDevice though...")
 		}
 		if !reconnect {
 			return errors.Wrap(err, " AND "+e.Error())
@@ -132,13 +132,9 @@ func retryAndOptimize(c *RealConnection, fn func() error, reconnect bool) error 
 		fmt.Println("Reconnecting...")
 		e = c.Dial(c.connectedAddr)
 		if e == nil {
-			return err
+			return errors.Wrap(err, "Was able to dial on reconnect though...")
 		}
-		fmt.Println("Dial error in retryAndOptimize: " + err.Error())
-		if strings.Contains(e.Error(), "EOF") {
-			panic(errors.New(util.ForcePanicMsgPrefix + err.Error() + " AND " + e.Error()))
-		}
-		return errors.Wrap(err, " AND "+err.Error())
+		return errors.Wrap(err, " AND reconnect issue "+e.Error())
 	})
 }
 
@@ -164,6 +160,9 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 		cln, addr, err := fn()
 		c.cln = cln
 		if err != nil {
+			if strings.Contains(err.Error(), "EOF") {
+				panic(errors.New(util.ForcePanicMsgPrefix + err.Error()))
+			}
 			return errors.Wrap(err, "ConnectOrDial issue: ")
 		}
 		return c.handleCln(cln, addr)
