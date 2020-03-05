@@ -27,8 +27,8 @@ type exampleListener struct {
 	c *client.BLEClient
 }
 
-func (l *exampleListener) OnConnected(addr string, rssi int) {
-	fmt.Printf("Client connected to server (%s) with rssi %d", addr, rssi)
+func (l *exampleListener) OnConnected(addr string) {
+	fmt.Printf("Client connected to server (%s)", addr)
 	for {
 		time.Sleep(time.Second * 1)
 		fmt.Println("Attempting to write to extra write char...")

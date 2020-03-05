@@ -20,7 +20,7 @@ const (
 )
 
 type connectionListener interface {
-	OnConnected(string, int)
+	OnConnected(string)
 	OnDisconnected()
 }
 
@@ -186,7 +186,6 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 	if err != nil {
 		return errors.Wrap(err, "DiscoverProfile issue: ")
 	}
-	rssi := cln.ReadRSSI()
 	for _, s := range p.Services {
 		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
 			for _, char := range s.Characteristics {
@@ -194,7 +193,7 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 				c.characteristics[uuid] = char
 			}
 			c.connectedAddr = addr
-			c.listener.OnConnected(addr, rssi)
+			c.listener.OnConnected(addr)
 			return nil
 		}
 	}

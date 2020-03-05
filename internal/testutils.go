@@ -11,16 +11,12 @@ import (
 	"github.com/go-ble/ble"
 )
 
-type TestListener struct {
-	Rssi int
-}
+type TestListener struct{}
 
 func (l *TestListener) OnDisconnected()       {}
 func (l *TestListener) OnTimeSync()           {}
 func (l *TestListener) OnInternalError(error) {}
-func (l *TestListener) OnConnected(_ string, r int) {
-	l.Rssi = r
-}
+func (l *TestListener) OnConnected(_ string)  {}
 
 type DummyAdv struct {
 	Address    ble.Addr
