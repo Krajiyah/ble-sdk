@@ -286,6 +286,8 @@ func (c *RealConnection) getCharacteristic(uuid string) (*ble.Characteristic, er
 }
 
 func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
+	c.connectionMutex.Lock()
+	defer c.connectionMutex.Unlock()
 	char, err := c.getCharacteristic(uuid)
 	if err != nil {
 		return nil, err
@@ -306,6 +308,8 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 }
 
 func (c *RealConnection) WriteValue(uuid string, data []byte) error {
+	c.connectionMutex.Lock()
+	defer c.connectionMutex.Unlock()
 	if data == nil || len(data) == 0 {
 		return errors.New("Empty data provided. Will skip writing.")
 	}
