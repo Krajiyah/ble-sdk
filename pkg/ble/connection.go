@@ -54,6 +54,7 @@ type RealConnection struct {
 	resetDeviceMutex *sync.Mutex
 	listener         connectionListener
 	ctx              context.Context
+	timeout          time.Duration
 }
 
 func (c *RealConnection) resetDevice() error {
@@ -82,12 +83,13 @@ func (c *RealConnection) resetDevice() error {
 	return nil
 }
 
-func newRealConnection(addr string, secret string, listener connectionListener, methods coreMethods, serviceInfo *ServiceInfo) (*RealConnection, error) {
+func newRealConnection(addr string, secret string, timeout time.Duration, listener connectionListener, methods coreMethods, serviceInfo *ServiceInfo) (*RealConnection, error) {
 	conn := &RealConnection{
 		srcAddr: addr, rssiMap: models.NewRssiMap(),
 		secret: secret, connectionMutex: &sync.Mutex{}, resetDeviceMutex: &sync.Mutex{},
 		methods: methods, characteristics: map[string]*ble.Characteristic{},
 		listener: listener, serviceInfo: serviceInfo, ctx: util.MakeINFContext(),
+		timeout: timeout,
 	}
 	if err := conn.resetDevice(); err != nil {
 		return nil, errors.Wrap(err, "newRealConnection resetDevice issue")
@@ -95,8 +97,8 @@ func newRealConnection(addr string, secret string, listener connectionListener, 
 	return conn, nil
 }
 
-func NewRealConnection(addr string, secret string, listener connectionListener, serviceInfo *ServiceInfo) (*RealConnection, error) {
-	return newRealConnection(addr, secret, listener, &realCoreMethods{}, serviceInfo)
+func NewRealConnection(addr string, secret string, timeout time.Duration, listener connectionListener, serviceInfo *ServiceInfo) (*RealConnection, error) {
+	return newRealConnection(addr, secret, timeout, listener, &realCoreMethods{}, serviceInfo)
 }
 
 func retry(fn func(int) error) error {
@@ -153,7 +155,7 @@ Reconnect: %s
 func retryAndOptimize(c *RealConnection, method string, fn func() error, reconnect bool) error {
 	err := retry(func(attempts int) error {
 		err := &retryAndOptimizeError{method: method, attempt: attempts}
-		err.original = util.Optimize(fn)
+		err.original = util.Optimize(fn, c.timeout)
 		if err.original == nil {
 			return nil
 		}

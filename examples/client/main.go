@@ -59,7 +59,7 @@ func main() {
 		return
 	}
 	var clien *client.BLEClient
-	clien, err := client.NewBLEClient(Name, BLEClientAddr, BLESecret, BLEServerAddr, &exampleListener{c: clien})
+	clien, err := client.NewBLEClient(Name, BLEClientAddr, BLESecret, BLEServerAddr, time.Minute, &exampleListener{c: clien})
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble client: " + err.Error())
 	}

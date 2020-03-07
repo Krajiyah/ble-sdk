@@ -34,11 +34,11 @@ type BLEServer struct {
 	listener        BLEServerStatusListener
 }
 
-func NewBLEServer(name string, addr string, secret string, cListener BLEClientListener, sListener BLEServerStatusListener,
+func NewBLEServer(name string, addr string, secret string, timeout time.Duration, cListener BLEClientListener, sListener BLEServerStatusListener,
 	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, Connection, error) {
 	server := newBLEServer(name, addr, secret, sListener)
 	service := getService(server, moreReadChars, moreWriteChars)
-	conn, err := NewRealConnection(addr, secret, cListener, &ServiceInfo{Service: service, ServiceName: name, UUID: ble.MustParse(util.MainServiceUUID)})
+	conn, err := NewRealConnection(addr, secret, timeout, cListener, &ServiceInfo{Service: service, ServiceName: name, UUID: ble.MustParse(util.MainServiceUUID)})
 	if err != nil {
 		return nil, nil, err
 	}

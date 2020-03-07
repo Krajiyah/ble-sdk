@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	inf     = 1000000
-	timeout = time.Second * 60
+	inf = 1000000
 )
 
 func AddrEqualAddr(a string, b string) bool {
@@ -54,4 +53,6 @@ func CatchErrs(fn func() error) error {
 	return err
 }
 
-func Optimize(fn func() error) error { return Timeout(func() error { return CatchErrs(fn) }, timeout) }
+func Optimize(fn func() error, timeout time.Duration) error {
+	return Timeout(func() error { return CatchErrs(fn) }, timeout)
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Krajiyah/ble-sdk/pkg/forwarder"
 	"github.com/Krajiyah/ble-sdk/pkg/models"
@@ -33,7 +34,7 @@ func main() {
 		fmt.Println("please compile this with BLESecret, BLEForwarderAddr, and BLEServerAddr as ldflag")
 		return
 	}
-	forward, err := forwarder.NewBLEForwarder(Name, BLEForwarderAddr, BLESecret, BLEServerAddr, myListener{})
+	forward, err := forwarder.NewBLEForwarder(Name, BLEForwarderAddr, BLESecret, BLEServerAddr, time.Minute, myListener{})
 	if err != nil {
 		fmt.Println("Ooops! Something went wrong with setting up ble client: " + err.Error())
 	}

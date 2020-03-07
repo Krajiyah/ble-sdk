@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	. "github.com/Krajiyah/ble-sdk/internal"
 	"github.com/Krajiyah/ble-sdk/pkg/models"
@@ -145,7 +146,7 @@ func setDummyCoreClient(c *RealConnection, d ble.Client) {
 }
 
 func newConnection(t *testing.T) *RealConnection {
-	c, err := newRealConnection(testAddr, testSecret, &TestListener{}, &testCoreMethods{}, nil)
+	c, err := newRealConnection(testAddr, testSecret, time.Minute, &TestListener{}, &testCoreMethods{}, nil)
 	assert.NilError(t, err)
 	return c
 }

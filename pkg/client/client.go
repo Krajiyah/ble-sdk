@@ -50,8 +50,8 @@ func NewBLEClientWithSharedConn(name string, addr string, secret string, serverA
 	}, nil
 }
 
-func NewBLEClient(name string, addr string, secret string, serverAddr string, listener BLEClientListener) (*BLEClient, error) {
-	conn, err := NewRealConnection(addr, secret, listener, nil)
+func NewBLEClient(name string, addr string, secret string, serverAddr string, timeout time.Duration, listener BLEClientListener) (*BLEClient, error) {
+	conn, err := NewRealConnection(addr, secret, timeout, listener, nil)
 	if err != nil {
 		return nil, err
 	}
