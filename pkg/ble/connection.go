@@ -15,7 +15,7 @@ import (
 const (
 	stopDelay             = time.Second * 3
 	setDefaultDeviceDelay = time.Second * 2
-	maxRetryAttempts      = 10
+	maxRetryAttempts      = 6
 )
 
 type connectionListener interface {
