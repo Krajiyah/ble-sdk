@@ -11,7 +11,7 @@ import (
 
 const (
 	inf     = 1000000
-	timeout = time.Second * 20
+	timeout = time.Second * 60
 )
 
 func AddrEqualAddr(a string, b string) bool {
