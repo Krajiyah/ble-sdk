@@ -65,7 +65,6 @@ type RealConnection struct {
 
 func (c *RealConnection) getClient(purpose string) ble.Client {
 	wrapper := c.cln
-	fmt.Println("USING CLN for %s: %s", purpose, wrapper.guid)
 	return wrapper.cln
 }
 
@@ -219,7 +218,6 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 			return err
 		}
 		c.cln = &clnWrapper{cln: cln, guid: uuid.New().String()}
-		fmt.Println("FN PASS")
 		return c.handleCln(cln, addr)
 	}, false)
 	if err != nil && c.cln != nil {
@@ -237,12 +235,10 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 	if err != nil {
 		return errors.Wrap(err, "ExchangeMTU issue: ")
 	}
-	fmt.Println("EXCHANGE MTU PASS")
 	p, err := cln.DiscoverProfile(true)
 	if err != nil {
 		return errors.Wrap(err, "DiscoverProfile issue: ")
 	}
-	fmt.Println("DiscoverProfile PASS")
 	for _, s := range p.Services {
 		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
 			for _, char := range s.Characteristics {
@@ -275,7 +271,6 @@ func (c *RealConnection) Connect(filter ble.AdvFilter) error {
 func (c *RealConnection) Dial(addr string) error {
 	return c.wrapConnectOrDial(func() (ble.Client, string, error) {
 		cln, err := c.methods.Dial(c.ctx, ble.NewAddr(addr))
-		fmt.Println("DIAL DONE")
 		return cln, addr, err
 	})
 }
