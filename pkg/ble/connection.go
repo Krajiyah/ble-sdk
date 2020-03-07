@@ -63,9 +63,9 @@ type RealConnection struct {
 	timeout          time.Duration
 }
 
-func (c *RealConnection) getClient() ble.Client {
+func (c *RealConnection) getClient(purpose string) ble.Client {
 	wrapper := c.cln
-	fmt.Println("USING CLN: " + wrapper.guid)
+	fmt.Println("USING CLN for %s: %s", purpose, wrapper.guid)
 	return wrapper.cln
 }
 
@@ -209,12 +209,12 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 	defer c.connectionMutex.Unlock()
 	err := retryAndOptimize(c, "ConnectOrDial", func() error {
 		if c.cln != nil {
-			c.getClient().CancelConnection()
+			c.getClient("CancelConnection").CancelConnection()
 		}
 		cln, addr, err := fn()
 		if err != nil {
 			if cln != nil {
-				c.getClient().CancelConnection()
+				c.getClient("CancelConnection").CancelConnection()
 			}
 			return err
 		}
@@ -223,7 +223,7 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 		return c.handleCln(cln, addr)
 	}, false)
 	if err != nil && c.cln != nil {
-		c.getClient().CancelConnection()
+		c.getClient("CancelConnection").CancelConnection()
 	}
 	return err
 }
@@ -310,8 +310,7 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	}
 	var encData []byte
 	err = retryAndOptimize(c, "ReadLongCharacteristic", func() error {
-		fmt.Println("Doing READ!")
-		dat, e := c.getClient().ReadLongCharacteristic(char)
+		dat, e := c.getClient("ReadLongCharacteristic").ReadLongCharacteristic(char)
 		encData = dat
 		return e
 	}, true)
@@ -338,8 +337,7 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 	}
 	for _, packet := range packets {
 		err := retryAndOptimize(c, "WriteCharacteristic", func() error {
-			fmt.Println("DOING WRITE!")
-			return c.getClient().WriteCharacteristic(char, packet, true)
+			return c.getClient("WriteCharacteristic").WriteCharacteristic(char, packet, true)
 		}, true)
 		if err != nil {
 			return err
