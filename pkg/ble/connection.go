@@ -46,7 +46,7 @@ type RealConnection struct {
 	connectedAddr    string
 	rssiMap          *models.RssiMap
 	secret           string
-	cln              ble.Client
+	cln              *ble.Client
 	serviceInfo      *ServiceInfo
 	methods          coreMethods
 	characteristics  map[string]*ble.Characteristic
@@ -155,9 +155,7 @@ Reconnect: %s
 func retryAndOptimize(c *RealConnection, method string, fn func() error, reconnect bool) error {
 	err := retry(func(attempts int) error {
 		err := &retryAndOptimizeError{method: method, attempt: attempts}
-		c.connectionMutex.Lock()
 		err.original = util.Optimize(fn, c.timeout)
-		c.connectionMutex.Unlock()
 		if err.original == nil {
 			return nil
 		}
@@ -198,20 +196,25 @@ func (c *RealConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
 type connnectOrDialHelper func() (ble.Client, string, error)
 
 func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
+	c.connectionMutex.Lock()
+	defer c.connectionMutex.Unlock()
 	err := retryAndOptimize(c, "ConnectOrDial", func() error {
 		if c.cln != nil {
-			c.cln.CancelConnection()
+			(*c.cln).CancelConnection()
 		}
 		cln, addr, err := fn()
-		c.cln = cln
 		if err != nil {
+			if cln != nil {
+				(*c.cln).CancelConnection()
+			}
 			return err
 		}
+		c.cln = &cln
 		fmt.Println("FN PASS")
 		return c.handleCln(cln, addr)
 	}, false)
 	if err != nil && c.cln != nil {
-		c.cln.CancelConnection()
+		(*c.cln).CancelConnection()
 	}
 	return err
 }
@@ -300,7 +303,7 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	}
 	var encData []byte
 	err = retryAndOptimize(c, "ReadLongCharacteristic", func() error {
-		dat, e := c.cln.ReadLongCharacteristic(char)
+		dat, e := (*c.cln).ReadLongCharacteristic(char)
 		encData = dat
 		return e
 	}, true)
@@ -327,7 +330,7 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 	}
 	for _, packet := range packets {
 		err := retryAndOptimize(c, "WriteCharacteristic", func() error {
-			return c.cln.WriteCharacteristic(char, packet, true)
+			return (*c.cln).WriteCharacteristic(char, packet, true)
 		}, true)
 		if err != nil {
 			return err
