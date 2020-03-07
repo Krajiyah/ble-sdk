@@ -174,10 +174,12 @@ func retryAndOptimize(c *RealConnection, method string, fn func() error, reconne
 		return err.Error()
 	})
 	if err != nil {
-		panic(errors.New(util.ForcePanicMsgPrefix + err.Error()))
+		forcePanic(err)
 	}
 	return nil
 }
+
+func forcePanic(err error) { panic(errors.New(util.ForcePanicMsgPrefix + err.Error())) }
 
 func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
 	addr := a.Addr().String()

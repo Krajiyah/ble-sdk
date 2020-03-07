@@ -3,6 +3,8 @@ package ble
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
@@ -95,11 +97,20 @@ func (bc *realCoreMethods) newLinuxDevice() (ble.Device, error) {
 	return linux.NewDevice(ble.OptConnParams(opts))
 }
 
+func isHCIDown() bool {
+	out, _ := exec.Command("hciconfig").Output()
+	resp := string(out)
+	return strings.Contains(resp, "DOWN")
+}
+
 func (bc *realCoreMethods) SetDefaultDevice() error {
 	return retry(func(attempts int) error {
 		return util.CatchErrs(func() error {
 			device, err := bc.newLinuxDevice()
 			if err != nil {
+				if isHCIDown() {
+					forcePanic(errors.Wrap(err, "HCI is DOWN!"))
+				}
 				return errors.Wrap(err, fmt.Sprintf("newLinuxDevice issue (tried %d times)", attempts))
 			}
 			ble.SetDefaultDevice(device)
