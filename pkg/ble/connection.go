@@ -161,10 +161,7 @@ func retryAndOptimize(c *RealConnection, method string, fn func() error, reconne
 		}
 		err.doesReset = true
 		err.reset = c.resetDevice()
-		if err.reset == nil {
-			return err.Error()
-		}
-		if !reconnect {
+		if err.reset != nil || !reconnect {
 			return err.Error()
 		}
 		fmt.Println("Reconnecting...")
@@ -242,11 +239,9 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 			}
 			c.connectedAddr = addr
 			c.listener.OnConnected(addr)
-			fmt.Println("FIND CHARS PASS")
 			return nil
 		}
 	}
-	fmt.Println("FIND CHARS FAIL")
 	return errors.New("Could not find MainServiceUUID in broadcasted services")
 }
 

@@ -141,7 +141,7 @@ func setCharacteristic(c *RealConnection, uuid string) {
 	c.characteristics[uuid] = ble.NewCharacteristic(u)
 }
 
-func setDummyCoreClient(c *RealConnection, d ble.Client) {
+func setDummyCoreClient(c *RealConnection, d *ble.Client) {
 	c.cln = d
 }
 
@@ -178,7 +178,7 @@ func TestRead(t *testing.T) {
 	c := newConnection(t)
 	setCharacteristic(c, testCharUUID)
 	d := newDummyCoreClient()
-	setDummyCoreClient(c, d)
+	setDummyCoreClient(c, &d)
 	expected := []byte("Hello World!")
 	encData, err := util.Encrypt(expected, testSecret)
 	assert.NilError(t, err)
@@ -193,7 +193,7 @@ func TestWrite(t *testing.T) {
 	c := newConnection(t)
 	setCharacteristic(c, testCharUUID)
 	d := newDummyCoreClient()
-	setDummyCoreClient(c, d)
+	setDummyCoreClient(c, &d)
 	expected := []byte("Hello World!")
 	err := c.WriteValue(testCharUUID, expected)
 	assert.NilError(t, err)
