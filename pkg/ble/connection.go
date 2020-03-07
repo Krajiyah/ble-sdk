@@ -9,6 +9,7 @@ import (
 	"github.com/Krajiyah/ble-sdk/pkg/models"
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
 
@@ -41,12 +42,17 @@ type ServiceInfo struct {
 	UUID        ble.UUID
 }
 
+type clnWrapper struct {
+	cln  ble.Client
+	guid string
+}
+
 type RealConnection struct {
 	srcAddr          string
 	connectedAddr    string
 	rssiMap          *models.RssiMap
 	secret           string
-	cln              *ble.Client
+	cln              *clnWrapper
 	serviceInfo      *ServiceInfo
 	methods          coreMethods
 	characteristics  map[string]*ble.Characteristic
@@ -55,6 +61,12 @@ type RealConnection struct {
 	listener         connectionListener
 	ctx              context.Context
 	timeout          time.Duration
+}
+
+func (c *RealConnection) getClient() ble.Client {
+	wrapper := c.cln
+	fmt.Println("USING CLN: " + wrapper.guid)
+	return wrapper.cln
 }
 
 func (c *RealConnection) resetDevice() error {
@@ -197,21 +209,21 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 	defer c.connectionMutex.Unlock()
 	err := retryAndOptimize(c, "ConnectOrDial", func() error {
 		if c.cln != nil {
-			(*c.cln).CancelConnection()
+			c.getClient().CancelConnection()
 		}
 		cln, addr, err := fn()
 		if err != nil {
 			if cln != nil {
-				(*c.cln).CancelConnection()
+				c.getClient().CancelConnection()
 			}
 			return err
 		}
-		c.cln = &cln
+		c.cln = &clnWrapper{cln: cln, guid: uuid.New().String()}
 		fmt.Println("FN PASS")
 		return c.handleCln(cln, addr)
 	}, false)
 	if err != nil && c.cln != nil {
-		(*c.cln).CancelConnection()
+		c.getClient().CancelConnection()
 	}
 	return err
 }
@@ -298,7 +310,8 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	}
 	var encData []byte
 	err = retryAndOptimize(c, "ReadLongCharacteristic", func() error {
-		dat, e := (*c.cln).ReadLongCharacteristic(char)
+		fmt.Println("Doing READ!")
+		dat, e := c.getClient().ReadLongCharacteristic(char)
 		encData = dat
 		return e
 	}, true)
@@ -325,7 +338,8 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 	}
 	for _, packet := range packets {
 		err := retryAndOptimize(c, "WriteCharacteristic", func() error {
-			return (*c.cln).WriteCharacteristic(char, packet, true)
+			fmt.Println("DOING WRITE!")
+			return c.getClient().WriteCharacteristic(char, packet, true)
 		}, true)
 		if err != nil {
 			return err
