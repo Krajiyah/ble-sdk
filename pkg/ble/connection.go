@@ -239,9 +239,11 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 			}
 			c.connectedAddr = addr
 			c.listener.OnConnected(addr)
+			fmt.Println("FIND CHARS PASS")
 			return nil
 		}
 	}
+	fmt.Println("FIND CHARS FAIL")
 	return errors.New("Could not find MainServiceUUID in broadcasted services")
 }
 
@@ -292,12 +294,12 @@ func (c *RealConnection) getCharacteristic(uuid string) (*ble.Characteristic, er
 }
 
 func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
-	c.connectionMutex.Lock()
-	defer c.connectionMutex.Unlock()
 	char, err := c.getCharacteristic(uuid)
 	if err != nil {
 		return nil, err
 	}
+	c.connectionMutex.Lock()
+	defer c.connectionMutex.Unlock()
 	var encData []byte
 	err = retryAndOptimize(c, "ReadLongCharacteristic", func() error {
 		dat, e := c.cln.ReadLongCharacteristic(char)
@@ -314,8 +316,6 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 }
 
 func (c *RealConnection) WriteValue(uuid string, data []byte) error {
-	c.connectionMutex.Lock()
-	defer c.connectionMutex.Unlock()
 	if data == nil || len(data) == 0 {
 		return errors.New("Empty data provided. Will skip writing.")
 	}
@@ -327,6 +327,8 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 	if err != nil {
 		return err
 	}
+	c.connectionMutex.Lock()
+	defer c.connectionMutex.Unlock()
 	for _, packet := range packets {
 		err := retryAndOptimize(c, "WriteCharacteristic", func() error {
 			return c.cln.WriteCharacteristic(char, packet, true)
