@@ -155,7 +155,9 @@ Reconnect: %s
 func retryAndOptimize(c *RealConnection, method string, fn func() error, reconnect bool) error {
 	err := retry(func(attempts int) error {
 		err := &retryAndOptimizeError{method: method, attempt: attempts}
+		c.connectionMutex.Lock()
 		err.original = util.Optimize(fn, c.timeout)
+		c.connectionMutex.Unlock()
 		if err.original == nil {
 			return nil
 		}
@@ -196,8 +198,6 @@ func (c *RealConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
 type connnectOrDialHelper func() (ble.Client, string, error)
 
 func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
-	c.connectionMutex.Lock()
-	defer c.connectionMutex.Unlock()
 	err := retryAndOptimize(c, "ConnectOrDial", func() error {
 		if c.cln != nil {
 			c.cln.CancelConnection()
@@ -298,8 +298,6 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.connectionMutex.Lock()
-	defer c.connectionMutex.Unlock()
 	var encData []byte
 	err = retryAndOptimize(c, "ReadLongCharacteristic", func() error {
 		dat, e := c.cln.ReadLongCharacteristic(char)
@@ -327,8 +325,6 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	c.connectionMutex.Lock()
-	defer c.connectionMutex.Unlock()
 	for _, packet := range packets {
 		err := retryAndOptimize(c, "WriteCharacteristic", func() error {
 			return c.cln.WriteCharacteristic(char, packet, true)
