@@ -99,7 +99,8 @@ func (client *BLEClient) pingLoop() {
 	mutex := &sync.Mutex{}
 	for {
 		time.Sleep(PingInterval)
-		if err := client.ping(mutex); err != nil {
+		err := util.CatchErrs(func() error { return client.ping(mutex) })
+		if err != nil {
 			client.listener.OnInternalError(err)
 		}
 	}
