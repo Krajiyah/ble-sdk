@@ -1,6 +1,8 @@
 package ble
 
 import (
+	"fmt"
+
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
 	"github.com/pkg/errors"
@@ -71,6 +73,7 @@ func (c *RealConnection) completeBLEClient(cln ble.Client, addr string) error {
 
 func checkAndCancel(cln ble.Client) {
 	if cln != nil {
-		cln.CancelConnection()
+		fmt.Println("Would have cancelled connection...")
+		// cln.CancelConnection()
 	}
 }
