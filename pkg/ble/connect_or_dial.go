@@ -1,8 +1,6 @@
 package ble
 
 import (
-	"fmt"
-
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
 	"github.com/pkg/errors"
@@ -13,7 +11,7 @@ type connnectOrDialHelper func() (ble.Client, string, error)
 func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) {
 	c.connectionMutex.Lock()
 	defer c.connectionMutex.Unlock()
-	retryAndPanic(c, "ConnectOrDial", func(_ int) error {
+	retryAndOptimizeConnectOrDial(c, "ConnectOrDial", func() error {
 		checkAndCancel(c.cln)
 		cln, addr, err := c.initBLEClient(fn)
 		if err != nil {
@@ -24,23 +22,14 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) {
 }
 
 func (c *RealConnection) initBLEClient(fn connnectOrDialHelper) (ble.Client, string, error) {
-	var addr string
-	var cln ble.Client
-	err := util.CatchErrs(func() error {
-		var e error
-		cln, addr, e = fn()
-		if e != nil {
-			checkAndCancel(cln)
-			return e
-		}
-		return nil
-	})
+	cln, addr, err := fn()
 	if err != nil {
+		checkAndCancel(cln)
 		return nil, "", err
 	}
 	c.cln = cln
 	go func() {
-		<-cln.Disconnected() // TODO: is this slowing things down?
+		<-cln.Disconnected()
 		c.listener.OnDisconnected()
 	}()
 	return cln, addr, nil
@@ -73,7 +62,6 @@ func (c *RealConnection) completeBLEClient(cln ble.Client, addr string) error {
 
 func checkAndCancel(cln ble.Client) {
 	if cln != nil {
-		fmt.Println("Would have cancelled connection...")
-		// cln.CancelConnection()
+		cln.CancelConnection()
 	}
 }

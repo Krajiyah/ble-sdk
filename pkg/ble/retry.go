@@ -60,15 +60,8 @@ Reconnect: %s
 -------`, err.method, err.attempt, original, resetDevice, reconnect))
 }
 
-func retryAndPanic(c *RealConnection, method string, fn func(int) error) {
-	err := retry(fn)
-	if err != nil {
-		forcePanic(err)
-	}
-}
-
-func wrappedRetry(c *RealConnection, method string, fn func() error, reconnect bool) {
-	retryAndPanic(c, method, func(attempts int) error {
+func retryAndPanic(c *RealConnection, method string, fn func() error, reconnect bool) {
+	err := retry(func(attempts int) error {
 		err := &retryAndOptimizeError{method: method, attempt: attempts}
 		err.original = util.CatchErrs(fn)
 		if err.original == nil {
@@ -84,12 +77,15 @@ func wrappedRetry(c *RealConnection, method string, fn func() error, reconnect b
 		c.Dial(c.connectedAddr)
 		return err.Error()
 	})
+	if err != nil {
+		forcePanic(err)
+	}
 }
 
 func retryAndOptimizeConnectOrDial(c *RealConnection, method string, fn func() error) {
-	wrappedRetry(c, method, fn, false)
+	retryAndPanic(c, method, fn, false)
 }
 
 func retryAndOptimizeReadOrWrite(c *RealConnection, method string, fn func() error) {
-	wrappedRetry(c, method, fn, true)
+	retryAndPanic(c, method, fn, true)
 }
