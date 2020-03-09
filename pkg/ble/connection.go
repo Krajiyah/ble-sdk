@@ -269,7 +269,7 @@ func (c *RealConnection) Dial(addr string) {
 	})
 }
 
-func (c *RealConnection) scan(ctx context.Context, b bool, handle func(ble.Advertisement)) error {
+func (c *RealConnection) scan(ctx context.Context, handle func(ble.Advertisement)) error {
 	return c.methods.Scan(ctx, func(a ble.Advertisement) {
 		c.updateRssiMap(a)
 		handle(a)
@@ -277,7 +277,7 @@ func (c *RealConnection) scan(ctx context.Context, b bool, handle func(ble.Adver
 }
 
 func (c *RealConnection) Scan(handle func(ble.Advertisement)) error {
-	return c.scan(c.ctx, true, handle)
+	return c.scan(c.ctx, handle)
 }
 
 func (c *RealConnection) CollectAdvs(duration time.Duration) ([]ble.Advertisement, error) {
@@ -298,7 +298,7 @@ func (c *RealConnection) CollectAdvs(duration time.Duration) ([]ble.Advertisemen
 
 func (c *RealConnection) ScanForDuration(duration time.Duration, handle func(ble.Advertisement)) error {
 	ctx, _ := context.WithTimeout(c.ctx, duration)
-	err := c.scan(ctx, false, handle)
+	err := c.scan(ctx, handle)
 	if err != nil && err.Error() == "context deadline exceeded" {
 		err = nil
 	}
