@@ -38,7 +38,6 @@ func (bc *realCoreMethods) Connect(ctx context.Context, f ble.AdvFilter) (ble.Cl
 		return e
 	})
 	return client, err
-
 }
 
 func (bc *realCoreMethods) Dial(ctx context.Context, addr ble.Addr) (ble.Client, error) {

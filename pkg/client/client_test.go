@@ -18,6 +18,7 @@ const (
 	testForwarderAddr = "33:22:33:44:55:66"
 	testSecret        = "test123"
 	testRSSI          = -50
+	waitForLogTime    = time.Second
 )
 
 func setServerConnection() *TestConnection {
@@ -79,6 +80,7 @@ func TestLog(t *testing.T) {
 	assert.NilError(t, err)
 
 	// mock write to server
+	time.Sleep(waitForLogTime)
 	data := connection.GetMockedWriteBufferData(util.ClientLogUUID)
 	actual, err := GetClientLogRequestFromBytes(data)
 	assert.NilError(t, err)
@@ -88,7 +90,7 @@ func TestLog(t *testing.T) {
 func TestConnectLoop(t *testing.T) {
 	connection := setServerConnection()
 	client := getTestClient(t, connection)
-	client.connectLoop()
+	client.connect()
 	assert.DeepEqual(t, client.connection.GetConnectedAddr(), client.serverAddr)
 }
 
@@ -123,13 +125,14 @@ func TestForwardedWrite(t *testing.T) {
 	assert.NilError(t, err)
 	err = client.Log(req)
 	assert.NilError(t, err)
+	time.Sleep(waitForLogTime)
 	data := connection.GetMockedWriteBufferData(util.WriteForwardCharUUID)
 	r, err := GetForwarderRequestFromBytes(data)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, r.Payload, expectedData)
 
 	// 2nd forwarder request
-	err = client.WriteValue(util.WriteForwardCharUUID, data)
+	err = client.WriteValue(util.WriteForwardCharUUID, data, true)
 	assert.NilError(t, err)
 	data = connection.GetMockedWriteBufferData(util.WriteForwardCharUUID)
 	r2, err := GetForwarderRequestFromBytes(data)

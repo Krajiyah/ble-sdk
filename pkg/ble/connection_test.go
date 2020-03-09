@@ -153,10 +153,9 @@ func newConnection(t *testing.T) *RealConnection {
 
 func TestConnect(t *testing.T) {
 	c := newConnection(t)
-	err := c.Connect(func(a ble.Advertisement) bool {
+	c.Connect(func(a ble.Advertisement) bool {
 		return true
 	})
-	assert.NilError(t, err)
 	assert.DeepEqual(t, rm.GetAll(), c.GetRssiMap().GetAll())
 	assert.Equal(t, c.GetConnectedAddr(), testOtherAddr)
 }
@@ -195,11 +194,11 @@ func TestWrite(t *testing.T) {
 	d := newDummyCoreClient()
 	setDummyCoreClient(c, d)
 	expected := []byte("Hello World!")
-	err := c.WriteValue(testCharUUID, expected)
-	assert.NilError(t, err)
+	c.BlockingWriteValue(testCharUUID, expected)
 	client := d.(*dummyCoreClient)
 	buff := util.NewPacketBuffer(testSecret)
 	var actual []byte
+	var err error
 	for _, b := range *client.mockedWriteCharData {
 		actual, err = buff.Set(b.Bytes())
 		assert.NilError(t, err)

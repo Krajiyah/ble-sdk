@@ -3,7 +3,6 @@ package client
 import (
 	"fmt"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -23,7 +22,7 @@ const (
 
 type Client interface {
 	GetConnection() Connection
-	WriteValue(string, []byte) error
+	WriteValue(string, []byte, bool) error
 	ReadValue(string) ([]byte, error)
 	Log(ClientLogRequest) error
 	UnixTS() (int64, error)
@@ -31,21 +30,20 @@ type Client interface {
 }
 
 type BLEClient struct {
-	name                string
-	addr                string
-	secret              string
-	status              BLEClientStatus
-	connectionLoopMutex *sync.Mutex
-	timeSync            *util.TimeSync
-	serverAddr          string
-	connection          Connection
-	listener            BLEClientListener
+	name       string
+	addr       string
+	secret     string
+	status     BLEClientStatus
+	timeSync   *util.TimeSync
+	serverAddr string
+	connection Connection
+	listener   BLEClientListener
 }
 
 func NewBLEClientWithSharedConn(name string, addr string, secret string, serverAddr string, listener BLEClientListener, conn Connection) (*BLEClient, error) {
 	return &BLEClient{
 		name, addr, secret, Disconnected,
-		&sync.Mutex{}, nil, serverAddr,
+		nil, serverAddr,
 		conn, listener,
 	}, nil
 }
@@ -59,7 +57,8 @@ func NewBLEClient(name string, addr string, secret string, serverAddr string, ti
 }
 
 func (client *BLEClient) Run() {
-	client.connectLoop()
+	client.connect()
+	client.status = Connected
 	time.Sleep(afterConnectionDelay)
 	go client.scanLoop()
 	go client.pingLoop()
@@ -75,9 +74,7 @@ func (client *BLEClient) scanLoop() {
 	}
 }
 
-func (client *BLEClient) ping(mutex *sync.Mutex) error {
-	mutex.Lock()
-	defer mutex.Unlock()
+func (client *BLEClient) ping() error {
 	if client.status != Connected {
 		return nil
 	}
@@ -85,10 +82,11 @@ func (client *BLEClient) ping(mutex *sync.Mutex) error {
 	connectedAddr := client.connection.GetConnectedAddr()
 	req := &ClientStateRequest{Name: client.name, Addr: client.addr, ConnectedAddr: connectedAddr, RssiMap: m}
 	b, _ := req.Data()
-	err := client.WriteValue(util.ClientStateUUID, b)
+	err := client.WriteValue(util.ClientStateUUID, b, false)
 	if err != nil {
 		return err
 	}
+	fmt.Println("Updated Client State!")
 	if client.timeSync == nil {
 		return client.syncTime()
 	}
@@ -96,10 +94,9 @@ func (client *BLEClient) ping(mutex *sync.Mutex) error {
 }
 
 func (client *BLEClient) pingLoop() {
-	mutex := &sync.Mutex{}
 	for {
 		time.Sleep(PingInterval)
-		if err := client.ping(mutex); err != nil {
+		if err := client.ping(); err != nil {
 			client.listener.OnInternalError(err)
 		}
 	}
@@ -137,7 +134,7 @@ func (client *BLEClient) getUnixTS() (int64, error) {
 
 func (client *BLEClient) Log(log ClientLogRequest) error {
 	b, _ := log.Data()
-	return client.WriteValue(util.ClientLogUUID, b)
+	return client.WriteValue(util.ClientLogUUID, b, false)
 }
 
 func (client *BLEClient) GetConnection() Connection { return client.connection }
@@ -156,10 +153,7 @@ func (client *BLEClient) ReadValue(uuid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = client.connection.WriteValue(util.StartReadForwardCharUUID, data)
-	if err != nil {
-		return nil, err
-	}
+	client.connection.BlockingWriteValue(util.StartReadForwardCharUUID, data)
 	time.Sleep(ForwardedReadDelay) // FIXME: this is too brittle
 	return client.connection.ReadValue(util.EndReadForwardCharUUID)
 }
@@ -173,16 +167,24 @@ func isForwardedWrite(uuid string, data []byte) bool {
 	return isDataForwarderRequest(data) && util.AddrEqualAddr(uuid, util.WriteForwardCharUUID)
 }
 
-func (client *BLEClient) WriteValue(uuid string, data []byte) error {
+func (client *BLEClient) doWriteValue(uuid string, data []byte, block bool) error {
+	if block {
+		return client.connection.BlockingWriteValue(uuid, data)
+	}
+	client.connection.NonBlockingWriteValue(uuid, data)
+	return nil
+}
+
+func (client *BLEClient) WriteValue(uuid string, data []byte, block bool) error {
 	if !client.isConnectedToForwarder() || isForwardedWrite(uuid, data) {
-		return client.connection.WriteValue(uuid, data)
+		return client.doWriteValue(uuid, data, block)
 	}
 	req := ForwarderRequest{uuid, data, false, true}
 	payload, err := req.Data()
 	if err != nil {
 		return err
 	}
-	return client.connection.WriteValue(util.WriteForwardCharUUID, payload)
+	return client.doWriteValue(util.WriteForwardCharUUID, payload, block)
 }
 
 func HasMainService(a ble.Advertisement) bool {
@@ -194,26 +196,8 @@ func HasMainService(a ble.Advertisement) bool {
 	return false
 }
 
-func (client *BLEClient) connectLoop() {
-	client.connectionLoopMutex.Lock()
-	defer client.connectionLoopMutex.Unlock()
-	client.status = Disconnected
-	err := errors.New("")
-	for err != nil {
-		err = client.connect()
-		if err != nil {
-			fmt.Println("ConnectLoop connect issue: ")
-			fmt.Println(err)
-		}
-	}
-	client.status = Connected
-}
-
-func (client *BLEClient) connect() error {
-	err := client.connection.Dial(client.serverAddr)
-	if err != nil {
-		client.listener.OnInternalError(errors.Wrap(err, "Could not connect to server.\nSo now trying to connect to a forwarder.\n"))
-		err = client.connection.Connect(HasMainService)
-	}
-	return err
+func (client *BLEClient) connect() {
+	client.connection.Connect(func(a ble.Advertisement) bool {
+		return util.AddrEqualAddr(a.Addr().String(), client.serverAddr) || HasMainService(a)
+	})
 }

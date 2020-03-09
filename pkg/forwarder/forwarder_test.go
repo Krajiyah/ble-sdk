@@ -55,7 +55,7 @@ func (c *dummyClient) GetConnection() ble.Connection {
 	return c.connection
 }
 
-func (c *dummyClient) WriteValue(char string, data []byte) error {
+func (c *dummyClient) WriteValue(char string, data []byte, block bool) error {
 	buf := bytes.NewBuffer(data)
 	c.mockedWriteBuffer[char] = buf
 	return nil
