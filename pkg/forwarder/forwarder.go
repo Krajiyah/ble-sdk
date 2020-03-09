@@ -70,7 +70,7 @@ func (l *forwarderServerListener) OnServerStatusChanged(s models.BLEServerStatus
 func NewBLEForwarder(name string, addr string, secret string, serverAddr string, timeout time.Duration, listener models.BLEForwarderListener) (*BLEForwarder, error) {
 	f := newBLEForwarder(name, addr, serverAddr, listener)
 	readChars, writeChars := getChars(f)
-	serv, conn, err := server.NewBLEServer(name, addr, secret, timeout, listener, &forwarderServerListener{listener: listener}, readChars, writeChars)
+	serv, conn, err := server.NewBLEServer(name, addr, secret, timeout, false, listener, &forwarderServerListener{listener: listener}, readChars, writeChars)
 	if err != nil {
 		return nil, err
 	}
