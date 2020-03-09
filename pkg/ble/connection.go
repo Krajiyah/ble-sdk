@@ -296,12 +296,17 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var encData []byte
+	encDataBuff := make(chan []byte, 1)
 	retryAndOptimize(c, "ReadLongCharacteristic", func() error {
 		dat, e := c.getClient("ReadLongCharacteristic").ReadLongCharacteristic(char)
-		encData = dat
-		return e
+		if e != nil {
+			return e
+		}
+		go func() { encDataBuff <- dat }()
+		return nil
 	}, true)
+	encData := <-encDataBuff
+	close(encDataBuff)
 	if len(encData) == 0 {
 		return nil, errors.New("Received Empty Data")
 	}
