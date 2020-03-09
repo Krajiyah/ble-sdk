@@ -88,7 +88,6 @@ func (client *BLEClient) ping() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Updated Client State!")
 	if client.timeSync == nil {
 		return client.syncTime()
 	}
