@@ -11,5 +11,5 @@ const (
 )
 
 func (s BLEServerStatus) String() string {
-	return []string{"Running", "Crashed"}[s]
+	return []string{"running", "crashed"}[s]
 }

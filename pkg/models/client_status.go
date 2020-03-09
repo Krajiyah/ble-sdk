@@ -11,7 +11,7 @@ const (
 )
 
 func (s BLEClientStatus) String() string {
-	return []string{"Connected", "Disconnected"}[s]
+	return []string{"connected", "disconnected"}[s]
 }
 
 // BLEClientState is representation of ble client's state
