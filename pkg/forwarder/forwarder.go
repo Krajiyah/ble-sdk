@@ -107,10 +107,8 @@ func (forwarder *BLEForwarder) GetClient() client.Client {
 	return forwarder.forwardingClient
 }
 
-func (forwarder *BLEForwarder) runIter(mutex *sync.Mutex) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-	advs, err := forwarder.collectAdvirtisements()
+func (forwarder *BLEForwarder) runIter() error {
+	advs, err := forwarder.GetClient().GetConnection().CollectAdvs(scanDuration)
 	if err != nil {
 		return errors.Wrap(err, "collectAdvirtisements error")
 	}
@@ -124,11 +122,9 @@ func (forwarder *BLEForwarder) runIter(mutex *sync.Mutex) error {
 }
 
 func (forwarder *BLEForwarder) Run() error {
-	mutex := &sync.Mutex{}
 	for {
 		time.Sleep(client.ScanInterval)
-		err := util.CatchErrs(func() error { return forwarder.runIter(mutex) })
-		if err != nil {
+		if err := forwarder.runIter(); err != nil {
 			forwarder.listener.OnInternalError(err)
 		}
 	}
@@ -143,34 +139,13 @@ func isClosed(ch <-chan ble.Advertisement) bool {
 	return false
 }
 
-func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, error) {
-	advs := &sync.Map{}
-	err := forwarder.forwardingClient.GetConnection().ScanForDuration(scanDuration, func(a ble.Advertisement) {
-		advs.Store(a.Addr().String(), a)
-	})
-	if err != nil && err.Error() == "context deadline exceeded" {
-		err = nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	ret := []ble.Advertisement{}
-	advs.Range(func(_ interface{}, v interface{}) bool {
-		ret = append(ret, v.(ble.Advertisement))
-		return true
-	})
-	return ret, nil
-}
-
 func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	addr := a.Addr().String()
 	if !client.HasMainService(a) {
 		return nil
 	}
-	err := forwarder.connect(addr)
-	if err != nil {
-		return err
-	}
+	forwarder.connect(addr)
+	var err error
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
 		err = forwarder.updateClientState()
 	} else {
@@ -179,10 +154,7 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if err != nil {
 		return err
 	}
-	err = forwarder.connect(forwarder.toConnectAddr)
-	if err != nil {
-		return err
-	}
+	forwarder.connect(forwarder.toConnectAddr)
 	return forwarder.refreshShortestPath()
 }
 
@@ -197,7 +169,7 @@ func (forwarder *BLEForwarder) updateClientState() error {
 	if err != nil {
 		return err
 	}
-	return forwarder.forwardingClient.WriteValue(util.ClientStateUUID, data)
+	return forwarder.forwardingClient.WriteValue(util.ClientStateUUID, data, true)
 }
 
 func (forwarder *BLEForwarder) updateNetworkState(addr string) error {
@@ -232,15 +204,16 @@ func (forwarder *BLEForwarder) refreshShortestPath() error {
 	}
 	nextHop := path[1]
 	forwarder.toConnectAddr = nextHop
-	return forwarder.connect(nextHop)
+	forwarder.connect(nextHop)
+	return nil
 }
 
-func (forwarder *BLEForwarder) connect(addr string) error {
+func (forwarder *BLEForwarder) connect(addr string) {
 	conn := forwarder.forwardingClient.GetConnection()
 	if addr == "" || util.AddrEqualAddr(addr, conn.GetConnectedAddr()) {
-		return nil
+		return
 	}
-	return conn.Dial(addr)
+	conn.Dial(addr)
 }
 
 func (forwarder *BLEForwarder) isConnected() bool {
@@ -276,11 +249,7 @@ func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic
 			return
 		}
 		if !forwarder.isConnectedToServer() {
-			err := forwarder.forwardingClient.WriteValue(util.WriteForwardCharUUID, data)
-			if err != nil {
-				forwarder.listener.OnInternalError(err)
-				return
-			}
+			forwarder.forwardingClient.WriteValue(util.WriteForwardCharUUID, data, false)
 		} else {
 			r, err := models.GetForwarderRequestFromBytes(data)
 			if err != nil {
@@ -291,11 +260,7 @@ func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic
 				forwarder.listener.OnInternalError(errors.New(errInvalidForwardReq))
 				return
 			}
-			err = forwarder.forwardingClient.WriteValue(r.CharUUID, r.Payload)
-			if err != nil {
-				forwarder.listener.OnInternalError(err)
-				return
-			}
+			forwarder.forwardingClient.WriteValue(r.CharUUID, r.Payload, false)
 		}
 	}, DoInBackground: noop}
 }
@@ -311,7 +276,7 @@ func newStartReadForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteri
 			return
 		}
 		if !forwarder.isConnectedToServer() {
-			err := forwarder.forwardingClient.WriteValue(util.StartReadForwardCharUUID, data)
+			err := forwarder.forwardingClient.WriteValue(util.StartReadForwardCharUUID, data, true)
 			if err != nil {
 				forwarder.listener.OnInternalError(err)
 				return

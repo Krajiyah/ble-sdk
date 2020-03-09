@@ -32,7 +32,7 @@ func (l *exampleListener) OnConnected(addr string) {
 	for {
 		time.Sleep(time.Second * 1)
 		fmt.Println("Attempting to write to extra write char...")
-		err := l.c.WriteValue(exampleWriteCharUUID, []byte("Hello Server! ~ from Client"))
+		err := l.c.WriteValue(exampleWriteCharUUID, []byte("Hello Server! ~ from Client"), true)
 		if err != nil {
 			fmt.Println("Could not write to extra write char :( " + err.Error())
 		} else {

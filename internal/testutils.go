@@ -97,20 +97,26 @@ func (c *TestConnection) GetMockedWriteBufferData(uuid string) []byte {
 
 func (c *TestConnection) GetConnectedAddr() string    { return c.connectedAddr }
 func (c *TestConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
-func (c *TestConnection) Connect(ble.AdvFilter) error {
+func (c *TestConnection) Connect(ble.AdvFilter) {
 	c.connectedAddr = c.toConnectAddr
-	return nil
 }
-func (c *TestConnection) Dial(a string) error {
+func (c *TestConnection) Dial(a string) {
 	c.connectedAddr = a
-	return nil
 }
 func (c *TestConnection) ScanForDuration(time.Duration, func(ble.Advertisement)) error {
 	return nil
 }
-func (c *TestConnection) Scan(fn func(ble.Advertisement)) error {
+func (c *TestConnection) CollectAdvs(time.Duration) ([]ble.Advertisement, error) {
+	advs := []ble.Advertisement{}
 	for addr, rssi := range c.rssiMap.GetAll()[c.srcAddr] {
-		fn(DummyAdv{DummyAddr{addr}, rssi, false})
+		advs = append(advs, DummyAdv{DummyAddr{addr}, rssi, false})
+	}
+	return advs, nil
+}
+func (c *TestConnection) Scan(fn func(ble.Advertisement)) error {
+	advs, _ := c.CollectAdvs(time.Microsecond)
+	for _, adv := range advs {
+		fn(adv)
 	}
 	return nil
 }
@@ -121,7 +127,13 @@ func (c *TestConnection) ReadValue(uuid string) ([]byte, error) {
 	}
 	return nil, errors.New("UUID not in mocked read value: " + uuid)
 }
-func (c *TestConnection) WriteValue(uuid string, data []byte) error {
+func (c *TestConnection) BlockingWriteValue(uuid string, data []byte) error {
 	c.mockedWriteValue[uuid] = bytes.NewBuffer(data)
 	return nil
+}
+
+func (c *TestConnection) NonBlockingWriteValue(uuid string, data []byte) {
+	go func() {
+		c.BlockingWriteValue(uuid, data)
+	}()
 }

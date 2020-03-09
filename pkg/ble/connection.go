@@ -27,12 +27,14 @@ type connectionListener interface {
 type Connection interface {
 	GetConnectedAddr() string
 	GetRssiMap() *models.RssiMap
-	Connect(ble.AdvFilter) error
-	Dial(string) error
+	Connect(ble.AdvFilter)
+	Dial(string)
 	Scan(func(ble.Advertisement)) error
 	ScanForDuration(time.Duration, func(ble.Advertisement)) error
+	CollectAdvs(time.Duration) ([]ble.Advertisement, error)
 	ReadValue(string) ([]byte, error)
-	WriteValue(string, []byte) error
+	BlockingWriteValue(string, []byte) error
+	NonBlockingWriteValue(string, []byte)
 	Context() context.Context
 }
 
@@ -163,7 +165,7 @@ Reconnect: %s
 -------`, err.method, err.attempt, original, resetDevice, reconnect))
 }
 
-func retryAndOptimize(c *RealConnection, method string, fn func() error, reconnect bool) error {
+func retryAndOptimize(c *RealConnection, method string, fn func() error, reconnect bool) {
 	err := retry(func(attempts int) error {
 		err := &retryAndOptimizeError{method: method, attempt: attempts}
 		err.original = util.Optimize(fn, c.timeout)
@@ -177,16 +179,12 @@ func retryAndOptimize(c *RealConnection, method string, fn func() error, reconne
 		}
 		fmt.Println("Reconnecting...")
 		err.doesDial = true
-		err.dial = c.Dial(c.connectedAddr)
-		if err.dial == nil {
-			return err.Error()
-		}
+		c.Dial(c.connectedAddr)
 		return err.Error()
 	})
 	if err != nil {
 		forcePanic(err)
 	}
-	return nil
 }
 
 func forcePanic(err error) { panic(errors.New(util.ForcePanicMsgPrefix + err.Error())) }
@@ -203,10 +201,10 @@ func (c *RealConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
 
 type connnectOrDialHelper func() (ble.Client, string, error)
 
-func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
+func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) {
 	c.connectionMutex.Lock()
 	defer c.connectionMutex.Unlock()
-	err := retryAndOptimize(c, "ConnectOrDial", func() error {
+	retryAndOptimize(c, "ConnectOrDial", func() error {
 		if c.cln != nil {
 			c.getClient("CancelConnection").CancelConnection()
 		}
@@ -220,10 +218,6 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) error {
 		c.cln = &clnWrapper{cln: cln, guid: uuid.New().String()}
 		return c.handleCln(cln, addr)
 	}, false)
-	if err != nil && c.cln != nil {
-		c.getClient("CancelConnection").CancelConnection()
-	}
-	return err
 }
 
 func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
@@ -253,8 +247,8 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 	return errors.New("Could not find MainServiceUUID in broadcasted services")
 }
 
-func (c *RealConnection) Connect(filter ble.AdvFilter) error {
-	return c.wrapConnectOrDial(func() (ble.Client, string, error) {
+func (c *RealConnection) Connect(filter ble.AdvFilter) {
+	c.wrapConnectOrDial(func() (ble.Client, string, error) {
 		var addr string
 		cln, err := c.methods.Connect(c.ctx, func(a ble.Advertisement) bool {
 			c.updateRssiMap(a)
@@ -268,15 +262,15 @@ func (c *RealConnection) Connect(filter ble.AdvFilter) error {
 	})
 }
 
-func (c *RealConnection) Dial(addr string) error {
-	return c.wrapConnectOrDial(func() (ble.Client, string, error) {
+func (c *RealConnection) Dial(addr string) {
+	c.wrapConnectOrDial(func() (ble.Client, string, error) {
 		cln, err := c.methods.Dial(c.ctx, ble.NewAddr(addr))
 		return cln, addr, err
 	})
 }
 
 func (c *RealConnection) scan(ctx context.Context, handle func(ble.Advertisement)) error {
-	return c.methods.Scan(ctx, true, func(a ble.Advertisement) {
+	return c.methods.Scan(ctx, func(a ble.Advertisement) {
 		c.updateRssiMap(a)
 		handle(a)
 	}, nil)
@@ -286,9 +280,29 @@ func (c *RealConnection) Scan(handle func(ble.Advertisement)) error {
 	return c.scan(c.ctx, handle)
 }
 
+func (c *RealConnection) CollectAdvs(duration time.Duration) ([]ble.Advertisement, error) {
+	advs := &sync.Map{}
+	err := c.ScanForDuration(duration, func(a ble.Advertisement) {
+		advs.Store(a.Addr().String(), a)
+	})
+	if err != nil {
+		return nil, err
+	}
+	ret := []ble.Advertisement{}
+	advs.Range(func(_ interface{}, v interface{}) bool {
+		ret = append(ret, v.(ble.Advertisement))
+		return true
+	})
+	return ret, nil
+}
+
 func (c *RealConnection) ScanForDuration(duration time.Duration, handle func(ble.Advertisement)) error {
 	ctx, _ := context.WithTimeout(c.ctx, duration)
-	return c.scan(ctx, handle)
+	err := c.scan(ctx, handle)
+	if err != nil && err.Error() == "context deadline exceeded" {
+		err = nil
+	}
+	return err
 }
 
 func (c *RealConnection) getCharacteristic(uuid string) (*ble.Characteristic, error) {
@@ -303,40 +317,61 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var encData []byte
-	err = retryAndOptimize(c, "ReadLongCharacteristic", func() error {
+	encDataBuff := make(chan []byte, 1)
+	retryAndOptimize(c, "ReadLongCharacteristic", func() error {
 		dat, e := c.getClient("ReadLongCharacteristic").ReadLongCharacteristic(char)
-		encData = dat
-		return e
+		if e != nil {
+			return e
+		}
+		go func() { encDataBuff <- dat }()
+		return nil
 	}, true)
-	if err != nil {
-		return nil, err
-	}
+	encData := <-encDataBuff
+	close(encDataBuff)
 	if len(encData) == 0 {
 		return nil, errors.New("Received Empty Data")
 	}
 	return util.Decrypt(encData, c.secret)
 }
 
-func (c *RealConnection) WriteValue(uuid string, data []byte) error {
+func (c *RealConnection) prepWriteValue(uuid string, data []byte) (*ble.Characteristic, [][]byte, error) {
 	if data == nil || len(data) == 0 {
-		return errors.New("Empty data provided. Will skip writing.")
+		return nil, nil, errors.New("empty data to write")
 	}
 	char, err := c.getCharacteristic(uuid)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	packets, err := util.EncodeDataAsPackets(data, c.secret)
 	if err != nil {
+		return nil, nil, err
+	}
+	return char, packets, nil
+}
+
+func (c *RealConnection) doWrite(wg *sync.WaitGroup, char *ble.Characteristic, packet []byte) {
+	retryAndOptimize(c, "WriteCharacteristic", func() error {
+		return c.getClient("WriteCharacteristic").WriteCharacteristic(char, packet, true)
+	}, true)
+	wg.Done()
+}
+
+func (c *RealConnection) BlockingWriteValue(uuid string, data []byte) error {
+	char, packets, err := c.prepWriteValue(uuid, data)
+	if err != nil {
 		return err
 	}
+	wg := &sync.WaitGroup{}
 	for _, packet := range packets {
-		err := retryAndOptimize(c, "WriteCharacteristic", func() error {
-			return c.getClient("WriteCharacteristic").WriteCharacteristic(char, packet, true)
-		}, true)
-		if err != nil {
-			return err
-		}
+		wg.Add(1)
+		go c.doWrite(wg, char, packet)
 	}
+	wg.Wait()
 	return nil
+}
+
+func (c *RealConnection) NonBlockingWriteValue(uuid string, data []byte) {
+	go func() {
+		c.BlockingWriteValue(uuid, data)
+	}()
 }
