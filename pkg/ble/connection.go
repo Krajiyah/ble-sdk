@@ -31,6 +31,7 @@ type Connection interface {
 	Dial(string)
 	Scan(func(ble.Advertisement)) error
 	ScanForDuration(time.Duration, func(ble.Advertisement)) error
+	CollectAdvs(time.Duration) ([]ble.Advertisement, error)
 	ReadValue(string) ([]byte, error)
 	BlockingWriteValue(string, []byte) error
 	NonBlockingWriteValue(string, []byte)
@@ -269,7 +270,7 @@ func (c *RealConnection) Dial(addr string) {
 }
 
 func (c *RealConnection) scan(ctx context.Context, b bool, handle func(ble.Advertisement)) error {
-	return c.methods.Scan(ctx, b, func(a ble.Advertisement) {
+	return c.methods.Scan(ctx, func(a ble.Advertisement) {
 		c.updateRssiMap(a)
 		handle(a)
 	}, nil)
@@ -277,6 +278,22 @@ func (c *RealConnection) scan(ctx context.Context, b bool, handle func(ble.Adver
 
 func (c *RealConnection) Scan(handle func(ble.Advertisement)) error {
 	return c.scan(c.ctx, true, handle)
+}
+
+func (c *RealConnection) CollectAdvs(duration time.Duration) ([]ble.Advertisement, error) {
+	advs := &sync.Map{}
+	err := c.ScanForDuration(duration, func(a ble.Advertisement) {
+		advs.Store(a.Addr().String(), a)
+	})
+	if err != nil {
+		return nil, err
+	}
+	ret := []ble.Advertisement{}
+	advs.Range(func(_ interface{}, v interface{}) bool {
+		ret = append(ret, v.(ble.Advertisement))
+		return true
+	})
+	return ret, nil
 }
 
 func (c *RealConnection) ScanForDuration(duration time.Duration, handle func(ble.Advertisement)) error {

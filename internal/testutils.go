@@ -106,9 +106,17 @@ func (c *TestConnection) Dial(a string) {
 func (c *TestConnection) ScanForDuration(time.Duration, func(ble.Advertisement)) error {
 	return nil
 }
-func (c *TestConnection) Scan(fn func(ble.Advertisement)) error {
+func (c *TestConnection) CollectAdvs(time.Duration) ([]ble.Advertisement, error) {
+	advs := []ble.Advertisement{}
 	for addr, rssi := range c.rssiMap.GetAll()[c.srcAddr] {
-		fn(DummyAdv{DummyAddr{addr}, rssi, false})
+		advs = append(advs, DummyAdv{DummyAddr{addr}, rssi, false})
+	}
+	return advs, nil
+}
+func (c *TestConnection) Scan(fn func(ble.Advertisement)) error {
+	advs, _ := c.CollectAdvs(time.Microsecond)
+	for _, adv := range advs {
+		fn(adv)
 	}
 	return nil
 }

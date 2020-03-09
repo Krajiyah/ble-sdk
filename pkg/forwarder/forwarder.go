@@ -108,7 +108,7 @@ func (forwarder *BLEForwarder) GetClient() client.Client {
 }
 
 func (forwarder *BLEForwarder) runIter() error {
-	advs, err := forwarder.collectAdvirtisements()
+	advs, err := forwarder.GetClient().GetConnection().CollectAdvs(scanDuration)
 	if err != nil {
 		return errors.Wrap(err, "collectAdvirtisements error")
 	}
@@ -137,22 +137,6 @@ func isClosed(ch <-chan ble.Advertisement) bool {
 	default:
 	}
 	return false
-}
-
-func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, error) {
-	advs := &sync.Map{}
-	err := forwarder.forwardingClient.GetConnection().ScanForDuration(scanDuration, func(a ble.Advertisement) {
-		advs.Store(a.Addr().String(), a)
-	})
-	if err != nil {
-		return nil, err
-	}
-	ret := []ble.Advertisement{}
-	advs.Range(func(_ interface{}, v interface{}) bool {
-		ret = append(ret, v.(ble.Advertisement))
-		return true
-	})
-	return ret, nil
 }
 
 func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {

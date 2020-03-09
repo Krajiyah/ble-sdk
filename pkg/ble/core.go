@@ -23,7 +23,7 @@ type coreMethods interface {
 	SetDefaultDevice() error
 	Connect(context.Context, ble.AdvFilter) (ble.Client, error)
 	Dial(context.Context, ble.Addr) (ble.Client, error)
-	Scan(context.Context, bool, ble.AdvHandler, ble.AdvFilter) error
+	Scan(context.Context, ble.AdvHandler, ble.AdvFilter) error
 	AdvertiseNameAndServices(context.Context, string, ...ble.UUID) error
 	AddService(*ble.Service) error
 }
@@ -50,9 +50,9 @@ func (bc *realCoreMethods) Dial(ctx context.Context, addr ble.Addr) (ble.Client,
 	return client, err
 }
 
-func (bc *realCoreMethods) Scan(ctx context.Context, b bool, h ble.AdvHandler, f ble.AdvFilter) error {
+func (bc *realCoreMethods) Scan(ctx context.Context, h ble.AdvHandler, f ble.AdvFilter) error {
 	return util.CatchErrs(func() error {
-		return ble.Scan(ctx, b, h, f)
+		return ble.Scan(ctx, true, h, f)
 	})
 }
 

@@ -53,7 +53,7 @@ func (bc *testCoreMethods) Connect(_ context.Context, f ble.AdvFilter) (ble.Clie
 	return newDummyCoreClient(), nil
 }
 
-func (bc *testCoreMethods) Scan(_ context.Context, _ bool, h ble.AdvHandler, _ ble.AdvFilter) error {
+func (bc *testCoreMethods) Scan(_ context.Context, h ble.AdvHandler, _ ble.AdvFilter) error {
 	bc.filter(func(addr string, rssi int) { h(DummyAdv{DummyAddr{addr}, rssi, false}) })
 	return nil
 }

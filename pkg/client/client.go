@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	ScanInterval         = time.Millisecond * 500
-	PingInterval         = time.Second * 1
-	ForwardedReadDelay   = time.Millisecond * 500
-	afterConnectionDelay = time.Millisecond * 250
-	maxLookForServerTime = time.Minute * 2
+	ScanInterval          = time.Millisecond * 500
+	PingInterval          = time.Second * 1
+	ForwardedReadDelay    = time.Millisecond * 500
+	afterConnectionDelay  = time.Millisecond * 250
+	maxLookForServerTime  = time.Minute * 2
+	iterLookForServerTime = time.Second * 3
 )
 
 type Client interface {
@@ -197,17 +198,32 @@ func HasMainService(a ble.Advertisement) bool {
 	return false
 }
 
+func (client *BLEClient) iterTryToFindServer() bool {
+	advs, err := client.connection.CollectAdvs(iterLookForServerTime)
+	if err != nil {
+		fmt.Println("Error collecting advirtisements: " + err.Error())
+		return false
+	}
+	for _, a := range advs {
+		if util.AddrEqualAddr(a.Addr().String(), client.serverAddr) {
+			return true
+		}
+	}
+	return false
+}
+
 func (client *BLEClient) tryToFindServer() bool {
-	foundServer := make(chan bool, 1)
-	go func() {
-		client.connection.ScanForDuration(maxLookForServerTime, func(a ble.Advertisement) {
-			if util.AddrEqualAddr(a.Addr().String(), client.serverAddr) {
-				go func() { foundServer <- true }()
+	result := false
+	util.Timeout(func() error {
+		for {
+			b := client.iterTryToFindServer()
+			if b {
+				result = true
+				return nil
 			}
-		})
-		go func() { foundServer <- false }()
-	}()
-	return <-foundServer
+		}
+	}, maxLookForServerTime)
+	return result
 }
 
 func (client *BLEClient) connect() {
