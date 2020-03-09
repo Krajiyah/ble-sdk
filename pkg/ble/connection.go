@@ -209,7 +209,6 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) {
 			c.getClient("CancelConnection").CancelConnection()
 		}
 		cln, addr, err := fn()
-		fmt.Println("Finished ConnectOrDial")
 		if err != nil {
 			if cln != nil {
 				c.getClient("CancelConnection").CancelConnection()
@@ -230,12 +229,10 @@ func (c *RealConnection) handleCln(cln ble.Client, addr string) error {
 	if err != nil {
 		return errors.Wrap(err, "ExchangeMTU issue: ")
 	}
-	fmt.Println("Finished ExchangeMTU")
 	p, err := cln.DiscoverProfile(true)
 	if err != nil {
 		return errors.Wrap(err, "DiscoverProfile issue: ")
 	}
-	fmt.Println("Finished DiscoverProfile")
 	for _, s := range p.Services {
 		if util.UuidEqualStr(s.UUID, util.MainServiceUUID) {
 			for _, char := range s.Characteristics {
