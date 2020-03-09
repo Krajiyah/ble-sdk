@@ -19,7 +19,7 @@ const (
 	ForwardedReadDelay       = time.Millisecond * 500
 	afterConnectionDelay     = time.Millisecond * 250
 	maxLookForServerTimeIter = 5
-	iterLookForServerTime    = time.Second * 3
+	iterLookForServerTime    = time.Second * 10
 )
 
 type Client interface {
