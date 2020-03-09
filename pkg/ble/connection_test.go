@@ -142,7 +142,7 @@ func setCharacteristic(c *RealConnection, uuid string) {
 }
 
 func setDummyCoreClient(c *RealConnection, d ble.Client) {
-	c.cln = &clnWrapper{cln: d, guid: "someGUID"}
+	c.cln = d
 }
 
 func newConnection(t *testing.T) *RealConnection {
