@@ -127,8 +127,7 @@ func (forwarder *BLEForwarder) Run() error {
 	mutex := &sync.Mutex{}
 	for {
 		time.Sleep(client.ScanInterval)
-		err := util.CatchErrs(func() error { return forwarder.runIter(mutex) })
-		if err != nil {
+		if err := forwarder.runIter(mutex); err != nil {
 			forwarder.listener.OnInternalError(err)
 		}
 	}
