@@ -33,7 +33,6 @@ type Connection interface {
 	ReadValue(string) ([]byte, error)
 	BlockingWriteValue(string, []byte) error
 	NonBlockingWriteValue(string, []byte)
-	Context() context.Context
 }
 
 type ServiceInfo struct {
@@ -54,7 +53,6 @@ type RealConnection struct {
 	connectionMutex  *sync.Mutex
 	resetDeviceMutex *sync.Mutex
 	listener         connectionListener
-	ctx              context.Context
 	timeout          time.Duration
 }
 
@@ -63,7 +61,7 @@ func newRealConnection(addr string, secret string, timeout time.Duration, listen
 		srcAddr: addr, rssiMap: models.NewRssiMap(),
 		secret: secret, connectionMutex: &sync.Mutex{}, resetDeviceMutex: &sync.Mutex{},
 		methods: methods, characteristics: map[string]*ble.Characteristic{},
-		listener: listener, serviceInfo: serviceInfo, ctx: util.MakeINFContext(),
+		listener: listener, serviceInfo: serviceInfo,
 		timeout: timeout,
 	}
 	if err := conn.resetDevice(); err != nil {
@@ -82,14 +80,13 @@ func (c *RealConnection) updateRssiMap(a ble.Advertisement) {
 	c.rssiMap.Set(c.srcAddr, addr, rssi)
 }
 
-func (c *RealConnection) Context() context.Context    { return c.ctx }
 func (c *RealConnection) GetConnectedAddr() string    { return c.connectedAddr }
 func (c *RealConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
 
 func (c *RealConnection) Connect(filter ble.AdvFilter) {
 	c.wrapConnectOrDial(func() (ble.Client, string, error) {
 		var addr string
-		cln, err := c.methods.Connect(c.ctx, func(a ble.Advertisement) bool {
+		cln, err := c.methods.Connect(c.timeout, func(a ble.Advertisement) bool {
 			c.updateRssiMap(a)
 			b := filter(a)
 			if b {
@@ -103,7 +100,7 @@ func (c *RealConnection) Connect(filter ble.AdvFilter) {
 
 func (c *RealConnection) Dial(addr string) {
 	c.wrapConnectOrDial(func() (ble.Client, string, error) {
-		cln, err := c.methods.Dial(c.ctx, ble.NewAddr(addr))
+		cln, err := c.methods.Dial(c.timeout, ble.NewAddr(addr))
 		return cln, addr, err
 	})
 }
@@ -116,7 +113,7 @@ func (c *RealConnection) scan(ctx context.Context, handle func(ble.Advertisement
 }
 
 func (c *RealConnection) Scan(handle func(ble.Advertisement)) error {
-	return c.scan(c.ctx, handle)
+	return c.scan(util.MakeINFContext(), handle)
 }
 
 func (c *RealConnection) CollectAdvs(duration time.Duration) ([]ble.Advertisement, error) {
@@ -136,7 +133,7 @@ func (c *RealConnection) CollectAdvs(duration time.Duration) ([]ble.Advertisemen
 }
 
 func (c *RealConnection) ScanForDuration(duration time.Duration, handle func(ble.Advertisement)) error {
-	ctx, _ := context.WithTimeout(c.ctx, duration)
+	ctx, _ := context.WithTimeout(context.Background(), duration)
 	err := c.scan(ctx, handle)
 	if err != nil && err.Error() == "context deadline exceeded" {
 		err = nil

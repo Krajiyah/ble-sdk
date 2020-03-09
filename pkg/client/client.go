@@ -14,12 +14,12 @@ import (
 )
 
 const (
-	ScanInterval          = time.Millisecond * 500
-	PingInterval          = time.Second * 1
-	ForwardedReadDelay    = time.Millisecond * 500
-	afterConnectionDelay  = time.Millisecond * 250
-	maxLookForServerTime  = time.Minute * 2
-	iterLookForServerTime = time.Second * 3
+	ScanInterval             = time.Millisecond * 500
+	PingInterval             = time.Second * 1
+	ForwardedReadDelay       = time.Millisecond * 500
+	afterConnectionDelay     = time.Millisecond * 250
+	maxLookForServerTimeIter = 5
+	iterLookForServerTime    = time.Second * 3
 )
 
 type Client interface {
@@ -212,17 +212,15 @@ func (client *BLEClient) iterTryToFindServer() bool {
 }
 
 func (client *BLEClient) tryToFindServer() bool {
-	result := false
-	util.Timeout(func() error {
-		for {
-			b := client.iterTryToFindServer()
-			if b {
-				result = true
-				return nil
-			}
+	iter := 0
+	for iter < maxLookForServerTimeIter {
+		b := client.iterTryToFindServer()
+		if b {
+			return true
 		}
-	}, maxLookForServerTime)
-	return result
+		iter++
+	}
+	return false
 }
 
 func (client *BLEClient) connect() {

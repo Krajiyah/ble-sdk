@@ -70,7 +70,7 @@ func retryAndPanic(c *RealConnection, method string, fn func(int) error) {
 func wrappedRetry(c *RealConnection, method string, fn func() error, reconnect bool) {
 	retryAndPanic(c, method, func(attempts int) error {
 		err := &retryAndOptimizeError{method: method, attempt: attempts}
-		err.original = util.Optimize(fn, c.timeout)
+		err.original = util.CatchErrs(fn)
 		if err.original == nil {
 			return nil
 		}

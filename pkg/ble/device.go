@@ -28,7 +28,7 @@ func (c *RealConnection) resetDevice() error {
 		return err
 	}
 	go func() {
-		c.methods.AdvertiseNameAndServices(c.ctx, c.serviceInfo.ServiceName, c.serviceInfo.UUID)
+		c.methods.AdvertiseNameAndServices(c.serviceInfo.ServiceName, c.serviceInfo.UUID)
 	}()
 	return nil
 }

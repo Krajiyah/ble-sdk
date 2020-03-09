@@ -24,7 +24,7 @@ func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) {
 func (c *RealConnection) initBLEClient(fn connnectOrDialHelper) (ble.Client, string, error) {
 	var addr string
 	var cln ble.Client
-	err := util.Optimize(func() error {
+	err := util.CatchErrs(func() error {
 		var e error
 		cln, addr, e = fn()
 		if e != nil {
@@ -32,7 +32,7 @@ func (c *RealConnection) initBLEClient(fn connnectOrDialHelper) (ble.Client, str
 			return e
 		}
 		return nil
-	}, c.timeout)
+	})
 	if err != nil {
 		return nil, "", err
 	}
@@ -45,8 +45,8 @@ func (c *RealConnection) initBLEClient(fn connnectOrDialHelper) (ble.Client, str
 }
 
 func (c *RealConnection) completeBLEClient(cln ble.Client, addr string) error {
-	return util.CatchErrs(func() error { // TODO: do I need to time this out?
-		_, err := cln.ExchangeMTU(util.MTU) // TODO: this never finishes sometimes? (within timeout)
+	return util.CatchErrs(func() error {
+		_, err := cln.ExchangeMTU(util.MTU)
 		if err != nil {
 			return errors.Wrap(err, "ExchangeMTU issue: ")
 		}

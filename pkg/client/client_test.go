@@ -18,7 +18,7 @@ const (
 	testForwarderAddr = "33:22:33:44:55:66"
 	testSecret        = "test123"
 	testRSSI          = -50
-	waitForLogTime    = time.Second
+	waitForLogTime    = time.Second * 2
 )
 
 func setServerConnection() *TestConnection {

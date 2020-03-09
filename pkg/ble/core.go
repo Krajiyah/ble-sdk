@@ -21,16 +21,17 @@ const (
 type coreMethods interface {
 	Stop() error
 	SetDefaultDevice() error
-	Connect(context.Context, ble.AdvFilter) (ble.Client, error)
-	Dial(context.Context, ble.Addr) (ble.Client, error)
+	Connect(time.Duration, ble.AdvFilter) (ble.Client, error)
+	Dial(time.Duration, ble.Addr) (ble.Client, error)
 	Scan(context.Context, ble.AdvHandler, ble.AdvFilter) error
-	AdvertiseNameAndServices(context.Context, string, ...ble.UUID) error
+	AdvertiseNameAndServices(string, ...ble.UUID) error
 	AddService(*ble.Service) error
 }
 
 type realCoreMethods struct{}
 
-func (bc *realCoreMethods) Connect(ctx context.Context, f ble.AdvFilter) (ble.Client, error) {
+func (bc *realCoreMethods) Connect(timeout time.Duration, f ble.AdvFilter) (ble.Client, error) {
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	var client ble.Client
 	err := util.CatchErrs(func() error {
 		c, e := ble.Connect(ctx, f)
@@ -40,7 +41,8 @@ func (bc *realCoreMethods) Connect(ctx context.Context, f ble.AdvFilter) (ble.Cl
 	return client, err
 }
 
-func (bc *realCoreMethods) Dial(ctx context.Context, addr ble.Addr) (ble.Client, error) {
+func (bc *realCoreMethods) Dial(timeout time.Duration, addr ble.Addr) (ble.Client, error) {
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
 	var client ble.Client
 	err := util.CatchErrs(func() error {
 		c, e := ble.Dial(ctx, addr)
@@ -66,9 +68,9 @@ func (bc *realCoreMethods) Stop() error {
 	return nil
 }
 
-func (bc *realCoreMethods) AdvertiseNameAndServices(ctx context.Context, name string, uuids ...ble.UUID) error {
+func (bc *realCoreMethods) AdvertiseNameAndServices(name string, uuids ...ble.UUID) error {
 	return util.CatchErrs(func() error {
-		return ble.AdvertiseNameAndServices(ctx, name, uuids...)
+		return ble.AdvertiseNameAndServices(util.MakeINFContext(), name, uuids...)
 	})
 }
 
