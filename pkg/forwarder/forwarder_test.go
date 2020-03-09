@@ -19,12 +19,13 @@ import (
 )
 
 const (
-	clientAddr     = "33:22:33:44:55:66"
-	testServerName = "Some Name"
-	testAddr       = "11:22:33:44:55:66"
-	testAddr2      = "44:22:33:44:55:66"
-	testSecret     = "passwd123"
-	testServerAddr = "22:22:33:44:55:66"
+	clientAddr              = "33:22:33:44:55:66"
+	testServerName          = "Some Name"
+	testAddr                = "11:22:33:44:55:66"
+	testAddr2               = "44:22:33:44:55:66"
+	testSecret              = "passwd123"
+	testServerAddr          = "22:22:33:44:55:66"
+	waitForNonBlockingWrite = time.Second
 )
 
 type dummyListener struct{}
@@ -206,6 +207,7 @@ func TestWriteChar(t *testing.T) {
 	_, writeChars1 := getChars(f1)
 	char1 := writeChars1[0]
 	char1.HandleWrite(clientAddr, data, nil)
+	time.Sleep(waitForNonBlockingWrite)
 	bufferData1 := mockedWriteBuffer1[util.WriteForwardCharUUID].Bytes()
 	assert.DeepEqual(t, bufferData1, data)
 
@@ -213,6 +215,7 @@ func TestWriteChar(t *testing.T) {
 	_, writeChars2 := getChars(f2)
 	char2 := writeChars2[0]
 	char2.HandleWrite(testAddr, data, nil)
+	time.Sleep(waitForNonBlockingWrite)
 	bufferData2 := mockedWriteBuffer2[util.ClientLogUUID].Bytes()
 	assert.DeepEqual(t, bufferData2, logData)
 }
@@ -233,6 +236,7 @@ func TestStartEndReadChars(t *testing.T) {
 	readChars1, writeChars1 := getChars(f1)
 	writeChar1 := writeChars1[1]
 	writeChar1.HandleWrite(clientAddr, data, nil)
+	time.Sleep(waitForNonBlockingWrite)
 	bufferData1 := mockedWriteBuffer1[util.StartReadForwardCharUUID].Bytes()
 	assert.Check(t, !f1.isConnectedToServer(), "F1 should not be connected to server")
 	assert.DeepEqual(t, bufferData1, data)
