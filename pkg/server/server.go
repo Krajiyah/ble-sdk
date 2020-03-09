@@ -95,7 +95,7 @@ func (server *BLEServer) setClientState(addr string, state BLEClientState) {
 		server.connectionGraph.Set(addr, "")
 	}
 	server.rssiMap.Merge(NewRssiMapFromRaw(state.RssiMap))
-	server.listener.OnClientStateMapChanged(server.connectionGraph, server.rssiMap, server.clientStateMap)
+	server.listener.OnClientStateMapChanged(server.connectionGraph, server.GetRssiMap(), server.clientStateMap)
 }
 
 func getService(server *BLEServer, moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) *ble.Service {
