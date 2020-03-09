@@ -332,7 +332,7 @@ func (c *RealConnection) WriteValue(uuid string, data []byte) error {
 	}
 	for _, packet := range packets {
 		err := retryAndOptimize(c, "WriteCharacteristic", func() error {
-			return c.getClient("WriteCharacteristic").WriteCharacteristic(char, packet, true)
+			return c.getClient("WriteCharacteristic").WriteCharacteristic(char, packet, false)
 		}, true)
 		if err != nil {
 			return err
