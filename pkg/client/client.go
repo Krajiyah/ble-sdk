@@ -207,9 +207,7 @@ func (client *BLEClient) tryToFindServer() bool {
 		})
 		go func() { foundServer <- false }()
 	}()
-	b := <-foundServer
-	close(foundServer)
-	return b
+	return <-foundServer
 }
 
 func (client *BLEClient) connect() {
