@@ -144,9 +144,6 @@ func (forwarder *BLEForwarder) collectAdvirtisements() ([]ble.Advertisement, err
 	err := forwarder.forwardingClient.GetConnection().ScanForDuration(scanDuration, func(a ble.Advertisement) {
 		advs.Store(a.Addr().String(), a)
 	})
-	if err != nil && err.Error() == "context deadline exceeded" {
-		err = nil
-	}
 	if err != nil {
 		return nil, err
 	}

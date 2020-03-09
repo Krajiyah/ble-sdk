@@ -18,6 +18,7 @@ const (
 	PingInterval         = time.Second * 1
 	ForwardedReadDelay   = time.Millisecond * 500
 	afterConnectionDelay = time.Millisecond * 250
+	lookForServerTime    = time.Second * 10
 )
 
 type Client interface {
@@ -197,7 +198,15 @@ func HasMainService(a ble.Advertisement) bool {
 }
 
 func (client *BLEClient) connect() {
-	client.connection.Connect(func(a ble.Advertisement) bool {
-		return util.AddrEqualAddr(a.Addr().String(), client.serverAddr) || HasMainService(a)
+	foundServer := false
+	client.connection.ScanForDuration(lookForServerTime, func(a ble.Advertisement) {
+		if util.AddrEqualAddr(a.Addr().String(), client.serverAddr) {
+			foundServer = true
+		}
 	})
+	if foundServer {
+		client.connection.Dial(client.serverAddr)
+	} else {
+		client.connection.Connect(HasMainService)
+	}
 }

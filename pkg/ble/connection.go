@@ -281,7 +281,11 @@ func (c *RealConnection) Scan(handle func(ble.Advertisement)) error {
 
 func (c *RealConnection) ScanForDuration(duration time.Duration, handle func(ble.Advertisement)) error {
 	ctx, _ := context.WithTimeout(c.ctx, duration)
-	return c.scan(ctx, handle)
+	err := c.scan(ctx, handle)
+	if err != nil && err.Error() == "context deadline exceeded" {
+		err = nil
+	}
+	return err
 }
 
 func (c *RealConnection) getCharacteristic(uuid string) (*ble.Characteristic, error) {
