@@ -2,7 +2,6 @@ package ble
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
@@ -53,29 +52,23 @@ func (c *RealConnection) prepWriteValue(uuid string, data []byte) (*ble.Characte
 	return char, packets, nil
 }
 
-func (c *RealConnection) doWrite(wg *sync.WaitGroup, char *ble.Characteristic, packet []byte) {
-	retryAndOptimizeReadOrWrite(c, "WriteCharacteristic", func() error {
-		return c.cln.WriteCharacteristic(char, packet, true)
-	})
-	wg.Done()
-}
-
-func (c *RealConnection) BlockingWriteValue(uuid string, data []byte) error {
+func (c *RealConnection) doWrite(uuid string, data []byte, blocking bool) error {
 	char, packets, err := c.prepWriteValue(uuid, data)
 	if err != nil {
 		return err
 	}
-	wg := &sync.WaitGroup{}
 	for _, packet := range packets {
-		wg.Add(1)
-		go c.doWrite(wg, char, packet)
+		retryAndOptimizeReadOrWrite(c, "BlockingWriteValue (packet)", func() error {
+			return c.cln.WriteCharacteristic(char, packet, !blocking)
+		})
 	}
-	wg.Wait()
 	return nil
 }
 
+func (c *RealConnection) BlockingWriteValue(uuid string, data []byte) error {
+	return c.doWrite(uuid, data, true)
+}
+
 func (c *RealConnection) NonBlockingWriteValue(uuid string, data []byte) {
-	go func() {
-		c.BlockingWriteValue(uuid, data)
-	}()
+	c.doWrite(uuid, data, false)
 }
