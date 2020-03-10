@@ -20,7 +20,7 @@ const (
 
 type coreMethods interface {
 	Stop() error
-	SetDefaultDevice() error
+	SetDefaultDevice(time.Duration) error
 	Find(time.Duration, ble.Addr) (bool, error)
 	Connect(time.Duration, ble.AdvFilter) (ble.Client, error)
 	Dial(time.Duration, ble.Addr) (ble.Client, error)
@@ -92,8 +92,8 @@ func (bc *realCoreMethods) AddService(s *ble.Service) error {
 	})
 }
 
-func (bc *realCoreMethods) newLinuxDevice() (ble.Device, error) {
-	opts := cmd.LECreateConnection{
+func (bc *realCoreMethods) newLinuxDevice(timeout time.Duration) (ble.Device, error) {
+	connectionOpt := cmd.LECreateConnection{
 		LEScanInterval:        0x0060,    // 0x0004 - 0x4000; N * 0.625 msec
 		LEScanWindow:          0x0060,    // 0x0004 - 0x4000; N * 0.625 msec
 		InitiatorFilterPolicy: 0x00,      // White list is not used
@@ -107,7 +107,13 @@ func (bc *realCoreMethods) newLinuxDevice() (ble.Device, error) {
 		MinimumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
 		MaximumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
 	}
-	return linux.NewDevice(ble.OptConnParams(opts))
+	opts := []ble.Option{
+		ble.OptDialerTimeout(timeout),
+		// TODO: do we need this?
+		// ble.OptListenerTimeout(timeout),
+		ble.OptConnParams(connectionOpt),
+	}
+	return linux.NewDevice(opts...)
 }
 
 func isHCIDown() bool {
@@ -116,10 +122,10 @@ func isHCIDown() bool {
 	return strings.Contains(resp, "DOWN")
 }
 
-func (bc *realCoreMethods) SetDefaultDevice() error {
+func (bc *realCoreMethods) SetDefaultDevice(timeout time.Duration) error {
 	return retry(func(attempts int) error {
 		return util.CatchErrs(func() error {
-			device, err := bc.newLinuxDevice()
+			device, err := bc.newLinuxDevice(timeout)
 			if err != nil {
 				if isHCIDown() {
 					forcePanic(errors.Wrap(err, "HCI is DOWN!"))

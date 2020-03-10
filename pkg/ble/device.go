@@ -15,7 +15,7 @@ func (c *RealConnection) resetDevice() error {
 	if err != nil {
 		fmt.Println("Warning: Stop Issue: " + err.Error())
 	}
-	err = c.methods.SetDefaultDevice()
+	err = c.methods.SetDefaultDevice(c.timeout)
 	time.Sleep(setDefaultDeviceDelay)
 	if err != nil {
 		return errors.Wrap(err, "SetDefaultDevice issue")

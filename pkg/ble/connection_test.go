@@ -38,8 +38,8 @@ func (bc *testCoreMethods) filter(fn func(addr string, rssi int)) {
 	}
 }
 
-func (bc *testCoreMethods) Stop() error             { return nil }
-func (bc *testCoreMethods) SetDefaultDevice() error { return nil }
+func (bc *testCoreMethods) Stop() error                          { return nil }
+func (bc *testCoreMethods) SetDefaultDevice(time.Duration) error { return nil }
 func (bc *testCoreMethods) AdvertiseNameAndServices(name string, uuids ...ble.UUID) error {
 	return nil
 }
