@@ -2,6 +2,7 @@ package ble
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/pkg/errors"
@@ -9,15 +10,15 @@ import (
 
 func forcePanic(err error) { panic(errors.New(util.ForcePanicMsgPrefix + err.Error())) }
 
-func retry(fn func(int) error) error {
+func retry(fn func() error) error {
 	err := errors.New("not error")
 	attempts := 0
 	for err != nil && attempts < maxRetryAttempts {
 		if attempts > 0 {
-			fmt.Printf("Error: %s\n Retrying...\n", err.Error())
+			fmt.Printf("Attempt: %d Error: %s\n Retrying...\n", attempts, err.Error())
 		}
 		attempts += 1
-		err = fn(attempts)
+		err = fn()
 	}
 	if err != nil {
 		return errors.Wrap(err, "Exceeded attempts issue: ")
@@ -25,43 +26,17 @@ func retry(fn func(int) error) error {
 	return nil
 }
 
-type retryAndOptimizeError struct {
-	method   string
-	attempt  int
-	doesDial bool
-	original error
-	dial     error
-}
-
-func (err *retryAndOptimizeError) Error() error {
-	original := err.original.Error()
-	const pass = "✔"
-	reconnect := "n/a"
-	if err.dial != nil {
-		reconnect = err.dial.Error()
-	} else if err.doesDial {
-		reconnect = pass
-	}
-	return errors.New(fmt.Sprintf(`
--------
-Method: %s
-Attempt: %d
-Original: %s
-Reconnect: %s
--------`, err.method, err.attempt, original, reconnect))
-}
-
 func retryAndPanic(c *RealConnection, method string, fn func() error, reconnect bool) {
-	err := retry(func(attempts int) error {
-		err := &retryAndOptimizeError{method: method, attempt: attempts}
-		err.original = util.CatchErrs(fn)
-		if err.original == nil {
+	err := retry(func() error {
+		e := util.CatchErrs(fn)
+		if e == nil {
 			return nil
 		}
-		fmt.Println("Reconnecting...")
-		err.doesDial = true
-		c.Dial(c.connectedAddr)
-		return err.Error()
+		if reconnect && strings.Contains(e.Error(), "closed pipe") {
+			fmt.Println("Issue with " + method + " so reconnecting...")
+			c.Dial(c.connectedAddr)
+		}
+		return errors.Wrap(e, method+" issue: ")
 	})
 	if err != nil {
 		forcePanic(err)
