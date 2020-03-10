@@ -96,10 +96,9 @@ func (bc *realCoreMethods) newLinuxDevice(timeout time.Duration) (ble.Device, er
 		MaximumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
 	}
 	opts := []ble.Option{
-		ble.OptDialerTimeout(timeout),
-		// TODO: do we need this?
-		// ble.OptListenerTimeout(timeout),
-		ble.OptConnParams(connectionOpt),
+		ble.OptDialerTimeout(timeout),    // client to server timeout
+		ble.OptListenerTimeout(timeout),  // server accept client timeout
+		ble.OptConnParams(connectionOpt), // read/write options
 	}
 	return linux.NewDevice(opts...)
 }
