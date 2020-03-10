@@ -26,25 +26,17 @@ func retry(fn func(int) error) error {
 }
 
 type retryAndOptimizeError struct {
-	method    string
-	attempt   int
-	doesReset bool
-	doesDial  bool
-	original  error
-	reset     error
-	dial      error
+	method   string
+	attempt  int
+	doesDial bool
+	original error
+	dial     error
 }
 
 func (err *retryAndOptimizeError) Error() error {
 	original := err.original.Error()
 	const pass = "✔"
-	resetDevice := "n/a"
 	reconnect := "n/a"
-	if err.reset != nil {
-		resetDevice = err.reset.Error()
-	} else if err.doesReset {
-		resetDevice = pass
-	}
 	if err.dial != nil {
 		reconnect = err.dial.Error()
 	} else if err.doesDial {
@@ -55,9 +47,8 @@ func (err *retryAndOptimizeError) Error() error {
 Method: %s
 Attempt: %d
 Original: %s
-ResetDevice: %s
 Reconnect: %s
--------`, err.method, err.attempt, original, resetDevice, reconnect))
+-------`, err.method, err.attempt, original, reconnect))
 }
 
 func retryAndPanic(c *RealConnection, method string, fn func() error, reconnect bool) {
@@ -66,11 +57,6 @@ func retryAndPanic(c *RealConnection, method string, fn func() error, reconnect 
 		err.original = util.CatchErrs(fn)
 		if err.original == nil {
 			return nil
-		}
-		err.doesReset = true
-		err.reset = c.resetDevice()
-		if err.reset != nil || !reconnect {
-			return err.Error()
 		}
 		fmt.Println("Reconnecting...")
 		err.doesDial = true

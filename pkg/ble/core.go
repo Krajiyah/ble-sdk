@@ -2,9 +2,6 @@ package ble
 
 import (
 	"context"
-	"fmt"
-	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
@@ -14,12 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	hciResetDelay = 10 * time.Second
-)
-
 type coreMethods interface {
-	Stop() error
 	SetDefaultDevice(time.Duration) error
 	Connect(time.Duration, ble.AdvFilter) (ble.Client, error)
 	Dial(time.Duration, ble.Addr) (ble.Client, error)
@@ -58,16 +50,6 @@ func (bc *realCoreMethods) Scan(ctx context.Context, h ble.AdvHandler, f ble.Adv
 	})
 }
 
-func (bc *realCoreMethods) Stop() error {
-	err := util.CatchErrs(func() error {
-		return ble.Stop()
-	})
-	if err != nil && err.Error() != "default device is not set" {
-		return err
-	}
-	return nil
-}
-
 func (bc *realCoreMethods) AdvertiseNameAndServices(name string, uuids ...ble.UUID) error {
 	return util.CatchErrs(func() error {
 		return ble.AdvertiseNameAndServices(util.MakeINFContext(), name, uuids...)
@@ -102,24 +84,11 @@ func (bc *realCoreMethods) newLinuxDevice(timeout time.Duration) (ble.Device, er
 	return linux.NewDevice(opts...)
 }
 
-func isHCIDown() bool {
-	out, _ := exec.Command("hciconfig").Output()
-	resp := string(out)
-	return strings.Contains(resp, "DOWN")
-}
-
 func (bc *realCoreMethods) SetDefaultDevice(timeout time.Duration) error {
-	return retry(func(attempts int) error {
-		return util.CatchErrs(func() error {
-			device, err := bc.newLinuxDevice(timeout)
-			if err != nil {
-				if isHCIDown() {
-					forcePanic(errors.Wrap(err, "HCI is DOWN!"))
-				}
-				return errors.Wrap(err, fmt.Sprintf("newLinuxDevice issue (tried %d times)", attempts))
-			}
-			ble.SetDefaultDevice(device)
-			return nil
-		})
-	})
+	device, err := bc.newLinuxDevice(timeout)
+	if err != nil {
+		return errors.Wrap(err, "newLinuxDevice issue")
+	}
+	ble.SetDefaultDevice(device)
+	return nil
 }

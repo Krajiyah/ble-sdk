@@ -12,9 +12,7 @@ import (
 )
 
 const (
-	stopDelay             = time.Second * 3
-	setDefaultDeviceDelay = time.Second * 2
-	maxRetryAttempts      = 6
+	maxRetryAttempts = 5
 )
 
 type connectionListener interface {
@@ -43,29 +41,46 @@ type ServiceInfo struct {
 }
 
 type RealConnection struct {
-	srcAddr          string
-	connectedAddr    string
-	rssiMap          *models.RssiMap
-	secret           string
-	cln              ble.Client
-	serviceInfo      *ServiceInfo
-	methods          coreMethods
-	characteristics  map[string]*ble.Characteristic
-	connectionMutex  *sync.Mutex
-	resetDeviceMutex *sync.Mutex
-	listener         connectionListener
-	timeout          time.Duration
+	srcAddr         string
+	connectedAddr   string
+	rssiMap         *models.RssiMap
+	secret          string
+	cln             ble.Client
+	serviceInfo     *ServiceInfo
+	methods         coreMethods
+	characteristics map[string]*ble.Characteristic
+	connectionMutex *sync.Mutex
+	listener        connectionListener
+	timeout         time.Duration
+}
+
+func (c *RealConnection) setupDevice() error {
+	err := c.methods.SetDefaultDevice(c.timeout)
+	if err != nil {
+		return errors.Wrap(err, "SetDefaultDevice issue")
+	}
+	if c.serviceInfo == nil {
+		return nil
+	}
+	err = c.methods.AddService(c.serviceInfo.Service)
+	if err != nil {
+		return err
+	}
+	go func() {
+		c.methods.AdvertiseNameAndServices(c.serviceInfo.ServiceName, c.serviceInfo.UUID)
+	}()
+	return nil
 }
 
 func newRealConnection(addr string, secret string, timeout time.Duration, listener connectionListener, methods coreMethods, serviceInfo *ServiceInfo) (*RealConnection, error) {
 	conn := &RealConnection{
 		srcAddr: addr, rssiMap: models.NewRssiMap(),
-		secret: secret, connectionMutex: &sync.Mutex{}, resetDeviceMutex: &sync.Mutex{},
+		secret: secret, connectionMutex: &sync.Mutex{},
 		methods: methods, characteristics: map[string]*ble.Characteristic{},
 		listener: listener, serviceInfo: serviceInfo,
 		timeout: timeout,
 	}
-	if err := conn.resetDevice(); err != nil {
+	if err := conn.setupDevice(); err != nil {
 		return nil, errors.Wrap(err, "newRealConnection resetDevice issue")
 	}
 	return conn, nil

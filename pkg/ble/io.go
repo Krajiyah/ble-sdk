@@ -24,6 +24,7 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	retryAndOptimizeReadOrWrite(c, "ReadLongCharacteristic", func() error {
 		dat, e := c.cln.ReadLongCharacteristic(char)
 		if e != nil {
+			fmt.Println("Read Issue: " + e.Error())
 			return e
 		}
 		go func() { encDataBuff <- dat }()
