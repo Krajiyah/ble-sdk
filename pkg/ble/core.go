@@ -31,7 +31,7 @@ type coreMethods interface {
 type realCoreMethods struct{}
 
 func (bc *realCoreMethods) Connect(timeout time.Duration, f ble.AdvFilter) (ble.Client, error) {
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), timeout))
 	var client ble.Client
 	err := util.CatchErrs(func() error {
 		c, e := ble.Connect(ctx, f)
@@ -42,7 +42,7 @@ func (bc *realCoreMethods) Connect(timeout time.Duration, f ble.AdvFilter) (ble.
 }
 
 func (bc *realCoreMethods) Dial(timeout time.Duration, addr ble.Addr) (ble.Client, error) {
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), timeout))
 	var client ble.Client
 	err := util.CatchErrs(func() error {
 		c, e := ble.Dial(ctx, addr)

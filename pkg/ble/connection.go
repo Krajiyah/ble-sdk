@@ -114,7 +114,8 @@ func (c *RealConnection) scan(ctx context.Context, handle func(ble.Advertisement
 }
 
 func (c *RealConnection) Scan(handle func(ble.Advertisement)) error {
-	return c.scan(util.MakeINFContext(), handle)
+	ctx := ble.WithSigHandler(util.MakeINFContext(), func() {})
+	return c.scan(ctx, handle)
 }
 
 func (c *RealConnection) CollectAdvs(duration time.Duration) ([]ble.Advertisement, error) {
@@ -133,8 +134,8 @@ func (c *RealConnection) CollectAdvs(duration time.Duration) ([]ble.Advertisemen
 	return ret, nil
 }
 
-func (c *RealConnection) ScanForDuration(duration time.Duration, handle func(ble.Advertisement)) error {
-	ctx, _ := context.WithTimeout(context.Background(), duration)
+func (c *RealConnection) ScanForDuration(timeout time.Duration, handle func(ble.Advertisement)) error {
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), timeout))
 	err := c.scan(ctx, handle)
 	if err != nil && err.Error() == "context deadline exceeded" {
 		err = nil
