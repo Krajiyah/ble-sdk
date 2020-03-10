@@ -21,7 +21,7 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 		return nil, err
 	}
 	encDataBuff := make(chan []byte, 1)
-	retryAndOptimizeReadOrWrite(c, "ReadLongCharacteristic", func() error {
+	retryAndPanic(c, "ReadLongCharacteristic", func() error {
 		dat, e := c.cln.ReadLongCharacteristic(char)
 		if e != nil {
 			fmt.Println("Read Issue: " + e.Error())
@@ -59,7 +59,7 @@ func (c *RealConnection) doWrite(uuid string, data []byte, blocking bool) error 
 		return err
 	}
 	for _, packet := range packets {
-		retryAndOptimizeReadOrWrite(c, "BlockingWriteValue (packet)", func() error {
+		retryAndPanic(c, "WriteCharacteristic", func() error {
 			return c.cln.WriteCharacteristic(char, packet, !blocking)
 		})
 	}

@@ -2,7 +2,6 @@ package ble
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/pkg/errors"
@@ -26,27 +25,15 @@ func retry(fn func() error) error {
 	return nil
 }
 
-func retryAndPanic(c *RealConnection, method string, fn func() error, reconnect bool) {
+func retryAndPanic(c *RealConnection, method string, fn func() error) {
 	err := retry(func() error {
 		e := util.CatchErrs(fn)
 		if e == nil {
 			return nil
-		}
-		if reconnect && strings.Contains(e.Error(), "closed pipe") {
-			fmt.Println("Issue with " + method + " so reconnecting...")
-			c.Dial(c.connectedAddr)
 		}
 		return errors.Wrap(e, method+" issue: ")
 	})
 	if err != nil {
 		forcePanic(err)
 	}
-}
-
-func retryAndOptimizeConnectOrDial(c *RealConnection, method string, fn func() error) {
-	retryAndPanic(c, method, fn, false)
-}
-
-func retryAndOptimizeReadOrWrite(c *RealConnection, method string, fn func() error) {
-	retryAndPanic(c, method, fn, true)
 }

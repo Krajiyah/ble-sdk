@@ -11,7 +11,7 @@ type connnectOrDialHelper func() (ble.Client, string, error)
 func (c *RealConnection) wrapConnectOrDial(fn connnectOrDialHelper) {
 	c.connectionMutex.Lock()
 	defer c.connectionMutex.Unlock()
-	retryAndOptimizeConnectOrDial(c, "ConnectOrDial", func() error {
+	retryAndPanic(c, "ConnectOrDial", func() error {
 		checkAndCancel(c.cln)
 		cln, addr, err := c.initBLEClient(fn)
 		if err != nil {
