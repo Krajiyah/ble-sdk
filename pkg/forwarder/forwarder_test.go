@@ -40,7 +40,7 @@ type dummyClient struct {
 	connection        *TestConnection
 	dummyRssiMap      *RssiMap
 	mockedReadValue   map[string]*bytes.Buffer
-	mockedWriteBuffer chan *writeTuple
+	mockedWriteBuffer map[string]*bytes.Buffer
 }
 
 func (c *dummyClient) ReadValue(uuid string) ([]byte, error) {
@@ -60,7 +60,7 @@ func (c *dummyClient) WriteValue(char string, data []byte, block bool) error {
 		return nil
 	}
 	buf := bytes.NewBuffer(data)
-	go func() { c.mockedWriteBuffer <- &writeTuple{uuid: char, data: buf} }()
+	c.mockedWriteBuffer[char] = buf
 	return nil
 }
 
@@ -84,12 +84,12 @@ type writeTuple struct {
 type testStructs struct {
 	forwarder         *BLEForwarder
 	mockedReadValue   map[string]*bytes.Buffer
-	mockedWriteBuffer chan *writeTuple
+	mockedWriteBuffer map[string]*bytes.Buffer
 }
 
 func getDummyForwarder(t *testing.T, addr string, rssiMap *RssiMap) *testStructs {
 	mockedReadValue := map[string]*bytes.Buffer{}
-	mockedWriteBuffer := make(chan *writeTuple)
+	mockedWriteBuffer := map[string]*bytes.Buffer{}
 	f := newBLEForwarder("some name", addr, testServerAddr, dummyListener{})
 	f.forwardingClient = &dummyClient{addr, NewTestConnection(addr, "empty", rssiMap), rssiMap, mockedReadValue, mockedWriteBuffer}
 	f.forwardingServer = &dummyServer{rssiMap}
@@ -195,12 +195,11 @@ func prepare2ForwarderState(t *testing.T) (*testStructs, *testStructs) {
 	return s1, s2
 }
 
-func getWriteData(t *testing.T, buffer chan *writeTuple, uuid string) []byte {
-	data := <-buffer
-	for data.uuid != uuid {
-		data = <-buffer
-	}
-	return data.data.Bytes()
+func getWriteData(t *testing.T, buffer map[string]*bytes.Buffer, uuid string) []byte {
+	time.Sleep(time.Second * 5)
+	buff, ok := buffer[uuid]
+	assert.Check(t, ok, "Data should be present")
+	return buff.Bytes()
 }
 
 func TestWriteChar(t *testing.T) {

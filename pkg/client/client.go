@@ -57,7 +57,7 @@ func NewBLEClient(name string, addr string, secret string, serverAddr string, ti
 }
 
 func (client *BLEClient) Run() {
-	client.connect()
+	client.connection.Connect(HasMainService)
 	client.status = Connected
 	go client.scanLoop()
 	go client.pingLoop()
@@ -206,14 +206,4 @@ func (client *BLEClient) tryToFindServer() bool {
 		}
 	}
 	return false
-}
-
-func (client *BLEClient) connect() {
-	if client.tryToFindServer() {
-		fmt.Println("Found server! So connecting to it...")
-		client.connection.Dial(client.serverAddr)
-	} else {
-		fmt.Println("Could not find server directly. So now expanding search to include forwarders...")
-		client.connection.Connect(HasMainService)
-	}
 }

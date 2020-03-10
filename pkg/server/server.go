@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -32,21 +31,16 @@ type BLEServer struct {
 	rssiMap         *RssiMap
 	clientStateMap  map[string]BLEClientState
 	buffer          *util.PacketBuffer
-	conn            Connection
 	listener        BLEServerStatusListener
 }
 
-func NewBLEServer(name string, addr string, secret string, timeout time.Duration, hasScanner bool, cListener BLEClientListener, sListener BLEServerStatusListener,
+func NewBLEServer(name string, addr string, secret string, timeout time.Duration, cListener BLEClientListener, sListener BLEServerStatusListener,
 	moreReadChars []*BLEReadCharacteristic, moreWriteChars []*BLEWriteCharacteristic) (*BLEServer, Connection, error) {
 	server := newBLEServer(name, addr, secret, sListener)
 	service := getService(server, moreReadChars, moreWriteChars)
 	conn, err := NewRealConnection(addr, secret, timeout, cListener, &ServiceInfo{Service: service, ServiceName: name, UUID: ble.MustParse(util.MainServiceUUID)})
 	if err != nil {
 		return nil, nil, err
-	}
-	server.conn = conn
-	if hasScanner {
-		go server.scanLoop()
 	}
 	return server, conn, nil
 }
@@ -55,27 +49,13 @@ func newBLEServer(name string, addr string, secret string, listener BLEServerSta
 	return &BLEServer{
 		name, addr, secret, Running,
 		NewConnectionGraph(), NewRssiMap(),
-		map[string]BLEClientState{}, util.NewPacketBuffer(secret), nil, listener,
-	}
-}
-
-func (server *BLEServer) scanLoop() {
-	for {
-		err := server.conn.Scan(func(ble.Advertisement) {})
-		if err != nil {
-			fmt.Println("Server had problem scanning: " + err.Error())
-		}
+		map[string]BLEClientState{}, util.NewPacketBuffer(secret), listener,
 	}
 }
 
 // GetRssiMap returns the current state of the network from server perspective
 func (server *BLEServer) GetRssiMap() *RssiMap {
-	if server.conn == nil {
-		return server.rssiMap
-	}
-	rm := NewRssiMapFromRaw(server.conn.GetRssiMap().GetAll())
-	rm.Merge(server.rssiMap)
-	return rm
+	return server.rssiMap
 }
 
 func (server *BLEServer) GetConnectionGraph() *ConnectionGraph {
