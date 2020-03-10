@@ -210,7 +210,7 @@ func (client *BLEClient) connect() {
 		fmt.Println("Found server! So connecting to it...")
 		client.connection.Dial(client.serverAddr)
 	} else {
-		fmt.Println("Could not find server. So trying to connect to a forwarder...")
+		fmt.Println("Could not find server directly. So now expanding search to include forwarders...")
 		client.connection.Connect(HasMainService)
 	}
 }
