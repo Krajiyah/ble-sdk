@@ -197,7 +197,9 @@ func prepare2ForwarderState(t *testing.T) (*testStructs, *testStructs) {
 
 func getWriteData(t *testing.T, buffer chan *writeTuple, uuid string) []byte {
 	data := <-buffer
-	assert.Equal(t, data.uuid, uuid)
+	for data.uuid == uuid {
+		data = <-buffer
+	}
 	return data.data.Bytes()
 }
 

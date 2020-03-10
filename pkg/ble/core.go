@@ -21,7 +21,6 @@ const (
 type coreMethods interface {
 	Stop() error
 	SetDefaultDevice(time.Duration) error
-	Find(time.Duration, ble.Addr) (bool, error)
 	Connect(time.Duration, ble.AdvFilter) (ble.Client, error)
 	Dial(time.Duration, ble.Addr) (ble.Client, error)
 	Scan(context.Context, ble.AdvHandler, ble.AdvFilter) error
@@ -40,17 +39,6 @@ func (bc *realCoreMethods) Connect(timeout time.Duration, f ble.AdvFilter) (ble.
 		return e
 	})
 	return client, err
-}
-
-func (bc *realCoreMethods) Find(timeout time.Duration, addr ble.Addr) (bool, error) {
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
-	var advs []ble.Advertisement
-	err := util.CatchErrs(func() error {
-		var e error
-		advs, e = ble.Find(ctx, true, func(a ble.Advertisement) bool { return util.AddrEqualAddr(a.Addr().String(), addr.String()) })
-		return e
-	})
-	return len(advs) > 0, err
 }
 
 func (bc *realCoreMethods) Dial(timeout time.Duration, addr ble.Addr) (ble.Client, error) {

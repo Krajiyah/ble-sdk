@@ -27,7 +27,6 @@ type Connection interface {
 	GetRssiMap() *models.RssiMap
 	Connect(ble.AdvFilter)
 	Disconnect() error
-	Find(time.Duration, string) (bool, error)
 	Dial(string)
 	Scan(func(ble.Advertisement)) error
 	ScanForDuration(time.Duration, func(ble.Advertisement)) error
@@ -116,10 +115,6 @@ func (c *RealConnection) scan(ctx context.Context, handle func(ble.Advertisement
 
 func (c *RealConnection) Scan(handle func(ble.Advertisement)) error {
 	return c.scan(util.MakeINFContext(), handle)
-}
-
-func (c *RealConnection) Find(duration time.Duration, addr string) (bool, error) {
-	return c.methods.Find(duration, ble.NewAddr(addr))
 }
 
 func (c *RealConnection) CollectAdvs(duration time.Duration) ([]ble.Advertisement, error) {
