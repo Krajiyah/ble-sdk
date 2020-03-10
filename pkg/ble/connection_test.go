@@ -179,10 +179,14 @@ func TestRead(t *testing.T) {
 	d := newDummyCoreClient()
 	setDummyCoreClient(c, d)
 	expected := []byte("Hello World!")
-	encData, err := util.Encrypt(expected, testSecret)
+	packets, _, err := util.EncodeDataAsPackets(expected, testSecret)
 	assert.NilError(t, err)
 	client := d.(*dummyCoreClient)
-	client.mockedReadCharData.Write(encData)
+	i := 0
+	for i < len(packets) {
+		client.mockedReadCharData.Write(packets[i])
+		i++
+	}
 	actual, err := c.ReadValue(testCharUUID)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, expected, actual)

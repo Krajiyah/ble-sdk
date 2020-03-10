@@ -20,22 +20,22 @@ func (c *RealConnection) ReadValue(uuid string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	encDataBuff := make(chan []byte, 1)
-	retryAndPanic(c, "ReadLongCharacteristic", func() error {
-		dat, e := c.cln.ReadLongCharacteristic(char)
-		if e != nil {
-			fmt.Println("Read Issue: " + e.Error())
-			return e
-		}
-		go func() { encDataBuff <- dat }()
-		return nil
-	})
-	encData := <-encDataBuff
-	close(encDataBuff)
-	if len(encData) == 0 {
-		return nil, errors.New("Received Empty Data")
+	buffer := util.NewPacketBuffer(c.secret)
+	var payload []byte
+	for payload == nil {
+		retryAndPanic(c, "ReadCharacteristic", func() error {
+			packet, err := c.cln.ReadCharacteristic(char)
+			if err != nil {
+				return err
+			}
+			payload, err = buffer.Set(packet)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 	}
-	return util.Decrypt(encData, c.secret)
+	return payload, nil
 }
 
 func (c *RealConnection) prepWriteValue(uuid string, data []byte) (*ble.Characteristic, [][]byte, error) {
@@ -46,7 +46,7 @@ func (c *RealConnection) prepWriteValue(uuid string, data []byte) (*ble.Characte
 	if err != nil {
 		return nil, nil, err
 	}
-	packets, err := util.EncodeDataAsPackets(data, c.secret)
+	packets, _, err := util.EncodeDataAsPackets(data, c.secret)
 	if err != nil {
 		return nil, nil, err
 	}
