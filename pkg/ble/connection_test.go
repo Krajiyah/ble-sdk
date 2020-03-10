@@ -58,6 +58,10 @@ func (bc *testCoreMethods) Scan(_ context.Context, h ble.AdvHandler, _ ble.AdvFi
 	return nil
 }
 
+func (bc *testCoreMethods) Find(_ time.Duration, _ ble.Addr) (bool, error) {
+	return true, nil
+}
+
 type mockConn struct {
 	ctx context.Context
 }

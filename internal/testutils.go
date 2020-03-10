@@ -104,6 +104,9 @@ func (c *TestConnection) Disconnect() error {
 func (c *TestConnection) Dial(a string) {
 	c.connectedAddr = a
 }
+func (c *TestConnection) Find(time.Duration, string) (bool, error) {
+	return true, nil
+}
 func (c *TestConnection) ScanForDuration(time.Duration, func(ble.Advertisement)) error {
 	return nil
 }

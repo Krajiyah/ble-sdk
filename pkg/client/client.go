@@ -197,17 +197,12 @@ func HasMainService(a ble.Advertisement) bool {
 }
 
 func (client *BLEClient) tryToFindServer() bool {
-	advs, err := client.connection.CollectAdvs(lookForServerTime)
+	b, err := client.connection.Find(lookForServerTime, client.serverAddr)
 	if err != nil {
-		fmt.Println("Error collecting advirtisements: " + err.Error())
+		fmt.Println("Error searching for server: " + err.Error())
 		return false
 	}
-	for _, a := range advs {
-		if util.AddrEqualAddr(a.Addr().String(), client.serverAddr) {
-			return true
-		}
-	}
-	return false
+	return b
 }
 
 func (client *BLEClient) connect() {
