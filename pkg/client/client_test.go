@@ -106,7 +106,7 @@ func TestRun(t *testing.T) {
 	connection := setServerConnection()
 	client := getTestClient(t, connection)
 	client.Run()
-	time.Sleep(afterConnectionDelay)
+	time.Sleep(time.Second * 2)
 	ts := mockUnixTS(connection.GetMockedReadBuffer(util.TimeSyncUUID))
 	time.Sleep(PingInterval + (PingInterval / 4))
 	actual, err := client.UnixTS()

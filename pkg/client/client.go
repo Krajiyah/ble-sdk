@@ -14,11 +14,10 @@ import (
 )
 
 const (
-	ScanInterval         = time.Millisecond * 500
-	PingInterval         = time.Second * 1
-	ForwardedReadDelay   = time.Millisecond * 500
-	afterConnectionDelay = time.Millisecond * 250
-	lookForServerTime    = time.Minute * 2
+	ScanInterval       = time.Millisecond * 500
+	PingInterval       = time.Second * 1
+	ForwardedReadDelay = time.Millisecond * 500
+	lookForServerTime  = time.Minute * 2
 )
 
 type Client interface {
@@ -60,7 +59,6 @@ func NewBLEClient(name string, addr string, secret string, serverAddr string, ti
 func (client *BLEClient) Run() {
 	client.connect()
 	client.status = Connected
-	time.Sleep(afterConnectionDelay)
 	go client.scanLoop()
 	go client.pingLoop()
 }
