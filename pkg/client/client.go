@@ -18,7 +18,7 @@ const (
 	PingInterval         = time.Second * 1
 	ForwardedReadDelay   = time.Millisecond * 500
 	afterConnectionDelay = time.Millisecond * 250
-	lookForServerTime    = time.Minute
+	lookForServerTime    = time.Minute * 2
 )
 
 type Client interface {
