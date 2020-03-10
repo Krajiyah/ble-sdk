@@ -25,7 +25,7 @@ const (
 	testAddr2               = "44:22:33:44:55:66"
 	testSecret              = "passwd123"
 	testServerAddr          = "22:22:33:44:55:66"
-	waitForNonBlockingWrite = time.Second * 2
+	waitForNonBlockingWrite = time.Second * 3
 )
 
 type dummyListener struct{}

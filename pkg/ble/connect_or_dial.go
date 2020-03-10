@@ -60,8 +60,11 @@ func (c *RealConnection) completeBLEClient(cln ble.Client, addr string) error {
 	})
 }
 
-func checkAndCancel(cln ble.Client) {
-	if cln != nil {
-		cln.CancelConnection()
+func checkAndCancel(cln ble.Client) error {
+	if cln == nil {
+		return nil
 	}
+	return cln.CancelConnection()
 }
+
+func (c *RealConnection) Disconnect() error { return checkAndCancel(c.cln) }

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"time"
 
@@ -76,8 +75,6 @@ func NewTestConnection(addr string, toConnectAddr string, rm *models.RssiMap) *T
 	return &TestConnection{toConnectAddr: toConnectAddr, srcAddr: addr, rssiMap: rm, mockedReadValue: map[string]*bytes.Buffer{}, mockedWriteValue: map[string]*bytes.Buffer{}}
 }
 
-func (c *TestConnection) Context() context.Context { return context.TODO() }
-
 func (c *TestConnection) SetToConnectAddr(addr string) { c.toConnectAddr = addr }
 
 func (c *TestConnection) SetConnectedAddr(addr string) { c.connectedAddr = addr }
@@ -99,6 +96,10 @@ func (c *TestConnection) GetConnectedAddr() string    { return c.connectedAddr }
 func (c *TestConnection) GetRssiMap() *models.RssiMap { return c.rssiMap }
 func (c *TestConnection) Connect(ble.AdvFilter) {
 	c.connectedAddr = c.toConnectAddr
+}
+func (c *TestConnection) Disconnect() error {
+	c.connectedAddr = ""
+	return nil
 }
 func (c *TestConnection) Dial(a string) {
 	c.connectedAddr = a

@@ -26,6 +26,7 @@ type Connection interface {
 	GetConnectedAddr() string
 	GetRssiMap() *models.RssiMap
 	Connect(ble.AdvFilter)
+	Disconnect() error
 	Dial(string)
 	Scan(func(ble.Advertisement)) error
 	ScanForDuration(time.Duration, func(ble.Advertisement)) error
