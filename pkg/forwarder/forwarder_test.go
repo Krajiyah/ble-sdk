@@ -29,11 +29,10 @@ const (
 
 type dummyListener struct{}
 
-func (l dummyListener) OnServerStatusChanged(models.BLEServerStatus, error) {}
-func (l dummyListener) OnInternalError(error)                               {}
-func (l dummyListener) OnConnected(string)                                  {}
-func (l dummyListener) OnDisconnected()                                     {}
-func (l dummyListener) OnTimeSync()                                         {}
+func (l dummyListener) OnInternalError(error) {}
+func (l dummyListener) OnConnected(string)    {}
+func (l dummyListener) OnDisconnected()       {}
+func (l dummyListener) OnTimeSync()           {}
 
 type dummyClient struct {
 	addr              string

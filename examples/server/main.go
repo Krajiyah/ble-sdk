@@ -23,9 +23,6 @@ var BLESecret string
 
 type myServerListener struct{}
 
-func (l myServerListener) OnServerStatusChanged(s models.BLEServerStatus, err error) {
-	fmt.Println(fmt.Sprintf("Server status changed: %s, Error: %s", s, err))
-}
 func (l myServerListener) OnClientStateMapChanged(c *models.ConnectionGraph, r *models.RssiMap, m map[string]models.BLEClientState) {
 	fmt.Println(fmt.Sprintf("Client status changed: %+v, %+v, %+v", c, r, m))
 }

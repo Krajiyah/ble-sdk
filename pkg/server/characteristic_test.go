@@ -50,7 +50,6 @@ func (rw *mockRspWriter) Cap() int                      { return rw.buff.Cap() }
 
 type testBlankListener struct{}
 
-func (l testBlankListener) OnServerStatusChanged(s BLEServerStatus, err error) {}
 func (l testBlankListener) OnClientStateMapChanged(c *ConnectionGraph, r *RssiMap, m map[string]BLEClientState) {
 }
 func (l testBlankListener) OnClientLog(r ClientLogRequest) {}
@@ -58,7 +57,7 @@ func (l testBlankListener) OnInternalError(err error)      {}
 
 func getDummyServer() *BLEServer {
 	secret := "passwd123"
-	return &BLEServer{"SomeName", "someAddr", secret, Running, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, util.NewPacketBuffer(secret), testBlankListener{}}
+	return &BLEServer{"SomeName", "someAddr", secret, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, util.NewPacketBuffer(secret), testBlankListener{}}
 }
 
 func getMockReq(data []byte) ble.Request {

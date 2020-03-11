@@ -63,9 +63,6 @@ func (l *forwarderServerListener) OnClientStateMapChanged(*models.ConnectionGrap
 }
 func (l *forwarderServerListener) OnClientLog(models.ClientLogRequest) {}
 func (l *forwarderServerListener) OnInternalError(err error)           { l.listener.OnInternalError(err) }
-func (l *forwarderServerListener) OnServerStatusChanged(s models.BLEServerStatus, err error) {
-	l.listener.OnServerStatusChanged(s, err)
-}
 
 func NewBLEForwarder(name string, addr string, secret string, serverAddr string, timeout time.Duration, listener models.BLEForwarderListener) (*BLEForwarder, error) {
 	f := newBLEForwarder(name, addr, serverAddr, listener)

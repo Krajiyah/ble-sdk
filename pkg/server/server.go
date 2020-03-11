@@ -26,7 +26,6 @@ type BLEServer struct {
 	name            string
 	addr            string
 	secret          string
-	status          BLEServerStatus
 	connectionGraph *ConnectionGraph
 	rssiMap         *RssiMap
 	clientStateMap  map[string]BLEClientState
@@ -47,7 +46,7 @@ func NewBLEServer(name string, addr string, secret string, timeout time.Duration
 
 func newBLEServer(name string, addr string, secret string, listener BLEServerStatusListener) *BLEServer {
 	return &BLEServer{
-		name, addr, secret, Running,
+		name, addr, secret,
 		NewConnectionGraph(), NewRssiMap(),
 		map[string]BLEClientState{}, util.NewPacketBuffer(secret), listener,
 	}
@@ -60,11 +59,6 @@ func (server *BLEServer) GetRssiMap() *RssiMap {
 
 func (server *BLEServer) GetConnectionGraph() *ConnectionGraph {
 	return server.connectionGraph
-}
-
-func (server *BLEServer) setStatus(status BLEServerStatus, err error) {
-	server.status = status
-	server.listener.OnServerStatusChanged(status, err)
 }
 
 func (server *BLEServer) setClientState(addr string, state BLEClientState) {

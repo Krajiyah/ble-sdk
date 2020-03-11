@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"testing"
 	"time"
@@ -12,20 +11,16 @@ import (
 	"gotest.tools/assert"
 )
 
-var errs []error
 var state map[string]BLEClientState
 var logs []ClientLogRequest
 
 type testBLEServerStatusListener struct{}
 
-func (l testBLEServerStatusListener) OnServerStatusChanged(s BLEServerStatus, err error) {
-	errs = append(errs, err)
-}
 func (l testBLEServerStatusListener) OnClientStateMapChanged(c *ConnectionGraph, r *RssiMap, m map[string]BLEClientState) {
 	state = m
 }
 func (l testBLEServerStatusListener) OnClientLog(r ClientLogRequest) { logs = append(logs, r) }
-func (l testBLEServerStatusListener) OnInternalError(err error)      { errs = append(errs, err) }
+func (l testBLEServerStatusListener) OnInternalError(err error)      {}
 
 func assertSimilar(t *testing.T, x int64, y int64) {
 	diff := x - y
@@ -48,7 +43,6 @@ func dummyWriteChar() *BLEWriteCharacteristic {
 }
 
 func beforeEach() {
-	errs = []error{}
 	state = map[string]BLEClientState{}
 	logs = []ClientLogRequest{}
 }
@@ -56,11 +50,6 @@ func beforeEach() {
 func TestStatusSetters(t *testing.T) {
 	beforeEach()
 	server := getTestServer()
-	expected := errors.New("test error")
-	server.setStatus(Crashed, expected)
-	assert.Equal(t, server.status, Crashed)
-	assert.Equal(t, len(errs), 1)
-	assert.DeepEqual(t, errs[0].Error(), expected.Error())
 	addr := "someaddr"
 	expectedRM := map[string]map[string]int{"A": map[string]int{"B": -90}}
 	s := BLEClientState{Name: "someName", Status: Connected, RssiMap: expectedRM, ConnectedAddr: addr}

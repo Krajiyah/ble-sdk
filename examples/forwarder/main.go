@@ -21,7 +21,6 @@ var (
 
 type myListener struct{}
 
-func (l myListener) OnServerStatusChanged(s models.BLEServerStatus, err error)  {}
 func (l myListener) OnClientStateMapChanged(m map[string]models.BLEClientState) {}
 func (l myListener) OnClientLog(r models.ClientLogRequest)                      {}
 func (l myListener) OnInternalError(err error)                                  {}

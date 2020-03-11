@@ -8,7 +8,6 @@ type BLEClientListener interface {
 }
 
 type BLEServerStatusListener interface {
-	OnServerStatusChanged(BLEServerStatus, error)
 	OnClientStateMapChanged(*ConnectionGraph, *RssiMap, map[string]BLEClientState)
 	OnClientLog(ClientLogRequest)
 	OnInternalError(error)
@@ -19,5 +18,4 @@ type BLEForwarderListener interface {
 	OnDisconnected()
 	OnTimeSync()
 	OnInternalError(error)
-	OnServerStatusChanged(BLEServerStatus, error)
 }
