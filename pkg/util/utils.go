@@ -52,7 +52,3 @@ func CatchErrs(fn func() error) error {
 	}.Do()
 	return err
 }
-
-func Optimize(fn func() error, timeout time.Duration) error {
-	return Timeout(func() error { return CatchErrs(fn) }, timeout)
-}

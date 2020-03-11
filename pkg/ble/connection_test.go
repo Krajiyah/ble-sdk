@@ -38,17 +38,17 @@ func (bc *testCoreMethods) filter(fn func(addr string, rssi int)) {
 	}
 }
 
-func (bc *testCoreMethods) Stop() error             { return nil }
-func (bc *testCoreMethods) SetDefaultDevice() error { return nil }
-func (bc *testCoreMethods) AdvertiseNameAndServices(ctx context.Context, name string, uuids ...ble.UUID) error {
+func (bc *testCoreMethods) Stop() error                          { return nil }
+func (bc *testCoreMethods) SetDefaultDevice(time.Duration) error { return nil }
+func (bc *testCoreMethods) AdvertiseNameAndServices(name string, uuids ...ble.UUID) error {
 	return nil
 }
 func (bc *testCoreMethods) AddService(s *ble.Service) error { return nil }
-func (bc *testCoreMethods) Dial(_ context.Context, a ble.Addr) (ble.Client, error) {
+func (bc *testCoreMethods) Dial(_ time.Duration, a ble.Addr) (ble.Client, error) {
 	return newDummyCoreClient(), nil
 }
 
-func (bc *testCoreMethods) Connect(_ context.Context, f ble.AdvFilter) (ble.Client, error) {
+func (bc *testCoreMethods) Connect(_ time.Duration, f ble.AdvFilter) (ble.Client, error) {
 	bc.filter(func(addr string, rssi int) { f(DummyAdv{DummyAddr{addr}, rssi, false}) })
 	return newDummyCoreClient(), nil
 }
@@ -142,7 +142,7 @@ func setCharacteristic(c *RealConnection, uuid string) {
 }
 
 func setDummyCoreClient(c *RealConnection, d ble.Client) {
-	c.cln = &clnWrapper{cln: d, guid: "someGUID"}
+	c.cln = d
 }
 
 func newConnection(t *testing.T) *RealConnection {
@@ -179,10 +179,14 @@ func TestRead(t *testing.T) {
 	d := newDummyCoreClient()
 	setDummyCoreClient(c, d)
 	expected := []byte("Hello World!")
-	encData, err := util.Encrypt(expected, testSecret)
+	packets, _, err := util.EncodeDataAsPackets(expected, testSecret)
 	assert.NilError(t, err)
 	client := d.(*dummyCoreClient)
-	client.mockedReadCharData.Write(encData)
+	i := 0
+	for i < len(packets) {
+		client.mockedReadCharData.Write(packets[i])
+		i++
+	}
 	actual, err := c.ReadValue(testCharUUID)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, expected, actual)

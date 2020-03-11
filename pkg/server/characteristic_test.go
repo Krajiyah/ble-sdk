@@ -58,7 +58,7 @@ func (l testBlankListener) OnInternalError(err error)      {}
 
 func getDummyServer() *BLEServer {
 	secret := "passwd123"
-	return &BLEServer{"SomeName", "someAddr", secret, Running, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, util.NewPacketBuffer(secret), nil, testBlankListener{}}
+	return &BLEServer{"SomeName", "someAddr", secret, Running, NewConnectionGraph(), NewRssiMap(), map[string]BLEClientState{}, util.NewPacketBuffer(secret), testBlankListener{}}
 }
 
 func getMockReq(data []byte) ble.Request {
@@ -72,7 +72,7 @@ func getMockRsp(data []byte) *mockRspWriter {
 func TestWriteHandler(t *testing.T) {
 	server := getDummyServer()
 	expected := []byte("Hello World!")
-	packets, err := util.EncodeDataAsPackets(expected, server.secret)
+	packets, _, err := util.EncodeDataAsPackets(expected, server.secret)
 	assert.NilError(t, err)
 	callCount := 0
 	handler := generateWriteHandler(server, util.MainServiceUUID, func(addr string, actual []byte, err error) {
@@ -103,7 +103,10 @@ func TestReadHandler(t *testing.T) {
 	// test read handler behavior
 	handler(req, rsp)
 
-	actual, err := util.Decrypt(rsp.ReadAll(), server.secret)
+	// mock client read and decrypt
+	packet := rsp.ReadAll()
+	buffer := util.NewPacketBuffer(server.secret)
+	actual, err := buffer.Set(packet)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, actual, expected)
 }

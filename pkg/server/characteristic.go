@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/Krajiyah/ble-sdk/pkg/util"
 	"github.com/go-ble/ble"
+
+	"github.com/pkg/errors"
 )
 
 // BLEReadCharacteristic is a struct representation of characteristic that can handle read operations from clients
@@ -55,24 +57,65 @@ func generateWriteHandler(server *BLEServer, uuid string, onWrite func(addr stri
 	}
 }
 
-func generateReadHandler(server *BLEServer, uuid string, load func(string, context.Context) ([]byte, error)) func(req ble.Request, rsp ble.ResponseWriter) {
+func getSessionKey(uuid string, addr string) string {
+	return fmt.Sprintf("session || %s || %s", uuid, addr)
+}
+
+type loadFn func(string, context.Context) ([]byte, error)
+
+func loadIntoBuffer(buffer *util.PacketBuffer, req ble.Request, uuid string, secret string, load loadFn) (string, error) {
+	addr := getAddrFromReq(req)
+	session := getSessionKey(uuid, addr)
+	ctx := req.Conn().Context()
+	data, err := load(addr, ctx)
+	if err != nil {
+		return "", err
+	}
+	if data == nil || len(data) == 0 {
+		return "", errors.New("empty data returned from read char loader")
+	}
+	var packets [][]byte
+	packets, guid, err := util.EncodeDataAsPackets(data, secret)
+	if err != nil {
+		return "", err
+	}
+	err = buffer.SetAll(packets)
+	if err != nil {
+		return "", err
+	}
+	ctx = context.WithValue(ctx, session, guid)
+	req.Conn().SetContext(ctx)
+	return guid, nil
+}
+
+func generateReadHandler(server *BLEServer, uuid string, load loadFn) func(req ble.Request, rsp ble.ResponseWriter) {
+	buffer := util.NewPacketBuffer(server.secret)
 	return func(req ble.Request, rsp ble.ResponseWriter) {
 		addr := getAddrFromReq(req)
-		data, err := load(addr, req.Conn().Context())
+		session := getSessionKey(uuid, addr)
+		ctx := req.Conn().Context()
+		var guid string
+		if ctx.Value(session) != nil {
+			guid = ctx.Value(session).(string)
+		} else {
+			var err error
+			guid, err = loadIntoBuffer(buffer, req, uuid, server.secret, load)
+			if err != nil {
+				server.listener.OnInternalError(errors.Wrap(err, "loadIntoBuffer issue: "))
+				return
+			}
+			ctx = req.Conn().Context()
+		}
+		packet, last, err := buffer.Pop(guid)
 		if err != nil {
-			server.listener.OnInternalError(err)
+			server.listener.OnInternalError(errors.Wrap(err, "buffer.Pop issue: "))
 			return
 		}
-		if data == nil || len(data) == 0 {
-			server.listener.OnInternalError(errors.New("empty data returned from read char loader"))
-			return
+		if last {
+			ctx = context.WithValue(ctx, session, nil)
+			req.Conn().SetContext(ctx)
 		}
-		encryptedData, err := util.Encrypt(data, server.secret)
-		if err != nil {
-			server.listener.OnInternalError(err)
-			return
-		}
-		rsp.Write(encryptedData)
+		rsp.Write(packet)
 	}
 }
 

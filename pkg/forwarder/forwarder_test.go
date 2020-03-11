@@ -19,13 +19,12 @@ import (
 )
 
 const (
-	clientAddr              = "33:22:33:44:55:66"
-	testServerName          = "Some Name"
-	testAddr                = "11:22:33:44:55:66"
-	testAddr2               = "44:22:33:44:55:66"
-	testSecret              = "passwd123"
-	testServerAddr          = "22:22:33:44:55:66"
-	waitForNonBlockingWrite = time.Second
+	clientAddr     = "33:22:33:44:55:66"
+	testServerName = "Some Name"
+	testAddr       = "11:22:33:44:55:66"
+	testAddr2      = "44:22:33:44:55:66"
+	testSecret     = "passwd123"
+	testServerAddr = "22:22:33:44:55:66"
 )
 
 type dummyListener struct{}
@@ -57,6 +56,9 @@ func (c *dummyClient) GetConnection() ble.Connection {
 }
 
 func (c *dummyClient) WriteValue(char string, data []byte, block bool) error {
+	if char == util.ClientStateUUID {
+		return nil
+	}
 	buf := bytes.NewBuffer(data)
 	c.mockedWriteBuffer[char] = buf
 	return nil
@@ -73,6 +75,11 @@ type dummyServer struct {
 func (s *dummyServer) GetRssiMap() *RssiMap                 { return s.rssiMap }
 func (s *dummyServer) GetConnectionGraph() *ConnectionGraph { return NewConnectionGraph() }
 func (s *dummyServer) Run() error                           { return nil }
+
+type writeTuple struct {
+	uuid string
+	data *bytes.Buffer
+}
 
 type testStructs struct {
 	forwarder         *BLEForwarder
@@ -188,6 +195,13 @@ func prepare2ForwarderState(t *testing.T) (*testStructs, *testStructs) {
 	return s1, s2
 }
 
+func getWriteData(t *testing.T, buffer map[string]*bytes.Buffer, uuid string) []byte {
+	time.Sleep(time.Second * 5)
+	buff, ok := buffer[uuid]
+	assert.Check(t, ok, "Data should be present")
+	return buff.Bytes()
+}
+
 func TestWriteChar(t *testing.T) {
 	s1, s2 := prepare2ForwarderState(t)
 	f1, _, mockedWriteBuffer1 := s1.forwarder, s1.mockedReadValue, s1.mockedWriteBuffer
@@ -207,16 +221,14 @@ func TestWriteChar(t *testing.T) {
 	_, writeChars1 := getChars(f1)
 	char1 := writeChars1[0]
 	char1.HandleWrite(clientAddr, data, nil)
-	time.Sleep(waitForNonBlockingWrite)
-	bufferData1 := mockedWriteBuffer1[util.WriteForwardCharUUID].Bytes()
+	bufferData1 := getWriteData(t, mockedWriteBuffer1, util.WriteForwardCharUUID)
 	assert.DeepEqual(t, bufferData1, data)
 
 	// mimic 2nd forwarder passing on data to server and unpacking forwarder request
 	_, writeChars2 := getChars(f2)
 	char2 := writeChars2[0]
 	char2.HandleWrite(testAddr, data, nil)
-	time.Sleep(waitForNonBlockingWrite)
-	bufferData2 := mockedWriteBuffer2[util.ClientLogUUID].Bytes()
+	bufferData2 := getWriteData(t, mockedWriteBuffer2, util.ClientLogUUID)
 	assert.DeepEqual(t, bufferData2, logData)
 }
 
@@ -236,8 +248,7 @@ func TestStartEndReadChars(t *testing.T) {
 	readChars1, writeChars1 := getChars(f1)
 	writeChar1 := writeChars1[1]
 	writeChar1.HandleWrite(clientAddr, data, nil)
-	time.Sleep(waitForNonBlockingWrite)
-	bufferData1 := mockedWriteBuffer1[util.StartReadForwardCharUUID].Bytes()
+	bufferData1 := getWriteData(t, mockedWriteBuffer1, util.StartReadForwardCharUUID)
 	assert.Check(t, !f1.isConnectedToServer(), "F1 should not be connected to server")
 	assert.DeepEqual(t, bufferData1, data)
 
@@ -251,6 +262,7 @@ func TestStartEndReadChars(t *testing.T) {
 	ts := []byte(strconv.FormatInt(util.UnixTS(), 10))
 	mockedReadValue1[util.EndReadForwardCharUUID] = bytes.NewBuffer(ts)
 	readChar1 := readChars1[0]
+	time.Sleep(client.ForwardedReadDelay)
 	data, err = readChar1.HandleRead(clientAddr, context.Background())
 	assert.NilError(t, err)
 	assert.DeepEqual(t, data, ts)
