@@ -32,6 +32,7 @@ type BLEForwarder struct {
 	connectionGraph   *models.ConnectionGraph
 	readCharUUIDMutex *sync.Mutex
 	readCharUUID      string
+	updateMutex       *sync.Mutex
 	listener          models.BLEForwarderListener
 	ctx               context.Context
 }
@@ -40,7 +41,7 @@ func newBLEForwarder(name, addr, serverAddr string, listener models.BLEForwarder
 	return &BLEForwarder{
 		name, addr, nil, nil,
 		serverAddr, "", models.NewRssiMap(), models.NewConnectionGraph(),
-		&sync.Mutex{}, "",
+		&sync.Mutex{}, "", &sync.Mutex{},
 		listener, context.Background(),
 	}
 }
@@ -144,6 +145,8 @@ func (forwarder *BLEForwarder) onScanned(a ble.Advertisement) error {
 	if !client.HasMainService(a) {
 		return nil
 	}
+	forwarder.updateMutex.Lock()
+	defer forwarder.updateMutex.Unlock()
 	forwarder.connect(addr)
 	var err error
 	if util.AddrEqualAddr(addr, forwarder.serverAddr) {
@@ -244,6 +247,10 @@ func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic
 			forwarder.listener.OnInternalError(err)
 			return
 		}
+		fmt.Println("waiting for lock release")
+		forwarder.updateMutex.Lock() // prevent connection changes to occur from run loop
+		fmt.Println("lock released!")
+		defer forwarder.updateMutex.Unlock()
 		if !forwarder.isConnected() {
 			forwarder.listener.OnInternalError(errors.New(errNotConnected))
 			return
@@ -271,6 +278,8 @@ func newStartReadForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteri
 			forwarder.listener.OnInternalError(err)
 			return
 		}
+		forwarder.updateMutex.Lock() // prevent connection changes to occur from run loop
+		// unlock for update mutex will happen in end read
 		if !forwarder.isConnected() {
 			forwarder.listener.OnInternalError(errors.New(errNotConnected))
 			return
@@ -302,6 +311,7 @@ func newEndReadForwardChar(forwarder *BLEForwarder) *server.BLEReadCharacteristi
 		if !forwarder.isConnected() {
 			return nil, errors.New(errNotConnected)
 		}
+		defer forwarder.updateMutex.Unlock()
 		if !forwarder.isConnectedToServer() {
 			return forwarder.forwardingClient.ReadValue(util.EndReadForwardCharUUID)
 		}
