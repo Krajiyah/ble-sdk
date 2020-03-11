@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	ScanInterval       = time.Millisecond * 500
-	PingInterval       = time.Second * 1
-	ForwardedReadDelay = time.Millisecond * 500
+	ScanInterval       = time.Second
+	PingInterval       = time.Second
+	ForwardedReadDelay = time.Second
 	lookForServerTime  = time.Minute * 2
 )
 
