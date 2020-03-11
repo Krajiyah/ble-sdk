@@ -247,14 +247,11 @@ func newWriteForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteristic
 			forwarder.listener.OnInternalError(err)
 			return
 		}
-		fmt.Println("waiting for lock release")
-		forwarder.updateMutex.Lock() // prevent connection changes to occur from run loop
-		fmt.Println("lock released!")
-		defer forwarder.updateMutex.Unlock()
-		if !forwarder.isConnected() {
-			forwarder.listener.OnInternalError(errors.New(errNotConnected))
-			return
+		for !forwarder.isConnected() {
+			// wait for forwarder to be connected
 		}
+		forwarder.updateMutex.Lock() // prevent connection changes to occur from run loop
+		defer forwarder.updateMutex.Unlock()
 		if !forwarder.isConnectedToServer() {
 			forwarder.forwardingClient.WriteValue(util.WriteForwardCharUUID, data, false)
 		} else {
@@ -278,12 +275,11 @@ func newStartReadForwardChar(forwarder *BLEForwarder) *server.BLEWriteCharacteri
 			forwarder.listener.OnInternalError(err)
 			return
 		}
+		for !forwarder.isConnected() {
+			// wait for forwarder to be connected
+		}
 		forwarder.updateMutex.Lock() // prevent connection changes to occur from run loop
 		// unlock for update mutex will happen in end read
-		if !forwarder.isConnected() {
-			forwarder.listener.OnInternalError(errors.New(errNotConnected))
-			return
-		}
 		if !forwarder.isConnectedToServer() {
 			err := forwarder.forwardingClient.WriteValue(util.StartReadForwardCharUUID, data, true)
 			if err != nil {
