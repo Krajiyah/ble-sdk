@@ -16,7 +16,7 @@ import (
 const (
 	ScanInterval       = time.Second
 	PingInterval       = time.Second
-	ForwardedReadDelay = time.Second
+	ForwardedReadDelay = time.Second * 15 // TODO: performance test this
 	lookForServerTime  = time.Minute * 2
 )
 
