@@ -9,7 +9,6 @@ require (
 	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/pkg/errors v0.9.1
-	golang.org/x/net v0.0.0-20200225223329-5d076fcf07a8
-	golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae // indirect
+	golang.org/x/net v0.7.0
 	gotest.tools v2.2.0+incompatible
 )
